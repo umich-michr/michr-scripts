@@ -1,0 +1,262 @@
+# ===========================================================================
+# Continuous integration
+#
+# Failures are reported as inline annotations on the changed lines, plus a
+# coverage table and test summary on the run page. GitHub emails the commit
+# author and repository watchers when a run fails.
+#
+# The same commands are available locally through the Makefile:
+#     make check
+# ===========================================================================
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Cancel a superseded run when new commits land on the same branch.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  checks: write         # publish annotations
+  pull-requests: write  # annotate the pull request diff
+
+env:
+  PYTHONDONTWRITEBYTECODE: "1"
+  FORCE_COLOR: "1"
+
+jobs:
+  # -------------------------------------------------------------------------
+  # Lint, format, types, security
+  # -------------------------------------------------------------------------
+  quality:
+    name: Lint, type check, and audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Set up Python
+        run: uv python install
+
+      # --locked fails if uv.lock is out of date with pyproject.toml, so a
+      # forgotten "uv lock" cannot slip through.
+      - name: Install dependencies
+        run: uv sync --locked --all-extras
+
+      - name: Ruff format check
+        run: uv run ruff format --check --diff src tests
+
+      # Ruff emits GitHub annotation syntax natively.
+      - name: Ruff lint
+        if: always()
+        run: uv run ruff check --output-format=github src tests
+
+      # mypy has no GitHub output format, so its file:line:col messages are
+      # rewritten as annotations. --no-pretty is required because the pretty
+      # renderer wraps messages across multiple lines.
+      - name: mypy (strict)
+        if: always()
+        run: |
+          set -o pipefail
+          uv run mypy --no-pretty --no-color-output 2>&1 | tee mypy.log | \
+          sed -E 's/^([^:]+):([0-9]+):([0-9]+): (error|note): (.*)$/::\4 file=\1,line=\2,col=\3::\5/' || true
+          if grep -qE '^[^:]+:[0-9]+:[0-9]+: error:' mypy.log; then
+            echo "::error::mypy reported type errors. See the annotations above."
+            exit 1
+          fi
+
+      - name: Dependency vulnerability audit
+        if: always()
+        run: uv run pip-audit --strict --progress-spinner=off
+
+      - name: Source security scan
+        if: always()
+        run: uv run bandit --configfile pyproject.toml --recursive src --quiet
+
+  # -------------------------------------------------------------------------
+  # Tests and coverage
+  # -------------------------------------------------------------------------
+  test:
+    name: Tests and coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Set up Python
+        run: uv python install
+
+      - name: Install dependencies
+        run: uv sync --locked --all-extras
+
+      # pytest-github-actions-annotate-failures turns each failing assertion
+      # into an annotation pinned to the failing line. Ordering is fixed here
+      # so a CI failure reproduces locally with the identical command.
+      - name: Run tests with coverage
+        run: |
+          uv run pytest \
+            -p no:randomly \
+            --cov \
+            --cov-report=term-missing:skip-covered \
+            --cov-report=xml \
+            --junitxml=reports/junit.xml
+
+      # Coverage table on the run page. Runs even when tests fail so partial
+      # coverage remains visible.
+      - name: Coverage summary
+        if: always()
+        run: |
+          if [ ! -f reports/coverage.xml ]; then
+            echo "No coverage report was produced." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          uv run python - <<'PYTHON' >> "$GITHUB_STEP_SUMMARY"
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+
+          root = ET.parse(Path("reports/coverage.xml")).getroot()
+
+          line_rate = float(root.get("line-rate", 0.0)) * 100
+          branch_rate = float(root.get("branch-rate", 0.0)) * 100
+
+          print("## Coverage\n")
+          print(f"**Lines {line_rate:.2f}% · Branches {branch_rate:.2f}%**\n")
+          print("| Module | Lines | Branches | Missing |")
+          print("|---|---:|---:|---|")
+
+          rows = []
+          for cls in root.iter("class"):
+              filename = cls.get("filename", "")
+              module_lines = float(cls.get("line-rate", 0.0)) * 100
+              module_branches = float(cls.get("branch-rate", 0.0)) * 100
+
+              missing = sorted(
+                  int(line.get("number", 0))
+                  for line in cls.iter("line")
+                  if line.get("hits") == "0"
+              )
+
+              # Collapse consecutive line numbers into ranges.
+              ranges: list[str] = []
+              for number in missing:
+                  if ranges and number == int(ranges[-1].split("-")[-1]) + 1:
+                      start = ranges[-1].split("-")[0]
+                      ranges[-1] = f"{start}-{number}"
+                  else:
+                      ranges.append(str(number))
+
+              summary = ", ".join(ranges[:8])
+              if len(ranges) > 8:
+                  summary += f", +{len(ranges) - 8} more"
+
+              rows.append((module_lines, filename, module_branches, summary))
+
+          # Least-covered modules first: that is where attention is needed.
+          for module_lines, filename, module_branches, summary in sorted(rows):
+              print(
+                  f"| `{filename}` | {module_lines:.1f}% "
+                  f"| {module_branches:.1f}% | {summary or '—'} |"
+              )
+          PYTHON
+
+      # Test counts and the name of every failure, on the run page.
+      - name: Test result summary
+        if: always()
+        run: |
+          if [ ! -f reports/junit.xml ]; then
+            exit 0
+          fi
+
+          uv run python - <<'PYTHON' >> "$GITHUB_STEP_SUMMARY"
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+
+          root = ET.parse(Path("reports/junit.xml")).getroot()
+          suite = root.find("testsuite") if root.tag == "testsuites" else root
+          if suite is None:
+              raise SystemExit(0)
+
+          total = int(suite.get("tests", 0))
+          failures = int(suite.get("failures", 0))
+          errors = int(suite.get("errors", 0))
+          skipped = int(suite.get("skipped", 0))
+          passed = total - failures - errors - skipped
+
+          status = "Passed" if failures == 0 and errors == 0 else "Failed"
+
+          print("\n## Tests\n")
+          print(
+              f"**{status}** — {passed} passed, {failures} failed, "
+              f"{errors} errored, {skipped} skipped, {total} total\n"
+          )
+
+          problems = [
+              case
+              for case in suite.iter("testcase")
+              if case.find("failure") is not None or case.find("error") is not None
+          ]
+
+          if problems:
+              print("### Failures\n")
+              for case in problems:
+                  classname = case.get("classname", "")
+                  name = case.get("name", "")
+
+                  detail = case.find("failure")
+                  if detail is None:
+                      detail = case.find("error")
+
+                  message = (
+                      (detail.get("message") or "").strip()
+                      if detail is not None
+                      else ""
+                  )
+                  first_line = message.splitlines()[0] if message else ""
+
+                  print(f"- **{classname}::{name}**")
+                  if first_line:
+                      print(f"  - `{first_line[:300]}`")
+
+              print("\nInline annotations show the exact failing lines.")
+          PYTHON
+
+  # -------------------------------------------------------------------------
+  # Single required status check
+  # -------------------------------------------------------------------------
+  # Configure branch protection to require "CI success" rather than each job
+  # individually, so adding a job later does not require editing the rule.
+  ci-success:
+    name: CI success
+    runs-on: ubuntu-latest
+    needs: [quality, test]
+    if: always()
+    steps:
+      - name: Verify all jobs succeeded
+        run: |
+          if [ "${{ contains(needs.*.result, 'failure') }}" = "true" ] || \
+             [ "${{ contains(needs.*.result, 'cancelled') }}" = "true" ]; then
+            echo "::error::One or more CI jobs did not succeed."
+            exit 1
+          fi
+          echo "All CI jobs succeeded."
