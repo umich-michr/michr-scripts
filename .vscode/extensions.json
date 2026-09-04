@@ -1,0 +1,49 @@
+{
+  // VS Code prompts collaborators to install these on first open.
+  "recommendations": [
+    // --- Python core ---------------------------------------------------
+    "ms-python.python",
+    "ms-python.vscode-pylance",
+    "ms-python.debugpy",
+
+    // --- Lint and format (must match pyproject.toml) -------------------
+    "charliermarsh.ruff",
+
+    // --- AI agent development -----------------------------------------
+    "github.copilot-chat",
+
+    // --- Configuration file support -----------------------------------
+    "tamasfe.even-better-toml",
+    "redhat.vscode-yaml",
+    "mikestead.dotenv",
+
+    // --- Documentation and diagrams -----------------------------------
+    // Renders the Mermaid program-flow diagrams in docs/.
+    "bierner.markdown-mermaid",
+    "yzhang.markdown-all-in-one",
+
+    // --- Data inspection ----------------------------------------------
+    // Opens generated CSV output in a readable table view.
+    "grapecity.gc-excelviewer",
+
+    // --- Coverage visualization ---------------------------------------
+    // Reads reports/coverage.xml and highlights uncovered lines.
+    "ryanluker.vscode-coverage-gutters",
+
+    // --- Makefile support ---------------------------------------------
+    "ms-vscode.makefile-tools",
+
+    // --- Git history ---------------------------------------------------
+    "eamodio.gitlens"
+  ],
+
+  // Extensions that conflict with the Ruff-only toolchain. VS Code warns if
+  // one of these is installed and enabled for this workspace.
+  "unwantedRecommendations": [
+    "ms-python.black-formatter",
+    "ms-python.isort",
+    "ms-python.flake8",
+    "ms-python.pylint",
+    "ms-python.autopep8"
+  ]
+}

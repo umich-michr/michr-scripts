@@ -1,0 +1,6 @@
+# Never commit real audit exports: they may contain participant-facing
+# free text and internal identifiers.
+*
+!.gitignore
+!sample/
+!sample/**

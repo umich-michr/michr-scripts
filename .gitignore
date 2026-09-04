@@ -1,0 +1,77 @@
+# ---------------------------------------------------------------------------
+# Python
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# ---------------------------------------------------------------------------
+# Virtual environments and uv
+# ---------------------------------------------------------------------------
+.venv/
+venv/
+env/
+# uv.lock IS committed on purpose: it makes builds reproducible.
+
+# ---------------------------------------------------------------------------
+# Build and packaging artifacts
+# ---------------------------------------------------------------------------
+build/
+dist/
+wheels/
+*.egg-info/
+*.egg
+.eggs/
+
+# ---------------------------------------------------------------------------
+# Test, coverage, and type-checking caches
+# ---------------------------------------------------------------------------
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+junit.xml
+
+# ---------------------------------------------------------------------------
+# Program output (regenerated on every run; never committed)
+# ---------------------------------------------------------------------------
+output/
+reports/
+*.log
+
+# ---------------------------------------------------------------------------
+# Local databases and secrets
+# ---------------------------------------------------------------------------
+*.db
+*.sqlite
+*.sqlite3
+.env
+.env.*
+!.env.example
+
+# Oracle wallet / TLS credentials must never be committed.
+wallet/
+tnsnames.ora
+sqlnet.ora
+cwallet.sso
+*.p12
+
+# ---------------------------------------------------------------------------
+# Editors and operating systems
+# ---------------------------------------------------------------------------
+# .vscode/ is committed intentionally so the team shares one configuration.
+.vscode/*.local.json
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# ---------------------------------------------------------------------------
+# Notebooks
+# ---------------------------------------------------------------------------
+.ipynb_checkpoints/

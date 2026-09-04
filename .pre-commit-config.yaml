@@ -1,0 +1,145 @@
+# ===========================================================================
+# Pre-commit hooks
+#
+# Install once per clone:
+#     make hooks
+#
+# Run manually against the whole repository:
+#     make hooks-run
+#
+# Bypass in an emergency (discouraged):
+#     git commit --no-verify
+#
+# Keep hook versions current:
+#     uv run pre-commit autoupdate
+#
+# Design notes
+#   - Hooks operate on staged files, so commits stay fast.
+#   - Formatting and import ordering are applied automatically.
+#   - mypy runs through "uv run" so it sees the project virtual environment
+#     and the real installed dependencies rather than an isolated hook env.
+#   - The full test suite is NOT a commit hook. Run "make check" before
+#     opening a pull request.
+# ===========================================================================
+
+minimum_pre_commit_version: "4.0.0"
+default_install_hook_types: [pre-commit, commit-msg]
+fail_fast: false
+
+repos:
+  # -----------------------------------------------------------------------
+  # General file hygiene
+  # -----------------------------------------------------------------------
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-added-large-files
+        args: [--maxkb=1024]
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: check-symlinks
+      - id: destroyed-symlinks
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+      - id: mixed-line-ending
+        args: [--fix=lf]
+      - id: check-toml
+      - id: check-yaml
+      - id: check-json
+        # VS Code configuration files legitimately contain comments (JSONC),
+        # which strict JSON parsing rejects.
+        exclude: ^\.vscode/
+      - id: check-ast
+      - id: debug-statements
+      - id: name-tests-test
+        args: [--pytest-test-first]
+      # Blocks committing a file named exactly "id_rsa", "*.pem", etc.
+      - id: detect-private-key
+
+  # -----------------------------------------------------------------------
+  # Ruff: lint, then format
+  # -----------------------------------------------------------------------
+  # Order matters. Linting with --fix can rewrite code, so formatting runs
+  # afterwards to normalize the result.
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.6
+    hooks:
+      - id: ruff-check
+        args: [--fix, --exit-non-zero-on-fix]
+      - id: ruff-format
+
+  # -----------------------------------------------------------------------
+  # uv: keep the lockfile consistent with pyproject.toml
+  # -----------------------------------------------------------------------
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    rev: 0.12.9
+    hooks:
+      # Fails if pyproject.toml changed without a matching uv.lock update.
+      - id: uv-lock
+
+  # -----------------------------------------------------------------------
+  # Local hooks that must use the project virtual environment
+  # -----------------------------------------------------------------------
+  - repo: local
+    hooks:
+      # mypy needs the real installed packages and type stubs to be useful,
+      # so it runs via "uv run" rather than in an isolated hook environment.
+      - id: mypy
+        name: mypy (strict)
+        entry: uv run mypy
+        language: system
+        types_or: [python, pyi]
+        # Pass no filenames: mypy uses the "files" setting in pyproject.toml
+        # so it always type-checks the whole project consistently.
+        pass_filenames: false
+        require_serial: true
+
+      # Bandit examines only our own source tree.
+      - id: bandit
+        name: bandit (security)
+        entry: uv run bandit --configfile pyproject.toml --quiet
+        language: system
+        types: [python]
+        files: ^src/
+        exclude: ^tests/
+
+      # Guard against committing a real environment file or Oracle wallet.
+      - id: block-secret-files
+        name: block .env and Oracle wallet files
+        entry: |
+          bash -c 'echo "ERROR: refusing to commit a credential file: $*"; exit 1' --
+        language: system
+        files: |
+          (?x)^(
+              \.env$
+            | \.env\..*$
+            | .*/tnsnames\.ora$
+            | .*/sqlnet\.ora$
+            | .*/cwallet\.sso$
+            | .*\.p12$
+          )$
+        exclude: ^\.env\.example$
+
+  # -----------------------------------------------------------------------
+  # Commit message format
+  # -----------------------------------------------------------------------
+  # Conventional Commits give a readable history and make it obvious what an
+  # AI agent changed in each commit. Example:
+  #     feat(metrics): add soft-word robustness score
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v4.4.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]
+        args:
+          - feat
+          - fix
+          - docs
+          - test
+          - refactor
+          - perf
+          - build
+          - ci
+          - chore
+          - revert

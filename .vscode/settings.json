@@ -1,0 +1,227 @@
+{
+  // =======================================================================
+  // Workspace settings for study-posting-ai-analysis
+  //
+  // This file is committed so every collaborator and every AI agent session
+  // behaves identically. Personal preferences belong in your User settings,
+  // not here.
+  //
+  // Assumes dependencies were installed with "make install" (uv sync),
+  // which creates .venv in the workspace root.
+  // =======================================================================
+
+  // ---------------------------------------------------------------------
+  // Interpreter: always the workspace virtual environment
+  // ---------------------------------------------------------------------
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+  "python.terminal.activateEnvironment": true,
+  "python.terminal.activateEnvInCurrentTerminal": true,
+
+  // src-layout support for editor tooling.
+  "python.analysis.extraPaths": ["${workspaceFolder}/src"],
+
+  // ---------------------------------------------------------------------
+  // Pylance: strict analysis so the agent sees type errors as it writes
+  // ---------------------------------------------------------------------
+  "python.languageServer": "Pylance",
+  "python.analysis.typeCheckingMode": "strict",
+  "python.analysis.diagnosticMode": "workspace",
+  "python.analysis.autoImportCompletions": true,
+  "python.analysis.inlayHints.functionReturnTypes": true,
+  "python.analysis.inlayHints.variableTypes": false,
+  "python.analysis.inlayHints.callArgumentNames": "partial",
+  "python.analysis.completeFunctionParens": false,
+  "python.analysis.packageIndexDepths": [
+    { "name": "pandas", "depth": 3 },
+    { "name": "rapidfuzz", "depth": 3 },
+    { "name": "sacrebleu", "depth": 3 }
+  ],
+
+  // Authoritative type checking is "make typecheck" (mypy strict).
+  // Pylance strict mode is a fast in-editor approximation, not a substitute.
+
+  // ---------------------------------------------------------------------
+  // Formatting and linting: Ruff owns both
+  // ---------------------------------------------------------------------
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.formatOnSave": true,
+    "editor.formatOnType": false,
+    "editor.codeActionsOnSave": {
+      "source.fixAll.ruff": "explicit",
+      "source.organizeImports.ruff": "explicit"
+    },
+    "editor.rulers": [88],
+    "editor.tabSize": 4,
+    "editor.insertSpaces": true,
+    "editor.wordBasedSuggestions": "off"
+  },
+
+  // Ruff reads all configuration from pyproject.toml. Nothing is duplicated
+  // here, so the editor and "make lint" can never disagree.
+  "ruff.importStrategy": "fromEnvironment",
+  "ruff.nativeServer": "on",
+  "ruff.fixAll": true,
+  "ruff.organizeImports": true,
+  "ruff.lineLength": 88,
+
+  // ---------------------------------------------------------------------
+  // Testing: pytest, configured from pyproject.toml
+  // ---------------------------------------------------------------------
+  "python.testing.pytestEnabled": true,
+  "python.testing.unittestEnabled": false,
+  "python.testing.autoTestDiscoverOnSaveEnabled": true,
+  "python.testing.cwd": "${workspaceFolder}",
+  // Deterministic ordering in the Test Explorer. Randomized ordering still
+  // applies on the command line via "make test".
+  "python.testing.pytestArgs": ["tests", "-p", "no:randomly"],
+  "testing.automaticallyOpenTestResults": "openOnTestFailure",
+  "testing.defaultGutterClickAction": "run",
+  "testing.followRunningTest": true,
+
+  // ---------------------------------------------------------------------
+  // GitHub Copilot: agent context and guardrails
+  // ---------------------------------------------------------------------
+  // Instruction files in .github/ are added to every Copilot request.
+  "github.copilot.chat.codeGeneration.useInstructionFiles": true,
+
+  "chat.promptFiles": true,
+  "chat.instructionsFilesLocations": {
+    ".github/instructions": true
+  },
+
+  // Let the agent see terminal output from make targets it runs.
+  "github.copilot.chat.agent.thinkingTool": true,
+  "chat.tools.autoApprove": false,
+
+  // Task-specific instruction snippets. These supplement, not replace,
+  // .github/copilot-instructions.md.
+  "github.copilot.chat.testGeneration.instructions": [
+    {
+      "text": "Write pytest-style tests. Prefer plain functions with assert over unittest.TestCase for new tests. Use pytest.raises with the match argument to assert on error messages. Mark randomized differential tests with @pytest.mark.slow. Never introduce a live database dependency into a unit test."
+    }
+  ],
+  "github.copilot.chat.reviewSelection.instructions": [
+    {
+      "text": "Verify that metric formulas match docs/analysis-specification.md exactly. Flag any change that could alter a reported score without a corresponding specification update. Confirm the domain layer imports no database or pandas code."
+    }
+  ],
+  "github.copilot.chat.commitMessageGeneration.instructions": [
+    {
+      "text": "Use Conventional Commits: type(scope): summary. Allowed types are feat, fix, docs, test, refactor, perf, build, ci, chore, revert. Use the imperative mood and keep the summary under 72 characters."
+    }
+  ],
+
+  // Never let an agent silently edit environment files or the lockfile.
+  "chat.editing.confirmEditRequestRemoval": true,
+
+  // ---------------------------------------------------------------------
+  // Editor behavior
+  // ---------------------------------------------------------------------
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+  "files.trimFinalNewlines": true,
+  "files.eol": "\n",
+  "editor.bracketPairColorization.enabled": true,
+  "editor.guides.bracketPairs": "active",
+  "editor.renderWhitespace": "boundary",
+
+  // Makefiles require real tab characters.
+  "[makefile]": {
+    "editor.insertSpaces": false,
+    "editor.tabSize": 4,
+    "editor.detectIndentation": false,
+    "editor.renderWhitespace": "all"
+  },
+
+  "[toml]": {
+    "editor.defaultFormatter": "tamasfe.even-better-toml",
+    "editor.formatOnSave": true
+  },
+  "evenBetterToml.schema.enabled": true,
+
+  "[markdown]": {
+    "editor.wordWrap": "on",
+    "editor.rulers": [80],
+    "files.trimTrailingWhitespace": false
+  },
+
+  "[jsonc]": {
+    "editor.defaultFormatter": "vscode.json-language-features"
+  },
+
+  "[yaml]": {
+    "editor.defaultFormatter": "redhat.vscode-yaml",
+    "editor.tabSize": 2
+  },
+
+  // ---------------------------------------------------------------------
+  // Explorer and search: hide generated noise from humans and agents
+  // ---------------------------------------------------------------------
+  "files.exclude": {
+    "**/__pycache__": true,
+    "**/*.egg-info": true,
+    "**/.pytest_cache": true,
+    "**/.ruff_cache": true,
+    "**/.mypy_cache": true
+  },
+  "search.exclude": {
+    "**/.venv": true,
+    "**/uv.lock": true,
+    "**/output": true,
+    "**/reports": true,
+    "**/htmlcov": true,
+    "**/data/**": true
+  },
+  "files.watcherExclude": {
+    "**/.venv/**": true,
+    "**/output/**": true,
+    "**/reports/**": true,
+    "**/.mypy_cache/**": true,
+    "**/.ruff_cache/**": true
+  },
+
+  "files.associations": {
+    "*.instructions.md": "markdown",
+    ".env.example": "dotenv"
+  },
+
+  // ---------------------------------------------------------------------
+  // Git
+  // ---------------------------------------------------------------------
+  "git.enableSmartCommit": false,
+  "git.confirmSync": true,
+  "git.autofetch": true,
+  "git.branchProtection": ["main"],
+  "git.inputValidationSubjectLength": 72,
+
+  // ---------------------------------------------------------------------
+  // Terminal
+  // ---------------------------------------------------------------------
+  "terminal.integrated.scrollback": 20000,
+  "terminal.integrated.env.osx": {
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "terminal.integrated.env.linux": {
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+
+  // ---------------------------------------------------------------------
+  // Coverage Gutters: reads the report produced by "make coverage"
+  // ---------------------------------------------------------------------
+  "coverage-gutters.coverageFileNames": ["coverage.xml"],
+  "coverage-gutters.coverageBaseDir": "reports",
+  "coverage-gutters.showLineCoverage": true,
+  "coverage-gutters.showGutterCoverage": true,
+  "coverage-gutters.showRulerCoverage": true,
+
+  // ---------------------------------------------------------------------
+  // Makefile Tools
+  // ---------------------------------------------------------------------
+  "makefile.configureOnOpen": false,
+  "makefile.makePath": "make",
+  "makefile.defaultLaunchConfiguration": {
+    "MIMode": "lldb"
+  }
+
+}

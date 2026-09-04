@@ -1,0 +1,237 @@
+{
+  // =======================================================================
+  // Tasks wrapping the Makefile
+  //
+  // Run with Terminal > Run Task, or Cmd+Shift+P > "Tasks: Run Task".
+  // "Check: all" is the default build task (Cmd+Shift+B).
+  //
+  // Exposing Make targets as tasks lets a Copilot agent invoke them by name
+  // and read structured problem output rather than parsing raw terminal text.
+  // =======================================================================
+  "version": "2.0.0",
+
+  // Shared problem matcher for Ruff and mypy output, both of which use the
+  // file:line:column: message format.
+  "tasks": [
+    {
+      "label": "Check: all",
+      "detail": "format-check + lint + typecheck + audit + coverage",
+      "type": "shell",
+      "command": "make check",
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": ["$python-ruff", "$python-mypy"],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
+      "label": "Format",
+      "detail": "Format code and organize imports with Ruff",
+      "type": "shell",
+      "command": "make format",
+      "problemMatcher": [],
+      "presentation": { "reveal": "silent", "panel": "shared", "clear": true }
+    },
+    {
+      "label": "Lint",
+      "detail": "Ruff lint check",
+      "type": "shell",
+      "command": "make lint",
+      "problemMatcher": ["$python-ruff"],
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true }
+    },
+    {
+      "label": "Lint: fix",
+      "detail": "Ruff lint with safe automatic fixes",
+      "type": "shell",
+      "command": "make lint-fix",
+      "problemMatcher": ["$python-ruff"],
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true }
+    },
+    {
+      "label": "Typecheck",
+      "detail": "mypy strict",
+      "type": "shell",
+      "command": "make typecheck",
+      "problemMatcher": ["$python-mypy"],
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true }
+    },
+    {
+      "label": "Test",
+      "detail": "Full pytest suite, clean start",
+      "type": "shell",
+      "command": "make test",
+      "group": { "kind": "test", "isDefault": true },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
+      "label": "Test: fast",
+      "detail": "Skip slow randomized differential tests",
+      "type": "shell",
+      "command": "make test-fast",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
+      "label": "Test: by keyword",
+      "detail": "Run tests matching a pytest -k expression",
+      "type": "shell",
+      "command": "make test PYTEST_ARGS=\"-k '${input:testKeyword}' -vv\"",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
+      "label": "Coverage",
+      "detail": "Run tests with coverage and write reports/",
+      "type": "shell",
+      "command": "make coverage",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
+      "label": "Coverage: open report",
+      "detail": "Build coverage and open the HTML report in a browser",
+      "type": "shell",
+      "command": "make coverage-open",
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    },
+    {
+      "label": "Audit: security",
+      "detail": "pip-audit dependencies and bandit source scan",
+      "type": "shell",
+      "command": "make audit",
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true }
+    },
+    {
+      "label": "Clean",
+      "detail": "Remove output, reports, and tool caches",
+      "type": "shell",
+      "command": "make clean",
+      "problemMatcher": [],
+      "presentation": { "reveal": "silent", "panel": "shared" }
+    },
+    {
+      "label": "Install",
+      "detail": "uv sync: create .venv and install dependencies",
+      "type": "shell",
+      "command": "make install",
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true }
+    },
+    {
+      "label": "Install: with Oracle driver",
+      "detail": "uv sync --extra oracle",
+      "type": "shell",
+      "command": "make install-oracle",
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true }
+    },
+    {
+      "label": "Doctor",
+      "detail": "Print interpreter, tooling, and library versions",
+      "type": "shell",
+      "command": "make doctor",
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true }
+    },
+    {
+      "label": "Hooks: install",
+      "detail": "Install pre-commit git hooks",
+      "type": "shell",
+      "command": "make hooks",
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared" }
+    },
+    {
+      "label": "Hooks: run on all files",
+      "detail": "Run every pre-commit hook against the whole repository",
+      "type": "shell",
+      "command": "make hooks-run",
+      "problemMatcher": ["$python-ruff", "$python-mypy"],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
+      "label": "App: load CSV into SQLite",
+      "detail": "Rebuild the local SQLite database from a CSV export",
+      "type": "shell",
+      "command": "make load-csv CSV_PATH=\"${input:csvPath}\"",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
+      "label": "App: analyze (SQLite)",
+      "detail": "Analyze eligible records and write CSV output",
+      "type": "shell",
+      "command": "make run",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
+      "label": "App: analyze with limit",
+      "detail": "Analyze only the first N eligible records",
+      "type": "shell",
+      "command": "make run LIMIT=${input:recordLimit} LOG_LEVEL=DEBUG",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    }
+  ],
+
+  // Prompted values keep task arguments named without editing this file.
+  "inputs": [
+    {
+      "id": "testKeyword",
+      "type": "promptString",
+      "description": "pytest -k expression",
+      "default": "soft_word"
+    },
+    {
+      "id": "csvPath",
+      "type": "promptString",
+      "description": "Path to the CSV export",
+      "default": "data/sample/audit_records_sample.csv"
+    },
+    {
+      "id": "recordLimit",
+      "type": "promptString",
+      "description": "Maximum number of eligible records to analyze",
+      "default": "10"
+    }
+  ]
+}
