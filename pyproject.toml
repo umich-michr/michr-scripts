@@ -69,6 +69,9 @@ packages = ["src/study_posting_ai_analysis"]
 [tool.uv]
 package = true
 
+[tool.uv.sources]
+study-posting-ai-analysis = { workspace = true }
+
 # ===========================================================================
 # Ruff: formatter and linter
 # ===========================================================================
