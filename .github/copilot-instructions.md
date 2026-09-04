@@ -12,7 +12,7 @@ reads those audit rows and produces per-field metrics describing how much
 technical post-editing the user performed.
 
 The canonical, authoritative description of the analysis is
-**`docs/analysis-specification.md`**. Treat it as the specification of record.
+**[`../docs/analysis-specification.md`](docs/analysis-specification.md)**. Treat it as the specification of record.
 If code and that document disagree, the document wins unless the user explicitly
 says otherwise.
 
@@ -188,6 +188,30 @@ make clean        # remove output, reports, caches
 ```
 
 Generated files live only in output/ and reports/. Both are removed bymake clean and are git-ignored.
+
+## Documentation is part of the change, not a follow-up
+
+Certain edits are incomplete without a matching documentation change. Before
+finishing a task, check this table. State in your summary which documents you
+updated, or why none were needed.
+
+| If you changed | You must also update |
+|---|---|
+| A metric formula, threshold, or normalization step | `docs/analysis-specification.md` §7 or §9 |
+| Requiredness of any field | `docs/analysis-specification.md` §4 |
+| A `MatchType` outcome or its evaluation order | `docs/analysis-specification.md` §5 and `docs/program-flow.md` §4 |
+| Lookup similarity policy | `docs/analysis-specification.md` §11 |
+| Compensation Boolean or text rules | `docs/analysis-specification.md` §10 and `docs/program-flow.md` §6 |
+| A column produced by `flatten_analysis_results()` | `README.md` "What the analysis produces" |
+| Added, removed, or renamed a module | `README.md` architecture tree and `docs/program-flow.md` §1 |
+| A Make target or CLI argument | `README.md` commands table and `CONTRIBUTING.md` |
+| A dependency or a version bound | `README.md` reproducibility table |
+
+A pre-commit hook enforces the first four rows. If it blocks a commit, open the
+named section and update it rather than bypassing the hook.
+
+If you are unsure whether a documentation change is required, say so explicitly
+rather than silently skipping it.
 
 ## Things to never do
 

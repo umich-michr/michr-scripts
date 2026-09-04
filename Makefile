@@ -39,6 +39,15 @@ PYTEST_ARGS ?=
 
 # Build the named-argument list. Empty variables contribute nothing.
 RUN_ARGS := --source=$(SOURCE) --output-dir=$(OUTPUT_DIR) --log-level=$(LOG_LEVEL)
+# Set ORACLE=true to include the Oracle driver extra.
+#   make setup ORACLE=true
+ORACLE ?= false
+
+ifeq ($(ORACLE),true)
+SYNC_FLAGS := --extra oracle
+else
+SYNC_FLAGS :=
+endif
 ifeq ($(SOURCE),sqlite)
 RUN_ARGS += --sqlite-path=$(SQLITE_PATH)
 endif
@@ -52,8 +61,8 @@ endif
 .DEFAULT_GOAL := help
 
 # Every target is phony: none of them produce a file named after the target.
-.PHONY: help install install-oracle lock upgrade \
-	    format format-check lint lint-fix typecheck \
+.PHONY: help setup install install-oracle lock upgrade \
+	    docs-check format format-check lint lint-fix typecheck \
 	    audit audit-deps audit-code \
 	    test test-fast test-slow coverage coverage-open \
 	    check ci \
@@ -69,6 +78,8 @@ help:
 	@echo "study-posting-ai-analysis — development targets"
 	@echo ""
 	@echo "  Setup"
+	@echo "    setup            Bootstrap a fresh clone (idempotent)"
+	@echo "                     ORACLE=true to include the Oracle driver"
 	@echo "    install          Create .venv and install all dependencies"
 	@echo "    install-oracle   Also install the Oracle driver extra"
 	@echo "    hooks            Install pre-commit git hooks"
@@ -77,6 +88,7 @@ help:
 	@echo "    doctor           Print tool versions and environment summary"
 	@echo ""
 	@echo "  Quality"
+	@echo "    docs-check       Verify documentation accompanies rule changes"
 	@echo "    format           Format code with Ruff"
 	@echo "    format-check     Verify formatting without editing files"
 	@echo "    lint             Lint with Ruff"
@@ -128,11 +140,40 @@ help:
 # ---------------------------------------------------------------------------
 # Setup
 # ---------------------------------------------------------------------------
+# One-command bootstrap for a fresh clone.
+#
+# Idempotent: safe to run repeatedly. Never overwrites .env, never changes
+# pinned versions, never contacts a database.
+#
+#   make setup                 dependencies, hooks, .env
+#   make setup ORACLE=true     also install the Oracle driver extra
+setup:
+	@echo "==> Installing dependencies into .venv"
+	$(UV) sync $(SYNC_FLAGS)
+	@echo ""
+	@echo "==> Installing git hooks"
+	$(RUN) pre-commit install --install-hooks
+	@echo ""
+	@echo "==> Environment file"
+	@if [ -f .env ]; then \
+	  echo "    .env already exists; left unchanged"; \
+	else \
+	  cp .env.example .env; \
+	  echo "    Created .env from .env.example"; \
+	fi
+	@echo ""
+	@echo "==> Environment summary"
+	@$(MAKE) --no-print-directory doctor
+	@echo ""
+	@echo "Setup complete."
+	@echo "  make check    Run the full quality gate"
+	@echo "  make          List all targets"
+
 install:
-	$(UV) sync
+	$(UV) sync $(SYNC_FLAGS)
 
 install-oracle:
-	$(UV) sync --extra oracle
+	@$(MAKE) install ORACLE=true
 
 lock:
 	$(UV) lock

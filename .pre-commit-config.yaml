@@ -104,6 +104,15 @@ repos:
         files: ^src/
         exclude: ^tests/
 
+      # Requires a specification update when a metric or rule module changes.
+      # See scripts/check_docs_sync.py for the pairings.
+      - id: docs-sync
+        name: documentation sync check
+        entry: uv run python scripts/check_docs_sync.py
+        language: system
+        pass_filenames: false
+        always_run: true
+
       # Guard against committing a real environment file or Oracle wallet.
       - id: block-secret-files
         name: block .env and Oracle wallet files
