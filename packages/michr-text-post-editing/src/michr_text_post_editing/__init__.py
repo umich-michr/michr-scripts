@@ -14,6 +14,11 @@ from michr_text_post_editing.models import (
     SoftWordResult,
     TerResult,
 )
+from michr_text_post_editing.normalization import (
+    clamp01,
+    count_whitespace_tokens,
+    normalize_metric_text,
+)
 
 __version__ = "0.1.0"
 
@@ -23,4 +28,7 @@ __all__ = [
     "SoftWordResult",
     "TerResult",
     "__version__",
+    "clamp01",
+    "count_whitespace_tokens",
+    "normalize_metric_text",
 ]

@@ -3,6 +3,11 @@
 from pathlib import Path
 
 import michr_text_post_editing as package
+from michr_text_post_editing.normalization import (
+    clamp01,
+    count_whitespace_tokens,
+    normalize_metric_text,
+)
 
 
 def test_package_is_not_an_implicit_namespace() -> None:
@@ -22,3 +27,9 @@ def test_package_ships_typing_marker() -> None:
     package_directory = Path(package.__file__).parent
 
     assert (package_directory / "py.typed").is_file()
+
+
+def test_package_exports_normalization_helpers() -> None:
+    assert package.normalize_metric_text is normalize_metric_text
+    assert package.count_whitespace_tokens is count_whitespace_tokens
+    assert package.clamp01 is clamp01
