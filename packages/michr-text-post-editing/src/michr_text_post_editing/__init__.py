@@ -8,6 +8,14 @@ The comparison is directional. Normalized scores use the final text length as
 their denominator.
 """
 
+from michr_text_post_editing.metrics import (
+    analyze_post_edit,
+    calculate_character_metrics,
+    calculate_soft_word_metrics,
+    calculate_ter_metrics,
+    normalized_word_distance,
+    weighted_soft_word_distance,
+)
 from michr_text_post_editing.models import (
     CharacterResult,
     PostEditingResult,
@@ -28,7 +36,13 @@ __all__ = [
     "SoftWordResult",
     "TerResult",
     "__version__",
+    "analyze_post_edit",
+    "calculate_character_metrics",
+    "calculate_soft_word_metrics",
+    "calculate_ter_metrics",
     "clamp01",
     "count_whitespace_tokens",
     "normalize_metric_text",
+    "normalized_word_distance",
+    "weighted_soft_word_distance",
 ]

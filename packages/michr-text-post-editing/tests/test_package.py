@@ -3,6 +3,14 @@
 from pathlib import Path
 
 import michr_text_post_editing as package
+from michr_text_post_editing.metrics import (
+    analyze_post_edit,
+    calculate_character_metrics,
+    calculate_soft_word_metrics,
+    calculate_ter_metrics,
+    normalized_word_distance,
+    weighted_soft_word_distance,
+)
 from michr_text_post_editing.normalization import (
     clamp01,
     count_whitespace_tokens,
@@ -33,3 +41,12 @@ def test_package_exports_normalization_helpers() -> None:
     assert package.normalize_metric_text is normalize_metric_text
     assert package.count_whitespace_tokens is count_whitespace_tokens
     assert package.clamp01 is clamp01
+
+
+def test_package_exports_metric_api() -> None:
+    assert package.analyze_post_edit is analyze_post_edit
+    assert package.calculate_ter_metrics is calculate_ter_metrics
+    assert package.calculate_character_metrics is calculate_character_metrics
+    assert package.calculate_soft_word_metrics is calculate_soft_word_metrics
+    assert package.normalized_word_distance is normalized_word_distance
+    assert package.weighted_soft_word_distance is weighted_soft_word_distance
