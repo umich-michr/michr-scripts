@@ -289,8 +289,10 @@ clean-reports:
 clean-caches:
 	@rm -rf .pytest_cache .ruff_cache .mypy_cache
 	@rm -rf .coverage .coverage.* coverage.xml htmlcov junit.xml
-	@rm -rf packages/*/.pytest_cache packages/*/.coverage packages/*/.coverage.*
-	@rm -rf programs/*/.pytest_cache programs/*/.coverage programs/*/.coverage.*
+	@rm -rf packages/*/.pytest_cache packages/*/.ruff_cache packages/*/.mypy_cache
+	@rm -rf packages/*/.coverage packages/*/.coverage.*
+	@rm -rf programs/*/.pytest_cache programs/*/.ruff_cache programs/*/.mypy_cache
+	@rm -rf programs/*/.coverage programs/*/.coverage.*
 	@find . -type d -name __pycache__ -not -path "./.venv/*" \
 	  -prune -exec rm -rf {} + 2>/dev/null || true
 	@find . -type f -name "*.py[co]" -not -path "./.venv/*" \

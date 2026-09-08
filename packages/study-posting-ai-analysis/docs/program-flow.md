@@ -144,7 +144,7 @@ flowchart TB
     COSMETIC -->|Equal| M_COSMETIC["match = COSMETIC_EQUIVALENT"]
     COSMETIC -->|Differ| M_EDITED["match = EDITED"]
 
-    M_EXACT --> METRICS["analyze_selected_suggestion()"]
+    M_EXACT --> METRICS["michr_text_post_editing.analyze_post_edit()"]
     M_COSMETIC --> METRICS
     M_EDITED --> METRICS
 
@@ -152,6 +152,10 @@ flowchart TB
     UNASSISTED --> RESULT
     REMOVED --> RESULT
 ```
+
+For every selected, nonblank outcome, the study package delegates the text
+comparison to `michr_text_post_editing.analyze_post_edit()`. The returned
+`PostEditingResult` is attached to `TextFieldAnalysis.editing_metrics`.
 
 Evaluation order is **blank, then exact, then cosmetic, then edited**.
 
@@ -172,25 +176,16 @@ alongside its full policy credit.
 
 ```mermaid
 flowchart TB
-    ENTRY["analyze_selected_suggestion()<br/>NFC-normalize both texts,<br/>reject an empty final value"]
+    STUDY["study-posting-ai-analysis"]
+    CHECK["compare_selected_text()<br/>classify field outcome"]
+    GENERIC["michr-text-post-editing"]
+    ENTRY["analyze_post_edit(suggestion, final)"]
+    RESULT["PostEditingResult"]
 
-    ENTRY --> TER["calculate_ter_metrics()<br/>SacreBLEU TER<br/>case-insensitive"]
-    ENTRY --> CHAR["calculate_character_metrics()<br/>RapidFuzz Levenshtein<br/>case-sensitive"]
-    ENTRY --> SOFT["calculate_soft_word_metrics()<br/>weighted word distance<br/>case-sensitive"]
-    ENTRY --> LENGTHS["Character and<br/>whitespace-token counts"]
-
-    SOFT --> DP["weighted_soft_word_distance()<br/>Wagner-Fischer recurrence,<br/>two rows retained"]
-    DP --> WORD["normalized_word_distance()<br/>LRU-cached RapidFuzz<br/>normalized distance"]
-
-    CHAR --> ABS["estimated_characters_saved<br/>max(0, final chars − distance)"]
-
-    TER --> OUT
-    CHAR --> OUT
-    SOFT --> OUT
-    LENGTHS --> OUT
-    ABS --> OUT
-
-    OUT["SuggestionEditingResult<br/>raw and bounded scores<br/>for every measure"]
+    STUDY --> CHECK
+    CHECK -->|"EXACT, COSMETIC_EQUIVALENT, or EDITED"| GENERIC
+    GENERIC --> ENTRY --> RESULT
+    RESULT --> ATTACH["TextFieldAnalysis.editing_metrics"]
 ```
 
 | Measure | Formula | Role | Case |
@@ -209,10 +204,10 @@ The deliberate case asymmetry means a purely capitalization change yields TER
 which is the intended signal that something was edited even though TER regarded
 the texts as equivalent.
 
-The soft-word implementation retains only two dynamic-programming rows. A
-full-matrix reference implementation in `tests/helpers/` verifies it across 1,500
-seeded random cases to twelve decimal places. Unlike TER, it includes no
-phrase-shift operation.
+The soft-word implementation retains only two dynamic-programming rows. In the
+`michr-text-post-editing` package, a full-matrix reference implementation under
+`tests/helpers/` verifies it across 1,500 seeded random cases to twelve decimal
+places. Unlike TER, it includes no phrase-shift operation.
 
 ---
 

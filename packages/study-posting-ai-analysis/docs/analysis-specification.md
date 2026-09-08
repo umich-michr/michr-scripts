@@ -56,11 +56,17 @@ For the compensation radio button, the suggested Boolean may be propagated
 automatically into the interface. The final saved Boolean represents the value
 retained or changed by the user.
 
-### Eligibility
+### Upstream dataset inclusion rule
 
-Only audit rows with `ATTEMPT_TYPE = 'AI'` and `ATTEMPT_RESULT = 'COMPLETE'` are
-analyzed. Eligible rows must contain decodable JSON objects in the
-`LLM_SUGGESTIONS`, `SELECTED_SUGGESTIONS`, and `FINAL_SUBMISSION` columns.
+The study's planned audit-reporting program includes rows where
+`ATTEMPT_TYPE = 'AI'` and `ATTEMPT_RESULT = 'COMPLETE'`. It maps the
+`LLM_SUGGESTIONS`, `SELECTED_SUGGESTIONS`, and `FINAL_SUBMISSION` columns to the
+three objects accepted by this library.
+
+This eligibility rule and database-column mapping are **not enforced by
+`study-posting-ai-analysis`**. The library performs no database access and has
+no knowledge of an audit-table schema. A consuming program is responsible for
+selecting records and supplying the three inputs.
 
 ---
 
@@ -172,6 +178,14 @@ result.
 ---
 
 ## 7. Text post-editing metrics
+
+The calculations in this section are implemented by the reusable
+`michr-text-post-editing` package. `study-posting-ai-analysis` determines when a
+text comparison applies and stores the returned `PostEditingResult` on the
+corresponding field analysis; it does not implement these algorithms itself.
+
+The formulas remain part of this study specification because they define the
+meaning of the study's reported text metrics.
 
 ### 7.1 Primary metric: TER-derived effort saved
 
@@ -320,7 +334,15 @@ discarded.
 
 ---
 
-## 8. `SuggestionEditingResult` field guide
+## 8. `PostEditingResult` field guide
+
+`PostEditingResult` is defined by the reusable `michr-text-post-editing`
+package. It contains only technical text-comparison results and does not contain
+a study-posting field name.
+
+Field identity is maintained by the surrounding `analyze_objects()` result
+dictionary and, for selected suggestions, by `TextFieldAnalysis.pick.kind`.
+This avoids duplicating form-specific context inside a reusable metric result.
 
 Produced when a text suggestion was selected or otherwise applied **and** the
 final saved text is nonblank. It is **not** produced for `UNASSISTED` or
@@ -328,14 +350,13 @@ final saved text is nonblank. It is **not** produced for `UNASSISTED` or
 
 | Field | Definition | Recommended use |
 |---|---|---|
-| `field_name` | Name of the analyzed form field or suggestion category. | Group and compare results by field. Does not affect the calculation. |
 | `ter_rate` | TER edit cost ÷ final reference length. Range starts at `0`; may exceed `1`. | Conventional edit-rate result. Lower is better. |
 | `ter_effort_saved_raw` | `1 - ter_rate`. May be negative. | Directional diagnostic. Identifies cases where TER exceeded the final-length baseline. |
 | `ter_effort_saved` | `ter_effort_saved_raw` bounded to `[0, 1]`. | **Primary bounded reporting value.** Higher is better. |
 | `character_edit_distance` | Minimum character insertions, deletions, and substitutions. | Secondary character-level measure. Lower is better. Not an observed keystroke count. |
 | `character_effort_saved_raw` | `1 - character_edit_distance / final_character_count`. May be negative. | Character-level directional robustness measure. |
 | `character_effort_saved` | Bounded to `[0, 1]`. | Bounded character-level robustness result. |
-| `soft_word_edit_distance` | Weighted word-level distance: insertion and deletion cost `1`; substitution costs the normalized character distance. | Supporting robustness measure. Lower is better. Study-specific, not standard TER. |
+| `soft_word_edit_distance` | Weighted word-level distance: insertion and deletion cost `1`; substitution costs the normalized character distance. | Supporting robustness measure. Lower is better. Custom robustness measure, not standardized TER. |
 | `soft_word_effort_saved_raw` | `1 - soft_word_edit_distance / final_word_count`. May be negative. | Diagnostic soft-word result before clamping. |
 | `soft_word_effort_saved` | Bounded to `[0, 1]`. | Bounded soft-word robustness result. |
 | `estimated_characters_saved` | `max(0, final_character_count - character_edit_distance)`. | Absolute technical-editing proxy for comparing assistance across differently sized fields. |
@@ -503,18 +524,39 @@ length and function.
 
 ## 13. How the analysis is run
 
-1. Load the suggested, selected, and final JSON audit objects.
+## 13. How the analysis is run
+
+Within this library:
+
+1. Optionally call `parse_analysis_inputs()` to decode the suggested, selected,
+   and final JSON objects.
 2. Call `analyze_objects()` to validate and analyze every configured field.
 3. Text fields route to `analyze_text_field()`.
 4. Contact subfields route to `analyze_contact()`.
 5. Compensation routes to `analyze_compensation()`.
 6. Lookup fields route to `analyze_lookup_values()`.
-7. Selected nonblank text suggestions pass to `analyze_selected_suggestion()`.
-8. Nested results convert to one CSV-ready row per field via
-   `flatten_analysis_results()`.
-9. Text, compensation, and lookup rows are summarized separately.
-10. Flattened data are exported to CSV for review or downstream statistical
-    analysis.
+7. Selected nonblank text suggestions pass to
+   `michr_text_post_editing.analyze_post_edit()`, which returns a
+   `PostEditingResult`.
+8. Optionally call `flatten_analysis_results()` to produce one plain dictionary
+   per analyzed field.
+
+Outside this library, a consuming program is responsible for:
+
+1. obtaining records from a database, CSV file, HTTP request, or another source;
+2. selecting eligible records;
+3. mapping source fields to the three analysis inputs;
+4. deciding whether a malformed record stops or is skipped by the run;
+5. aggregating text, compensation, and lookup results separately; and
+6. writing CSV files, DataFrames, database tables, or publication reports.
+
+`study-posting-ai-analysis` performs no database, filesystem, DataFrame,
+reporting, or logging I/O.
+
+The study package does not implement TER, character distance, or weighted
+soft-word distance. Those calculations and their low-level tests belong to
+`michr-text-post-editing`. The study package determines when the calculation is
+applicable and attaches the returned result to the appropriate field analysis.
 
 The implementation validates that:
 
@@ -534,6 +576,16 @@ disclosure of potentially sensitive content.
 ---
 
 ## 14. Software verification
+
+Verification is divided by package:
+
+- `michr-text-post-editing` tests TER, character-level Levenshtein,
+  weighted soft-word distance, normalization, raw and bounded formulas, and
+  randomized differential agreement with a full-matrix implementation.
+- `study-posting-ai-analysis` tests form requiredness, selection validity,
+  outcome classification, compensation behavior, contact behavior, lookup
+  analysis, JSON parsing, flattening, and integration with
+  `PostEditingResult`.
 
 ### Scope
 
@@ -606,9 +658,12 @@ orchestration.
 
 ## 15. Randomized differential testing
 
-The production soft-word implementation retains only two rows of the
-dynamic-programming matrix to reduce memory use. A separate full-matrix
-implementation is kept for testing.
+Randomized differential testing belongs to `michr-text-post-editing`, which
+owns the weighted soft-word algorithm.
+
+Its production implementation retains only two rows of the dynamic-programming
+matrix to reduce memory use. A separate full-matrix implementation is retained
+in that package's test suite for verification.
 
 The verification procedure:
 
@@ -675,9 +730,9 @@ Pinned versions:
 | Component | Version |
 |---|---|
 | Python | 3.14 |
-| SacreBLEU | 2.6.x — TER implementation |
-| RapidFuzz | 3.14.x — character-level Levenshtein |
-| pandas | 2.2.x — reporting layer only |
+| `michr-text-post-editing` | 0.1.x |
+| SacreBLEU | 2.6.x, owned by `michr-text-post-editing` |
+| RapidFuzz | 3.14.x, owned by `michr-text-post-editing` |
 
 Exact resolved versions are recorded in `uv.lock`, which is committed.
 
@@ -729,10 +784,15 @@ operation costs used in the weighted soft-word implementation.
 
 ### Software
 
-- **SacreBLEU** provides the TER implementation.
-- **RapidFuzz** provides character-level Levenshtein calculations.
-- The weighted soft-word measure is a custom implementation verified against a
-  full-matrix reference implementation.
+- `michr-text-post-editing` owns the technical text-comparison implementation
+  and `PostEditingResult`.
+- SacreBLEU 2.6.x provides TER inside `michr-text-post-editing`.
+- RapidFuzz 3.14.x provides character-level Levenshtein calculations inside
+  `michr-text-post-editing`.
+- The weighted soft-word measure is implemented and differentially tested in
+  `michr-text-post-editing`.
+- `study-posting-ai-analysis` owns form-field policy, selection validation,
+  requiredness, contact, compensation, lookup analysis, and flattening.
 
 ---
 

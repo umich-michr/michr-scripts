@@ -28,7 +28,9 @@ results out.
 Reading rows from a data source, looping over them, aggregating results, and
 writing reports are the responsibility of the programs that consume it.
 
-Runtime dependencies: `sacrebleu` and `rapidfuzz`. Nothing else.
+The package depends on [`michr-text-post-editing`](../michr-text-post-editing/)
+for technical text metrics. It does not directly depend on SacreBLEU or
+RapidFuzz and contains no metric implementation of its own.
 
 ---
 
@@ -59,6 +61,32 @@ results["topics"].similarity  # 0.33 (Jaccard)
 
 # One flat dictionary per field, ready for CSV, a DataFrame, or a table insert.
 rows = flatten_analysis_results(results, record_id="audit-1234")
+```  
+
+Text fields with a selected, nonblank suggestion contain a
+`michr_text_post_editing.PostEditingResult` in `editing_metrics`. Field identity
+is not duplicated inside that metric result: it remains the key in the result
+dictionary and, for selected values, in `Pick.kind`.
+
+```python
+title = results["title"]
+
+title.match  # MatchType.EDITED
+title.pick.kind  # "title"
+title.editing_metrics  # PostEditingResult
+title.ter_effort_saved  # convenience property
+```  
+
+Callers that need to compare two texts independently should use the genericpackage directly:
+
+
+```python
+from michr_text_post_editing import analyze_post_edit
+
+metrics = analyze_post_edit(
+    suggestion="Original text",
+    final="Human-edited text",
+)
 ```
 
 Writing the rows out is the consumer's job:
@@ -122,15 +150,28 @@ Free text is excluded unless `include_text=True` is passed.
 
 | Function | Purpose |
 |---|---|
-| `analyze_objects(suggested, selected, final)` | Analyze every configured field |
-| `parse_analysis_inputs(...)` | Decode three JSON payloads |
-| `parse_json_object(value, name=...)` | Decode one JSON payload |
+| `analyze_objects(suggested, selected, final)` | Analyze every configured study-posting field |
+| `parse_analysis_inputs(...)` | Decode the three JSON payloads |
+| `parse_json_object(value, name=...)` | Decode one JSON object |
 | `flatten_analysis_results(results, ...)` | Convert results to flat rows |
+| `analyze_text_field(...)` | Analyze one configured text field |
+| `analyze_contact(...)` | Analyze contact subfields |
+| `analyze_compensation(...)` | Analyze compensation text and Boolean policy |
+| `analyze_lookup_values(...)` | Analyze offered, picked, and saved lookup IDs |
+| `compare_selected_text(...)` | Classify a selected suggestion against its final text |
 
-Individual analyzers — `analyze_text_field`, `analyze_contact`,
-`analyze_compensation`, `analyze_lookup_values`, `compare_selected_text`,
-`analyze_selected_suggestion` — and the metric functions are also exported for
-callers analyzing one field at a time.
+Technical metric functions and result models are intentionally **not**
+re-exported. Import them from `michr_text_post_editing`:
+
+```python
+from michr_text_post_editing import (
+    PostEditingResult,
+    analyze_post_edit,
+    calculate_character_metrics,
+    calculate_soft_word_metrics,
+    calculate_ter_metrics,
+)
+```
 
 Configuration is exposed as `FIELD_SPECS`, `CONTACT_FIELDS`,
 `REQUIRED_CONTACT_FIELDS`, and `COMPENSATION_KINDS`.
@@ -188,27 +229,41 @@ Run `make` alone to list every target.
 
 ## Architecture
 
-Nine modules, no I/O anywhere.
+The study package owns form interpretation, not metric implementation.
 
-```
+```text
 src/study_posting_ai_analysis/
-├── models.py             Enums and frozen result dataclasses
-├── validation.py         Runtime type checks at trust boundaries
-├── text_normalization.py NFC normalization, cosmetic equivalence
-├── metrics.py            TER, character, and soft-word calculations
+├── models.py             Study-specific enums and result models
+├── validation.py         Runtime checks at JSON trust boundaries
+├── text_normalization.py Cosmetic-equivalence and blank-text policy
 ├── field_specs.py        Field configuration and requiredness
-├── field_analysis.py     Match classification and per-field analyzers
+├── field_analysis.py     Classification and per-field analyzers
 ├── parsing.py            JSON input decoding
-├── flattening.py         Results to tabular rows
+├── flattening.py         Study results to tabular rows
 └── errors.py             InputParseError
 ```
 
-Three constraints hold:
+Text analysis delegates to the sibling package:
 
-1. **No I/O.** No `sqlite3`, `oracledb`, `pandas`, filesystem, or `logging`.
-2. **Functions raise; they do not log.** Error handling belongs to the caller.
-3. **Results are immutable.** Frozen, slotted dataclasses with derived
-   properties rather than stored duplicates.
+```text
+study-posting-ai-analysis
+          │
+          └── michr-text-post-editing
+                ├── TER
+                ├── character Levenshtein
+                ├── weighted soft-word distance
+                ├── metric normalization
+                └── PostEditingResult
+```
+
+Four constraints hold:
+
+1. **No I/O.** No database, filesystem, DataFrame, CLI, or logging behavior.
+2. **No metric implementation.** Text calculations belong to
+   `michr-text-post-editing`.
+3. **Functions raise; they do not log.**
+4. **Study results are immutable.** Text metrics use the generic immutable
+   `PostEditingResult`.
 
 See [`docs/program-flow.md`](docs/program-flow.md) for the flow diagrams.
 
@@ -270,8 +325,13 @@ mean over text rows cannot be contaminated by a similarity value.
 | Component | Version |
 |---|---|
 | Python | 3.14 |
-| SacreBLEU | 2.6.x — TER implementation |
-| RapidFuzz | 3.14.x — character-level Levenshtein |
+| `michr-text-post-editing` | 0.1.x — reusable metric implementation |
+| SacreBLEU | 2.6.x — transitive TER implementation |
+| RapidFuzz | 3.14.x — transitive Levenshtein implementation |
+
+The study package pins the compatible `michr-text-post-editing` version. That
+package, in turn, bounds the metric libraries whose behavior can affect reported
+scores.
 
 Major versions are bounded deliberately: a major release of either library could
 change reported scores. `uv.lock` is committed so every clone and CI run
