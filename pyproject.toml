@@ -4,33 +4,18 @@
 [project]
 name = "study-posting-ai-analysis"
 version = "0.1.0"
-description = "Metrics for AI-assisted study posting authoring audit records."
+description = "Post-editing metrics for AI-assisted form field suggestions."
 readme = "README.md"
 requires-python = ">=3.13"
 license = "MIT"
 authors = [{ name = "University of Michigan" }]
-keywords = ["ter", "hter", "post-editing", "audit", "oracle", "llm-evaluation"]
+keywords = ["ter", "hter", "post-editing", "edit-distance", "llm-evaluation"]
 
 # --- Runtime dependencies --------------------------------------------------
 # Lower bounds are the versions the analysis was verified against. Upper
 # bounds exclude the next major version, because a major release of a metric
 # library could silently change reported scores.
-dependencies = [
-    "sacrebleu>=2.6.0,<3.0",
-    "rapidfuzz>=3.14.6,<4.0",
-    "pandas>=2.2.3,<3.0",
-]
-
-# --- Optional feature sets -------------------------------------------------
-# Installed with: uv sync --extra oracle
-# Kept optional so the test suite and CI never require a database driver.
-[project.optional-dependencies]
-oracle = ["oracledb>=3.0,<4.0"]
-
-# --- Command-line entry point ----------------------------------------------
-# Creates the "study-posting-analysis" command inside the virtual environment.
-[project.scripts]
-study-posting-analysis = "study_posting_ai_analysis.cli:main"
+dependencies = ["sacrebleu>=2.6.0,<3.0", "rapidfuzz>=3.14.6,<4.0"]
 
 [project.urls]
 Repository = "https://github.com/your-org/study-posting-ai-analysis"
@@ -40,16 +25,15 @@ Repository = "https://github.com/your-org/study-posting-ai-analysis"
 # ===========================================================================
 [dependency-groups]
 dev = [
-    "pytest>=8.3",
+    "pytest>=9.1",
     "pytest-cov>=6.0",
     "pytest-randomly>=3.16",
-    "ruff>=0.9",
-    "mypy>=1.14",
-    "pandas-stubs>=2.2",
+    "pytest-github-actions-annotate-failures>=0.4",
+    "ruff>=0.16",
+    "mypy>=2.3",
     "bandit>=1.8",
     "pip-audit>=2.7",
     "pre-commit>=4.0",
-    "pytest-github-actions-annotate-failures>=0.4.2",
 ]
 
 
@@ -113,7 +97,6 @@ select = [
     "PTH",
     "PL",
     "TRY",
-    "PD",
     "PERF",
     "FURB",
     "RUF",
@@ -177,10 +160,6 @@ module = ["sacrebleu.*"]
 implicit_reexport = true
 
 [[tool.mypy.overrides]]
-module = ["oracledb.*"]
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
 module = ["tests.*"]
 disallow_untyped_defs = false
 
@@ -201,7 +180,6 @@ addopts = [
 ]
 markers = [
     "slow: randomized differential tests; excluded by 'make test-fast'",
-    "oracle: requires a live Oracle connection; skipped unless configured",
     "integration: exercises more than one layer together",
 ]
 filterwarnings = ["error"]
@@ -217,14 +195,13 @@ source = ["src/study_posting_ai_analysis"]
 branch = true
 parallel = false
 relative_files = true
-omit = ["*/__main__.py", "*/adapters/oracle_adapter.py"]
 
 [tool.coverage.report]
 show_missing = true
 skip_covered = false
 skip_empty = true
 precision = 2
-fail_under = 85
+fail_under = 95
 exclude_also = [
     "if TYPE_CHECKING:",
     "raise AssertionError",

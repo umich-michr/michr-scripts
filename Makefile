@@ -250,7 +250,8 @@ audit: audit-deps audit-code
 # --strict fails on any dependency that cannot be audited, so a silent gap in
 # coverage is reported rather than ignored.
 audit-deps:
-	$(RUN) pip-audit --strict --progress-spinner=off
+	$(UV) export --no-emit-project --no-hashes --format requirements-txt \
+	  | $(RUN) pip-audit --strict --progress-spinner=off --requirement /dev/stdin
 
 audit-code:
 	$(RUN) bandit --configfile pyproject.toml --recursive $(SRC_DIR) --quiet
