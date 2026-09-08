@@ -139,7 +139,8 @@ def test_edited_subfield_records_metrics() -> None:
 
     assert result.match is MatchType.EDITED
     assert result.editing_metrics is not None
-    assert result.editing_metrics.field_name == "contact.name"
+    assert result.pick is not None
+    assert result.pick.kind == "contact.name"
 
 
 def test_optional_subfield_cleared_after_selection_is_removed() -> None:

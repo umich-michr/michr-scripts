@@ -14,6 +14,8 @@ and field definitions.
 from dataclasses import dataclass
 from enum import StrEnum
 
+from michr_text_post_editing.models import PostEditingResult
+
 # ---------------------------------------------------------------------------
 # Type aliases
 # ---------------------------------------------------------------------------
@@ -85,117 +87,6 @@ class MatchType(StrEnum):
 
 
 # ---------------------------------------------------------------------------
-# Low-level metric results
-# ---------------------------------------------------------------------------
-
-
-@dataclass(frozen=True, slots=True)
-class TerResult:
-    """TER and its effort-saved transformation.
-
-    Attributes
-    ----------
-    ter_rate
-        TER expressed as a proportion. It can exceed 1.
-    effort_saved_raw
-        ``1 - ter_rate``. It can be negative.
-    effort_saved
-        ``effort_saved_raw`` bounded to ``[0, 1]`` for reporting.
-    """
-
-    ter_rate: float
-    effort_saved_raw: float
-    effort_saved: float
-
-
-@dataclass(frozen=True, slots=True)
-class CharacterResult:
-    """Character-level Levenshtein results.
-
-    Attributes
-    ----------
-    distance
-        Minimum number of character insertions, deletions, and substitutions.
-        Not an observed keystroke count.
-    effort_saved_raw
-        ``1 - distance / final_character_count``. It can be negative.
-    effort_saved
-        ``effort_saved_raw`` bounded to ``[0, 1]``.
-    """
-
-    distance: int
-    effort_saved_raw: float
-    effort_saved: float
-
-
-@dataclass(frozen=True, slots=True)
-class SoftWordResult:
-    """Custom weighted word-level result.
-
-    A supporting robustness measure, not the primary standardized metric.
-
-    Attributes
-    ----------
-    distance
-        Weighted word-level edit distance. Insertions and deletions cost 1;
-        a substitution costs the normalized character distance between words.
-    effort_saved_raw
-        ``1 - distance / final_word_count``. It can be negative.
-    effort_saved
-        ``effort_saved_raw`` bounded to ``[0, 1]``.
-    """
-
-    distance: float
-    effort_saved_raw: float
-    effort_saved: float
-
-
-# ---------------------------------------------------------------------------
-# Combined editing result
-# ---------------------------------------------------------------------------
-
-
-@dataclass(frozen=True, slots=True)
-class SuggestionEditingResult:
-    """Technical post-editing measures for one applied suggestion.
-
-    Produced only when a suggestion was selected or applied and the final saved
-    text is nonblank. Not produced for ``UNASSISTED`` or ``REMOVED`` outcomes,
-    because the normalized scores would require a zero denominator.
-
-    These values measure textual transformation. They are proxies for technical
-    post-editing effort and do not measure elapsed time, keystrokes, or
-    cognitive effort. See docs/analysis-specification.md sections 8 and 16.
-    """
-
-    field_name: str
-
-    # Primary TER-derived measure.
-    ter_rate: float
-    ter_effort_saved_raw: float
-    ter_effort_saved: float
-
-    # Character-level robustness measure.
-    character_edit_distance: int
-    character_effort_saved_raw: float
-    character_effort_saved: float
-
-    # Custom soft-word robustness measure.
-    soft_word_edit_distance: float
-    soft_word_effort_saved_raw: float
-    soft_word_effort_saved: float
-
-    # Absolute technical-editing proxy.
-    estimated_characters_saved: float
-
-    # Descriptive length values, measured after NFC normalization.
-    suggestion_character_count: int
-    final_character_count: int
-    suggestion_word_count: int
-    final_word_count: int
-
-
-# ---------------------------------------------------------------------------
 # Selection identification
 # ---------------------------------------------------------------------------
 
@@ -247,7 +138,7 @@ class TextFieldAnalysis:
     suggestion_counts: dict[str, int]
     pick: Pick | None
     match: MatchType
-    editing_metrics: SuggestionEditingResult | None
+    editing_metrics: PostEditingResult | None
     selected_text: str | None
     final_text: str
 

@@ -18,11 +18,7 @@ license = "MIT"
 authors = [{ name = "University of Michigan" }]
 keywords = ["ter", "hter", "post-editing", "edit-distance", "llm-evaluation"]
 
-dependencies = [
-    "michr-text-post-editing>=0.1.0",
-    "sacrebleu>=2.6.0,<3.0",
-    "rapidfuzz>=3.14.6,<4.0",
-]
+dependencies = ["michr-text-post-editing>=0.1.0"]
 
 [tool.uv.sources]
 michr-text-post-editing = { workspace = true }

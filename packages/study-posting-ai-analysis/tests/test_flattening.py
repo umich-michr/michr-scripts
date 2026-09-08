@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from michr_text_post_editing.metrics import analyze_post_edit
 from study_posting_ai_analysis.field_analysis import (
     analyze_lookup_values,
     analyze_objects,
@@ -14,7 +15,6 @@ from study_posting_ai_analysis.flattening import (
     flatten_analysis_results,
     serialize_integer_set,
 )
-from study_posting_ai_analysis.metrics import analyze_selected_suggestion
 from study_posting_ai_analysis.models import (
     AnalysisResult,
     CompensationAnalysis,
@@ -43,8 +43,7 @@ def make_text_result(
 ) -> TextFieldAnalysis:
     """Return a text result, with metrics only when a selection was made."""
     metrics = (
-        analyze_selected_suggestion(
-            field_name="title",
+        analyze_post_edit(
             suggestion=selected,
             final=final,
         )

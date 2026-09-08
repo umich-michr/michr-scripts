@@ -1,28 +1,13 @@
-"""Metrics for AI-assisted study posting authoring.
+"""Analysis of AI-assisted study-posting form values.
 
-Measures how much AI-generated text assistance survived into final
-human-authored content in the eResearch study-posting form.
+Given the suggestions an AI offered, the values a user selected, and the final
+values saved, this package applies study-posting business rules and returns one
+structured analysis result per field.
 
-The contract is three inputs and one output: AI suggestions, user selections,
-and final saved values in; per-field analysis results out. This library performs
-no I/O and knows nothing about databases, files, or audit-table schemas.
+Technical text post-editing calculations are provided by the separate
+``michr-text-post-editing`` package.
 
-These metrics quantify technical post-editing effort. They do not measure time
-saved, keystrokes avoided, cognitive effort, or user satisfaction. See
-docs/analysis-specification.md section 16.
-
-Examples
---------
->>> from study_posting_ai_analysis import (
-...     analyze_objects,
-...     flatten_analysis_results,
-...     parse_analysis_inputs,
-... )
->>> suggested, selected, final = parse_analysis_inputs(
-...     suggestions_json, selections_json, final_json
-... )
->>> results = analyze_objects(suggested, selected, final)
->>> rows = flatten_analysis_results(results, record_id="audit-1234")
+This package performs no database, filesystem, reporting, or logging I/O.
 """
 
 from study_posting_ai_analysis.errors import InputParseError
@@ -44,25 +29,15 @@ from study_posting_ai_analysis.flattening import (
     FLATTENED_COLUMNS,
     flatten_analysis_results,
 )
-from study_posting_ai_analysis.metrics import (
-    analyze_selected_suggestion,
-    calculate_character_metrics,
-    calculate_soft_word_metrics,
-    calculate_ter_metrics,
-)
 from study_posting_ai_analysis.models import (
     AnalysisResult,
-    CharacterResult,
     CompensationAnalysis,
     FieldKind,
     FieldSpec,
     LookupValueAnalysis,
     MatchType,
     Pick,
-    SoftWordResult,
-    SuggestionEditingResult,
     Suggestions,
-    TerResult,
     TextFieldAnalysis,
 )
 from study_posting_ai_analysis.parsing import (
@@ -79,7 +54,6 @@ __all__ = [
     "FLATTENED_COLUMNS",
     "REQUIRED_CONTACT_FIELDS",
     "AnalysisResult",
-    "CharacterResult",
     "CompensationAnalysis",
     "FieldKind",
     "FieldSpec",
@@ -87,21 +61,14 @@ __all__ = [
     "LookupValueAnalysis",
     "MatchType",
     "Pick",
-    "SoftWordResult",
-    "SuggestionEditingResult",
     "Suggestions",
-    "TerResult",
     "TextFieldAnalysis",
     "__version__",
     "analyze_compensation",
     "analyze_contact",
     "analyze_lookup_values",
     "analyze_objects",
-    "analyze_selected_suggestion",
     "analyze_text_field",
-    "calculate_character_metrics",
-    "calculate_soft_word_metrics",
-    "calculate_ter_metrics",
     "compare_selected_text",
     "flatten_analysis_results",
     "parse_analysis_inputs",

@@ -1239,16 +1239,10 @@ version = "0.1.0"
 source = { editable = "packages/study-posting-ai-analysis" }
 dependencies = [
     { name = "michr-text-post-editing" },
-    { name = "rapidfuzz" },
-    { name = "sacrebleu" },
 ]
 
 [package.metadata]
-requires-dist = [
-    { name = "michr-text-post-editing", editable = "packages/michr-text-post-editing" },
-    { name = "rapidfuzz", specifier = ">=3.14.6,<4.0" },
-    { name = "sacrebleu", specifier = ">=2.6.0,<3.0" },
-]
+requires-dist = [{ name = "michr-text-post-editing", editable = "packages/michr-text-post-editing" }]
 
 [[package]]
 name = "tabulate"

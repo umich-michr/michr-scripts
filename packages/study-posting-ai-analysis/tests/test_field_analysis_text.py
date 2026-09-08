@@ -2,12 +2,13 @@
 
 import pytest
 
+from michr_text_post_editing.models import PostEditingResult
 from study_posting_ai_analysis.field_analysis import (
     analyze_text_field,
     compare_selected_text,
     find_first_picked_suggestion,
 )
-from study_posting_ai_analysis.models import MatchType, SuggestionEditingResult
+from study_posting_ai_analysis.models import MatchType
 
 # ---------------------------------------------------------------------------
 # find_first_picked_suggestion
@@ -68,7 +69,7 @@ def test_cosmetic_equivalence_does_not_suppress_edit_distance() -> None:
     )
 
     assert match is MatchType.COSMETIC_EQUIVALENT
-    assert isinstance(metrics, SuggestionEditingResult)
+    assert isinstance(metrics, PostEditingResult)
     assert metrics.character_edit_distance > 0
 
 
@@ -81,7 +82,7 @@ def test_edited_match_is_classified_and_measured() -> None:
     )
 
     assert match is MatchType.EDITED
-    assert isinstance(metrics, SuggestionEditingResult)
+    assert isinstance(metrics, PostEditingResult)
 
 
 def test_optional_field_classifies_blank_final_as_removed() -> None:

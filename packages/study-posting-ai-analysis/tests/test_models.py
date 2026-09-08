@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from michr_text_post_editing import PostEditingResult
 import study_posting_ai_analysis as package
 from study_posting_ai_analysis.models import (
     CompensationAnalysis,
@@ -11,7 +12,6 @@ from study_posting_ai_analysis.models import (
     LookupValueAnalysis,
     MatchType,
     Pick,
-    SuggestionEditingResult,
     TextFieldAnalysis,
 )
 
@@ -21,10 +21,9 @@ PACKAGE_ROOT = Path(__file__).resolve().parent.parent
 SPECIFICATION = PACKAGE_ROOT / "docs" / "analysis-specification.md"
 
 
-def make_editing_result(ter_effort_saved: float) -> SuggestionEditingResult:
+def make_editing_result(ter_effort_saved: float) -> PostEditingResult:
     """Return a minimal editing result with the given TER score."""
-    return SuggestionEditingResult(
-        field_name="title",
+    return PostEditingResult(
         ter_rate=1.0 - ter_effort_saved,
         ter_effort_saved_raw=ter_effort_saved,
         ter_effort_saved=ter_effort_saved,
@@ -45,7 +44,7 @@ def make_editing_result(ter_effort_saved: float) -> SuggestionEditingResult:
 def make_text_analysis(
     match: MatchType,
     *,
-    metrics: SuggestionEditingResult | None = None,
+    metrics: PostEditingResult | None = None,
 ) -> TextFieldAnalysis:
     """Return a text analysis with the given outcome."""
     return TextFieldAnalysis(

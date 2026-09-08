@@ -14,6 +14,8 @@ blank required field is a validation error rather than a metric of zero.
 See docs/analysis-specification.md sections 4, 5, 6, 10, and 11.
 """
 
+from michr_text_post_editing import PostEditingResult
+from michr_text_post_editing.metrics import analyze_post_edit
 from study_posting_ai_analysis.field_specs import (
     COMPENSATION_KINDS,
     CONTACT_FIELDS,
@@ -21,7 +23,6 @@ from study_posting_ai_analysis.field_specs import (
     FIELD_SPECS,
     REQUIRED_CONTACT_FIELDS,
 )
-from study_posting_ai_analysis.metrics import analyze_selected_suggestion
 from study_posting_ai_analysis.models import (
     AnalysisResult,
     CompensationAnalysis,
@@ -29,7 +30,6 @@ from study_posting_ai_analysis.models import (
     LookupValueAnalysis,
     MatchType,
     Pick,
-    SuggestionEditingResult,
     TextFieldAnalysis,
 )
 from study_posting_ai_analysis.text_normalization import (
@@ -91,7 +91,7 @@ def compare_selected_text(
     final: str,
     *,
     allow_empty_final: bool,
-) -> tuple[MatchType, SuggestionEditingResult | None]:
+) -> tuple[MatchType, PostEditingResult | None]:
     """Compare a selected suggestion with the value ultimately saved.
 
     Evaluation order is blank, then exact, then cosmetic, then edited.
@@ -109,7 +109,7 @@ def compare_selected_text(
 
     Returns
     -------
-    tuple[MatchType, SuggestionEditingResult | None]
+    tuple[MatchType, PostEditingResult | None]
         The outcome classification, and the editing metrics when the final text
         is nonblank. Metrics are ``None`` for a ``REMOVED`` outcome, because the
         normalized scores would require a zero denominator.
@@ -145,8 +145,7 @@ def compare_selected_text(
     else:
         match = MatchType.EDITED
 
-    editing_metrics = analyze_selected_suggestion(
-        field_name=field,
+    editing_metrics = analyze_post_edit(
         suggestion=selected,
         final=final,
     )
