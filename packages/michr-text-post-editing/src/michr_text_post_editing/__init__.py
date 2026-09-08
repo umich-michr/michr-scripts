@@ -4,10 +4,23 @@ This package compares an AI-generated suggestion with final human-edited text.
 It performs pure calculations only: no database, filesystem, pandas, logging,
 or application-specific business rules.
 
-The metric API will be added incrementally while preserving the verified
-behavior of ``study-posting-ai-analysis``.
+The comparison is directional. Normalized scores use the final text length as
+their denominator.
 """
+
+from michr_text_post_editing.models import (
+    CharacterResult,
+    PostEditingResult,
+    SoftWordResult,
+    TerResult,
+)
 
 __version__ = "0.1.0"
 
-__all__ = ["__version__"]
+__all__ = [
+    "CharacterResult",
+    "PostEditingResult",
+    "SoftWordResult",
+    "TerResult",
+    "__version__",
+]
