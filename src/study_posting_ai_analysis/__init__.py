@@ -15,7 +15,6 @@ module layout::
 
 from study_posting_ai_analysis.models import (
     AnalysisResult,
-    AuditRecord,
     CharacterResult,
     CompensationAnalysis,
     FieldKind,
@@ -34,7 +33,6 @@ __version__ = "0.1.0"
 
 __all__ = [
     "AnalysisResult",
-    "AuditRecord",
     "CharacterResult",
     "CompensationAnalysis",
     "FieldKind",

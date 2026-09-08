@@ -420,46 +420,6 @@ class FieldSpec:
     text_required: bool | None = None
 
 
-# ---------------------------------------------------------------------------
-# Audit record
-# ---------------------------------------------------------------------------
-
-
-@dataclass(frozen=True, slots=True)
-class AuditRecord:
-    """One eligible audit record with its JSON columns decoded.
-
-    An eligible record has ``ATTEMPT_TYPE = 'AI'`` and
-    ``ATTEMPT_RESULT = 'COMPLETE'``. The three JSON columns are required to
-    decode into JSON objects.
-
-    Attributes
-    ----------
-    audit_id
-        Primary key of the audit row.
-    study_num
-        Study number, when present.
-    start_time
-        Attempt start timestamp as stored, or ``None``.
-    end_time
-        Attempt end timestamp as stored, or ``None``.
-    suggested
-        Decoded ``LLM_SUGGESTIONS`` object.
-    selected
-        Decoded ``SELECTED_SUGGESTIONS`` object.
-    final
-        Decoded ``FINAL_SUBMISSION`` object.
-    """
-
-    audit_id: int
-    study_num: str | None
-    start_time: str | None
-    end_time: str | None
-    suggested: dict[str, object]
-    selected: dict[str, object]
-    final: dict[str, object]
-
-
 # # ---------------------------------------------------------------------------
 # # Result union
 # # ---------------------------------------------------------------------------
