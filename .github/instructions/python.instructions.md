@@ -73,20 +73,21 @@ Optional Booleans use type(value) is not bool for the same reason.
 
 ## Exceptions
 
-Define domain exceptions in `errors.py`, rooted at `AnalysisError`:
+This library raises only `TypeError`, `ValueError`, and `InputParseError`, which
+subclasses `ValueError`. Callers therefore need no special handling to use it
+idiomatically.
+
+Do not introduce an exception hierarchy. Record-level, repository, and
+configuration error types belong to consuming programs.
+
+Messages name the field, prefixed where applicable:
 
 ```python
-class AnalysisError(Exception):
-    """Base class for all analysis failures."""
-
-
-class RecordDecodeError(AnalysisError):
-    """An audit record's JSON column was missing, blank, or malformed."""
-
-
-class FieldValidationError(AnalysisError):
-    """A field value violated a form or requiredness rule."""
+raise ValueError(f"{field_name}: final saved text must not be blank")
 ```
+
+Never catch a bare `Exception`. Never log; raising is how this library reports a
+problem.
 
 Include the audit record ID and field name in the message whenever available. Never catch a bare `Exception` in the domain layer.
 
@@ -101,13 +102,25 @@ logger.warning("Record %s failed: %s", record.audit_id, error)
 
 Never log selected or final field text above `DEBUG`.
 
-## Database access
+## Purity
 
-- Parameterized queries only.
-- A table name from configuration must be validated against a strict identifierpattern before interpolation, and the reason documented in a comment.
-- Oracle uses named bind parameters (:attempt_type); SQLite uses ?.
-- import oracledb occurs inside the adapter function or method, never atmodule scope, so the package imports without the optional extra.
-- Set arraysize from configuration and stream rows; never fetchall() the whole table.
+Every module in `src/` is pure. None may import `sqlite3`, `oracledb`, `pandas`,
+`pathlib`, `os`, `logging`, or call `open`.
+
+Module docstrings state this constraint explicitly, so a reader or agent opening
+the file sees it before writing anything:
+
+```python
+"""Weighted text post-editing metrics.
+
+Pure functions only: no database, filesystem, pandas, or logging dependencies.
+All inputs are NFC-normalized before measurement.
+
+See docs/analysis-specification.md section 7 for the formulas.
+"""
+```
+
+If a task appears to require I/O, it belongs in a consuming program. Say so.
 
 ## Type annotation notes
 

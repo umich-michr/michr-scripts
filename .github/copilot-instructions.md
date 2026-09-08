@@ -1,77 +1,77 @@
 # Project context for AI coding agents
 
-## What this project is
+## What this library is
 
-A Python library and command-line program that measures how much
-**AI-generated text assistance survived into final human-authored content**.
+`study-posting-ai-analysis` measures how much **AI-generated text assistance
+survived into final human-authored content**.
 
-The University of Michigan eResearch study-posting form offers LLM-generated
-suggestions for fields such as title, purpose, description, compensation text,
-and contact details. Every attempt is written to an audit table. This project
-reads those audit rows and produces per-field metrics describing how much
-technical post-editing the user performed.
+Given three inputs — the suggestions an AI offered, the suggestions a user
+selected, and the values the user ultimately saved — it reports, per form field,
+what became of the suggestion and how much textual post-editing was required.
 
-The canonical, authoritative description of the analysis is
-**[`../docs/analysis-specification.md`](docs/analysis-specification.md)**. Treat it as the specification of record.
-If code and that document disagree, the document wins unless the user explicitly
-says otherwise.
+Built for the University of Michigan eResearch study-posting form.
 
-## Current scope (iteration 1)
+The authoritative description of the analysis is
+**`docs/analysis-specification.md`**. Treat it as the specification of record.
+If code and that document disagree, the document governs unless the user says
+otherwise.
 
-- Read eligible audit rows from a data source, one row at a time.
-- Analyze each row and produce one flat metrics row per form field.
-- Export the result as CSV.
+## Scope: what this library does NOT do
 
-Data sources: **SQLite** (local development, loaded from a CSV export) and
-**Oracle** (production, via `python-oracledb` in thin mode). Oracle batch
-processing is deliberately minimal in this iteration and will be expanded next.
+This is a **pure analysis library**. It performs no input or output.
 
-The code originated as a Google Colab notebook. Porting it must **not** change
-any metric result.
+It has no knowledge of, and must never gain knowledge of:
 
-## Architecture
+- databases, connections, queries, or drivers;
+- files, paths, CSV, or the filesystem;
+- audit-table schemas, eligibility filtering, or record identity beyond an
+  opaque `record_id` label;
+- pandas or any DataFrame;
+- logging;
+- command-line arguments or configuration.
 
-Four layers. Dependencies point inward only.
+Those concerns belong to separate consuming programs. If a task appears to
+require any of them, the task belongs in a different package — say so rather than
+adding the capability here.
 
-- Presentation cli.py, reporting.py output <- CSV, summaries, terminal.
-- Application pipeline.py <- orchestration, error capture
-- Domain models, metrics, field_analysis <- pure, no I/O
-- Adapter adapters/sqlite, adapters/oracle <- database access
+Runtime dependencies are **`sacrebleu` and `rapidfuzz`, and nothing else**.
 
+## Public contract
+
+```python
+suggested, selected, final = parse_analysis_inputs(a, b, c)  # JSON in
+results = analyze_objects(suggested, selected, final)        # dict[str, AnalysisResult]
+rows = flatten_analysis_results(results, record_id="x")      # list[dict[str, object]]
+```
+
+Flattened rows contain only `None`, `bool`, `int`, `float`, or `str` — never a
+nested structure. `FLATTENED_COLUMNS` defines every column and its order.
+
+## Modules
 
 | Module | Responsibility |
 |---|---|
-| `models.py` | Enums and frozen dataclasses. No logic beyond derived properties. |
-| `text_normalization.py` | Unicode normalization, cosmetic equivalence, `clamp01`, token counting. |
-| `metrics.py` | TER, character Levenshtein, weighted soft-word. Pure functions. |
+| `models.py` | Enums and frozen dataclasses. Derived values are properties, never stored fields. |
+| `validation.py` | Runtime type checks. Accepts `object` so `isinstance` narrowing is genuine. |
+| `text_normalization.py` | NFC normalization, cosmetic equivalence, `clamp01`, token counting. |
+| `metrics.py` | TER, character Levenshtein, weighted soft-word. Pure calculations. |
 | `field_specs.py` | `FIELD_SPECS`, contact field names, requiredness configuration. |
-| `field_analysis.py` | Business rules: match classification and per-field-kind analyzers. |
-| `errors.py` | Exception hierarchy rooted at `AnalysisError`. |
-| `repository.py` | `AuditRecordRepository` Protocol and JSON column decoding. |
-| `adapters/` | Concrete SQLite and Oracle repositories. |
-| `pipeline.py` | Iterates records, calls the domain, captures per-record errors. |
-| `reporting.py` | Flattening, pandas DataFrame construction, summaries, CSV export. |
-| `config.py` | Settings from environment variables. No secrets in code. |
-| `cli.py` | argparse entry point. |
+| `field_analysis.py` | Match classification and the four per-kind analyzers. |
+| `parsing.py` | JSON input decoding. |
+| `flattening.py` | Results to tabular rows. |
+| `errors.py` | `InputParseError` only. |
 
-### Hard architectural rules
+### Hard rules
 
-1. **The domain layer imports no I/O.** `models.py`, `text_normalization.py`,
-   `metrics.py`, `field_specs.py`, and `field_analysis.py` must never import
-   `sqlite3`, `oracledb`, `pandas`, `os`, or anything from `adapters/`.
-2. **`pandas` appears only in `reporting.py`.** Nowhere else.
-3. **`oracledb` is imported lazily**, inside the Oracle adapter, so the package
-   works when the optional extra is not installed.
-4. **`pipeline.py` depends on the `AuditRecordRepository` Protocol**, never on a
-   concrete adapter.
-5. **Domain functions raise; they do not log.** Logging belongs to the
-   application and presentation layers.
+1. **No I/O anywhere.** No `sqlite3`, `oracledb`, `pandas`, `pathlib`, `open`,
+   `os`, or `logging` in `src/`.
+2. **Functions raise; they never log.** Error handling is the caller's decision.
+3. **Results are immutable.** Frozen, slotted dataclasses.
+4. **No new dependency without asking.** Two runtime dependencies is a feature.
 
 ## Domain rules you must not change without explicit instruction
 
-### Match classification (`MatchType`)
-
-Applied to a text field where a suggestion was selected:
+### Match classification
 
 | Outcome | Condition |
 |---|---|
@@ -79,41 +79,54 @@ Applied to a text field where a suggestion was selected:
 | `COSMETIC_EQUIVALENT` | Equal after `normalize_text_for_equivalence`. |
 | `EDITED` | Nonblank final text with substantive differences remaining. |
 | `REMOVED` | A suggestion was selected but the optional final value is blank. |
-| `UNASSISTED` | No AI suggestion or lookup value was selected. |
+| `UNASSISTED` | No suggestion or lookup value was selected. |
 
-Evaluation order is **blank check, then exact, then cosmetic, then edited**.
+Evaluation order is **blank, then exact, then cosmetic, then edited**.
+
+Metrics are calculated for all three nonblank outcomes, so an exact match records
+a measured score rather than an assumed one.
 
 ### Metrics
 
-| Metric | Formula | Role |
-|---|---|---|
-| TER-derived | `1 - TER`, TER from SacreBLEU | **Primary**, case-insensitive |
-| Character | `1 - levenshtein / final_char_count` | Secondary, case-sensitive |
-| Soft-word | `1 - weighted_word_distance / final_word_count` | Robustness, case-sensitive |
-| Characters saved | `max(0, final_chars - char_distance)` | Absolute proxy |
+| Metric | Formula | Role | Case |
+|---|---|---|---|
+| TER-derived | `1 - TER`, from SacreBLEU | **Primary** | insensitive |
+| Character | `1 - levenshtein / final_char_count` | Secondary | sensitive |
+| Soft-word | `1 - weighted_distance / final_word_count` | Robustness | sensitive |
+| Characters saved | `max(0, final_chars - char_distance)` | Absolute proxy | sensitive |
 
-Every raw score may be negative and is retained. Bounded reporting scores are
-`clamp01(raw)`. Both are stored; never discard the raw value.
+The case asymmetry is deliberate. Do not "fix" it.
 
-Soft-word substitution cost is the RapidFuzz **normalized** character distance
-between the two words. Insertion and deletion each cost `1.0` by default.
+Every raw score may be negative and is retained alongside its `clamp01` bounded
+counterpart. Never discard the raw value.
+
+Soft-word substitution cost is the RapidFuzz **normalized** character distance.
+Insertion and deletion each cost `1.0` by default. The implementation keeps two
+dynamic-programming rows; the full matrix exists only in `tests/helpers/` as the
+verification reference.
+
+`_TER` is constructed once at module scope with every argument explicit. Changing
+its configuration changes published results.
 
 ### Requiredness
 
 Required: `title`, `purpose`, `description`, `contact.email`, `contact.name`.
 Optional: `about`, `contact.phone`, `contact.website`.
 Compensation text is required exactly when the **saved** `offersCompensation`
-value is `True`. The saved Boolean must be `True` or `False`, never absent.
+value is `True`. That Boolean must be `True` or `False`, never absent.
 
-A blank required final value is a validation error, not a metric of zero.
+A blank required final value raises. It is not a metric of zero.
 
 ### Lookup fields
 
-`department`, `locations`, `topics` hold sets of integer IDs. Booleans are
-rejected because `bool` subclasses `int`. Picked IDs must have been offered.
-Similarity is Jaccard between picked and saved. When nothing was picked the
-outcome is `UNASSISTED` and similarity is the **policy value `0.0`**, not a
+`department`, `locations`, `topics` hold sets of integer identifiers. Booleans are
+rejected because `bool` subclasses `int`. Picked identifiers must have been
+offered. Similarity is Jaccard between picked and saved. When nothing was picked,
+the outcome is `UNASSISTED` and similarity is the **policy value `0.0`**, not a
 calculated one.
+
+Lookup rows leave the TER and policy columns as `None` in flattened output, so a
+mean over text rows cannot be contaminated by a similarity value.
 
 ### Preprocessing invariants
 
@@ -126,113 +139,137 @@ calculated one.
 
 ## Interpretation discipline
 
-These metrics measure **technical post-editing effort**. In code comments,
-docstrings, log messages, and documentation, never describe them as measuring
-time saved, keystrokes avoided, cognitive effort, or user satisfaction.
+These metrics measure **technical post-editing effort**. In code, docstrings,
+comments, and documentation, never describe them as measuring time saved,
+keystrokes avoided, cognitive effort, or user satisfaction.
 
 Use the established vocabulary:
 
 | Statistic | Label |
 |---|---|
-| Fields with an offer / analyzed text fields | Suggestion offer coverage |
-| Fields with a selection / fields with an offer | Suggestion selection rate |
+| Fields with an offer ÷ analyzed text fields | Suggestion offer coverage |
+| Fields with a selection ÷ fields with an offer | Suggestion selection rate |
 | Mean policy score among fields with an offer | Realized suggestion utility |
 | Mean policy score among selected suggestions | Selected-suggestion utility |
 | Mean `ter_effort_saved` among nonblank post-edits | TER-derived post-editing score |
 
-Every reported mean must be accompanied by its denominator or sample count.
-Never average lookup similarity together with text effort-saved scores.
+Every mean must state its denominator. Never average lookup similarity together
+with text effort-saved scores.
 
 ## Coding conventions
 
-- Python 3.14, `from __future__ import annotations` not needed.
-- Full type annotations. `mypy --strict` must pass.
+- Python 3.14. Full type annotations. `mypy --strict` must pass.
 - Ruff formats and lints; line length 88. Do not hand-format around it.
-- NumPy-style docstrings on every public function, class, and module.
-- Frozen dataclasses with `slots=True` for result objects.
-- `StrEnum` for closed vocabularies.
-- Named keyword arguments for anything non-obvious; keyword-only (`*`) for flags.
-- Descriptive names. Prefer `number_of_final_words` over `n`.
-- `pathlib.Path`, never `os.path`.
-- Explicit, informative exception messages naming the field and the record.
-- Parameterized SQL only. Never build a query with string interpolation of
-  user or configuration input except for a validated table identifier.
+- NumPy-style docstrings on every public module, class, and function. Module
+  docstrings state the purity constraint.
+- Frozen dataclasses with `slots=True` for results. Derived values are
+  `@property`.
+- `StrEnum` for closed vocabularies. PEP 695 `type` statements for aliases.
+- Keyword-only (`*`) for flag parameters.
+- Descriptive names: `number_of_final_words`, not `n`.
+- Exception messages name the field, prefixed for contact and compensation.
+
+## Validation at trust boundaries
+
+Values arriving from decoded JSON carry no static type guarantee. Validate them
+through `validation.py`, whose helpers accept `object` so that `isinstance`
+narrowing is genuine rather than statically redundant.
+
+Never replace an `isinstance` check with a truthiness test on a method result:
+`None` must raise `TypeError`, not `AttributeError`, and the exception type for
+each failure is asserted by tests.
+
+Never silence a "redundant isinstance" diagnostic with `# noqa` or
+`# type: ignore`. Move the check into a helper that accepts `object`.
+
+Validate what the boundary genuinely permits, and no more. `isinstance(x, dict)`
+after `json.loads` is necessary, because JSON has six value types. Re-checking
+that keys are strings is not, because JSON guarantees it.
 
 ## Testing conventions
 
-- pytest. New tests are plain functions with `assert`.
-- Existing `unittest.TestCase` classes ported from the notebook may remain;
-  do not rewrite them without being asked.
-- `pytest.raises(..., match="...")` to assert on error messages.
+- pytest. Plain functions with `assert`. No `unittest.TestCase`.
+- `pytest.raises(..., match=r"...")`. Escape regex metacharacters, including the
+  dot in `contact\.email`.
+- Compare enum members with `is`, not `==`.
 - Mark randomized differential tests `@pytest.mark.slow`.
-- Mark tests needing a live database `@pytest.mark.oracle`; they must skip
-  automatically when unconfigured.
-- Unit tests must never open a network or file-based database connection.
-- The full-matrix reference implementation lives in `tests/helpers/` and exists
-  solely to verify the memory-optimized soft-word distance.
+- Seed every generator explicitly: `random.Random(42)`.
+- `pytest.approx(reference, abs=1e-12)` for float comparisons.
+- `pytest-randomly` shuffles order; tests must not depend on order or shared
+  state.
+- Use the `valid_audit_objects` fixture and modify exactly one field to isolate
+  the behavior under test.
+- Synthetic text only. Never real or realistic study content.
 
-## Workflow commands
+Coverage sits near 99 percent with a 95 percent gate. The four uncovered lines
+are defensive guards for states the type system prevents; leave them uncovered.
+
+## Documentation is part of the change
+
+Certain edits are incomplete without a matching documentation change. Before
+finishing, check this table and state in your summary which documents you updated
+or why none were needed.
+
+| If you changed | Also update |
+|---|---|
+| A metric formula, threshold, or normalization step | `docs/analysis-specification.md` §7 or §9 |
+| Requiredness of any field | `docs/analysis-specification.md` §4 |
+| A `MatchType` outcome or its evaluation order | `docs/analysis-specification.md` §5, `docs/program-flow.md` §4 |
+| Lookup similarity policy | `docs/analysis-specification.md` §11 |
+| Compensation Boolean or text rules | `docs/analysis-specification.md` §10, `docs/program-flow.md` §6 |
+| `FLATTENED_COLUMNS` | `README.md` "What it reports", `docs/program-flow.md` §8 |
+| Added, removed, or renamed a module | `README.md` architecture, `docs/program-flow.md` §1 |
+| The public API in `__init__.py` | `README.md` "Public API" |
+| A dependency or version bound | `README.md` reproducibility table |
+
+A pre-commit hook enforces the first five rows. If it blocks a commit, open the
+named section rather than bypassing the hook.
+
+## Workflow
 
 Always use `make`; never invoke `pip`, and never activate the venv manually.
 
 ```bash
-make install      # uv sync
-make format       # Ruff format and import ordering
-make lint         # Ruff lint
-make typecheck    # mypy strict
-make test         # pytest, clean start
-make coverage     # pytest with coverage into reports/
-make audit        # pip-audit and bandit
-make check        # everything above; the gate before any commit
-make clean        # remove output, reports, caches
+make setup       # bootstrap a fresh clone
+make format      # Ruff format and import ordering
+make lint        # Ruff lint
+make typecheck   # mypy strict
+make test        # pytest, clean start
+make test-fast   # skip slow randomized tests
+make coverage    # coverage reports into reports/
+make audit       # pip-audit and bandit
+make check       # everything; the gate before any commit
+make clean       # remove reports and caches
 ```
-
-Generated files live only in output/ and reports/. Both are removed bymake clean and are git-ignored.
-
-## Documentation is part of the change, not a follow-up
-
-Certain edits are incomplete without a matching documentation change. Before
-finishing a task, check this table. State in your summary which documents you
-updated, or why none were needed.
-
-| If you changed | You must also update |
-|---|---|
-| A metric formula, threshold, or normalization step | `docs/analysis-specification.md` §7 or §9 |
-| Requiredness of any field | `docs/analysis-specification.md` §4 |
-| A `MatchType` outcome or its evaluation order | `docs/analysis-specification.md` §5 and `docs/program-flow.md` §4 |
-| Lookup similarity policy | `docs/analysis-specification.md` §11 |
-| Compensation Boolean or text rules | `docs/analysis-specification.md` §10 and `docs/program-flow.md` §6 |
-| A column produced by `flatten_analysis_results()` | `README.md` "What the analysis produces" |
-| Added, removed, or renamed a module | `README.md` architecture tree and `docs/program-flow.md` §1 |
-| A Make target or CLI argument | `README.md` commands table and `CONTRIBUTING.md` |
-| A dependency or a version bound | `README.md` reproducibility table |
-
-A pre-commit hook enforces the first four rows. If it blocks a commit, open the
-named section and update it rather than bypassing the hook.
-
-If you are unsure whether a documentation change is required, say so explicitly
-rather than silently skipping it.
 
 ## Things to never do
 
-- Change a metric formula, normalization step, or threshold without anaccompanying update to docs/analysis-specification.md.
-- Introduce pandas into the domain layer.
-- Import oracledb at module scope outside its adapter.
-- Hard-code credentials, DSNs, hostnames, or file paths. Use config.py.
-- Commit real audit data. data/ is git-ignored except data/sample/.
-- Put actual study text in a test fixture, an example, or a docstring. Inventsynthetic text.
-- Log or print selected or final field text at INFO or above.
-- Silently swallow an exception. Record it per-record in the pipeline andcontinue, or let it propagate.
-- Add a dependency without asking. If one is needed, explain why and add it viauv add.
-- Loosen mypy strictness or add a broad # type: ignore. Use a narrow,code-specific ignore with a comment explaining it.
+- Add I/O, pandas, logging, or a database driver to this package.
+- Change a metric formula, normalization step, or threshold without updating
+  `docs/analysis-specification.md`.
+- Add a dependency without asking. Two runtime dependencies is deliberate.
+- Loosen `mypy` strictness, or add a broad `# type: ignore`. If an ignore is
+  unavoidable, make it code-specific and comment why.
+- "Simplify" a validation block. Values from decoded JSON have no static type
+  guarantee, and the exception type for each failure is asserted by tests.
+- Use `normalize_text_for_equivalence` as preprocessing for a metric. It exists
+  only for classification and would hide real edits.
+- Discard a raw effort-saved score in favor of only its bounded counterpart.
+- Combine lookup similarity with text effort-saved scores in one average.
+- Put real or realistic study text in a test, fixture, example, or docstring.
+  Invent synthetic content such as "Participants receive a $50 gift card."
+- Silence a lint or type diagnostic to make an error disappear rather than
+  addressing what it reports.
 
 ## When you are unsure
 
-Ask, and state the specific ambiguity. Preferred order of authority:
+Ask, and state the specific ambiguity. Order of authority:
 
 1. An explicit instruction in the current conversation.
-1. docs/analysis-specification.md.
-1. Existing behavior in the ported notebook code and its tests.
-1. This file.
+2. `docs/analysis-specification.md`.
+3. Existing behavior and its tests.
+4. This file.
 
-Prefer a small, reviewable change with a test over a large refactor.
+Prefer a small, reviewable change with a test over a large refactor. If a task
+seems to require I/O, a data source, or a DataFrame, it belongs in a consuming
+program rather than here — say so instead of adding the capability.
