@@ -1,28 +1,26 @@
 # ===========================================================================
-# Project metadata (PEP 621)
+# michr-scripts — uv workspace root
+#
+# This project is not itself installable. It declares the workspace, holds the
+# shared development dependency group, and configures the tools that apply
+# uniformly across every package and program.
+#
+# pytest and coverage are configured per package, because each package runs its
+# own suite from its own directory.
+#
+#   uv sync --all-packages     install every workspace member
+#   make check                 run the gate across all members
 # ===========================================================================
 [project]
-name = "study-posting-ai-analysis"
-version = "0.1.0"
-description = "Post-editing metrics for AI-assisted form field suggestions."
+name = "michr-scripts"
+version = "0.0.0"
+description = "MICHR scripts: shared packages and runnable programs."
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.14"
 license = "MIT"
 authors = [{ name = "University of Michigan" }]
-keywords = ["ter", "hter", "post-editing", "edit-distance", "llm-evaluation"]
+dependencies = []
 
-# --- Runtime dependencies --------------------------------------------------
-# Lower bounds are the versions the analysis was verified against. Upper
-# bounds exclude the next major version, because a major release of a metric
-# library could silently change reported scores.
-dependencies = ["sacrebleu>=2.6.0,<3.0", "rapidfuzz>=3.14.6,<4.0"]
-
-[project.urls]
-Repository = "https://github.com/your-org/study-posting-ai-analysis"
-
-# ===========================================================================
-# Development dependency group (PEP 735)
-# ===========================================================================
 [dependency-groups]
 dev = [
     "pytest>=9.1",
@@ -36,33 +34,22 @@ dev = [
     "pre-commit>=4.0",
 ]
 
-
 # ===========================================================================
-# Build backend
-# ===========================================================================
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
-[tool.hatch.build.targets.wheel]
-packages = ["src/study_posting_ai_analysis"]
-
-# ===========================================================================
-# uv
+# Workspace
 # ===========================================================================
 [tool.uv]
-package = true
+# The root is a coordination point, not a distributable.
+package = false
 
-[tool.uv.sources]
-study-posting-ai-analysis = { workspace = true }
+[tool.uv.workspace]
+members = ["packages/*", "programs/*"]
 
 # ===========================================================================
-# Ruff: formatter and linter
+# Ruff: shared across every member
 # ===========================================================================
 [tool.ruff]
 line-length = 88
-target-version = "py313"
-src = ["src", "tests"]
+target-version = "py314"
 extend-exclude = ["notebooks"]
 
 [tool.ruff.format]
@@ -107,7 +94,8 @@ ignore = ["D203", "D213", "ISC001", "TRY003", "EM101", "EM102"]
 convention = "numpy"
 
 [tool.ruff.lint.isort]
-known-first-party = ["study_posting_ai_analysis"]
+# Every workspace member is first-party. Add new members here.
+known-first-party = ["michr_text_post_editing", "study_posting_ai_analysis"]
 force-sort-within-sections = true
 
 [tool.ruff.lint.pylint]
@@ -117,7 +105,7 @@ max-args = 8
 mypy-init-return = true
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**/*.py" = [
+"**/tests/**/*.py" = [
     "S101",
     "D100",
     "D101",
@@ -125,29 +113,24 @@ mypy-init-return = true
     "D103",
     "D104",
     "PLR2004",
-    "ANN201",
     "S311",
 ]
-"src/study_posting_ai_analysis/__init__.py" = ["F401"]
+"**/src/*/__init__.py" = ["F401"]
+"scripts/*.py" = ["T201"]
 
 # ===========================================================================
-# mypy
+# mypy: shared across every member
 # ===========================================================================
 [tool.mypy]
-python_version = "3.13"
-files = ["src", "tests", "scripts"]
-# Required for src-layout: tells mypy that "src" is a package root, so
-# src/study_posting_ai_analysis/models.py maps to
-# study_posting_ai_analysis.models rather than being guessed from the path.
-mypy_path = "src"
-explicit_package_bases = true
-namespace_packages = true
+python_version = "3.14"
 strict = true
 pretty = true
 show_error_codes = true
 show_column_numbers = true
 warn_unreachable = true
 warn_no_return = true
+explicit_package_bases = true
+namespace_packages = true
 enable_error_code = [
     "redundant-expr",
     "truthy-bool",
@@ -155,6 +138,8 @@ enable_error_code = [
     "possibly-undefined",
 ]
 
+# sacrebleu is typed but declares no explicit re-exports, so strict mode's
+# no_implicit_reexport rejects "from sacrebleu.metrics import TER".
 [[tool.mypy.overrides]]
 module = ["sacrebleu.*"]
 implicit_reexport = true
@@ -164,59 +149,7 @@ module = ["tests.*"]
 disallow_untyped_defs = false
 
 # ===========================================================================
-# pytest
-# ===========================================================================
-[tool.pytest.ini_options]
-minversion = "8.0"
-testpaths = ["tests"]
-addopts = [
-    "--import-mode=importlib",
-    "--strict-markers",
-    "--strict-config",
-    "-ra",
-    "--showlocals",
-    "--tb=short",
-    "--durations=10",
-]
-markers = ["slow: randomized differential tests; excluded by 'make test-fast'"]
-filterwarnings = ["error"]
-log_cli = false
-log_cli_level = "INFO"
-log_cli_format = "%(levelname)-8s %(name)s: %(message)s"
-
-# ===========================================================================
-# Coverage
-# ===========================================================================
-[tool.coverage.run]
-source = ["src/study_posting_ai_analysis"]
-branch = true
-parallel = false
-relative_files = true
-
-[tool.coverage.report]
-show_missing = true
-skip_covered = false
-skip_empty = true
-precision = 2
-fail_under = 95
-exclude_also = [
-    "if TYPE_CHECKING:",
-    "raise AssertionError",
-    "raise NotImplementedError",
-    "@overload",
-    "@abstractmethod",
-    "if __name__ == .__main__.:",
-    "class .*\\(Protocol\\):",
-]
-
-[tool.coverage.html]
-directory = "reports/htmlcov"
-
-[tool.coverage.xml]
-output = "reports/coverage.xml"
-
-# ===========================================================================
-# Bandit
+# Bandit: shared
 # ===========================================================================
 [tool.bandit]
 exclude_dirs = ["tests", ".venv", "build", "dist"]

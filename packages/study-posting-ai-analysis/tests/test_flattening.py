@@ -23,6 +23,11 @@ from study_posting_ai_analysis.models import (
     TextFieldAnalysis,
 )
 
+# Resolved from this file's location so the tests pass regardless of the
+# working directory pytest was invoked from.
+PACKAGE_ROOT = Path(__file__).resolve().parent.parent
+SPECIFICATION = PACKAGE_ROOT / "docs" / "analysis-specification.md"
+
 type AuditObjects = tuple[
     dict[str, object],
     dict[str, object],
@@ -479,6 +484,6 @@ def test_empty_results_produce_no_rows() -> None:
 
 def test_specification_documents_the_flattening_step() -> None:
     """Section 13 describes the conversion to one row per field."""
-    specification = Path("docs/analysis-specification.md").read_text(encoding="utf-8")
+    specification = SPECIFICATION.read_text(encoding="utf-8")
 
     assert "flatten_analysis_results" in specification

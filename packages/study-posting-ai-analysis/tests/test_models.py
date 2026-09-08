@@ -15,6 +15,11 @@ from study_posting_ai_analysis.models import (
     TextFieldAnalysis,
 )
 
+# Resolved from this file's location so the tests pass regardless of the
+# working directory pytest was invoked from.
+PACKAGE_ROOT = Path(__file__).resolve().parent.parent
+SPECIFICATION = PACKAGE_ROOT / "docs" / "analysis-specification.md"
+
 
 def make_editing_result(ter_effort_saved: float) -> SuggestionEditingResult:
     """Return a minimal editing result with the given TER score."""
@@ -58,7 +63,7 @@ def make_text_analysis(
 # ---------------------------------------------------------------------------
 
 
-def test_match_type_values_are_stable():
+def test_match_type_values_are_stable() -> None:
     """Outcome names appear in exported data and must not change silently."""
     assert {outcome.value for outcome in MatchType} == {
         "EXACT",
@@ -69,7 +74,7 @@ def test_match_type_values_are_stable():
     }
 
 
-def test_field_kind_values_are_stable():
+def test_field_kind_values_are_stable() -> None:
     assert {kind.value for kind in FieldKind} == {
         "TEXT",
         "LOOKUP",
@@ -107,14 +112,14 @@ def test_policy_adjusted_effort_saved(
     assert analysis.policy_adjusted_effort_saved == pytest.approx(expected)
 
 
-def test_ter_effort_saved_is_none_without_metrics():
+def test_ter_effort_saved_is_none_without_metrics() -> None:
     """Undefined rather than zero, so it can be excluded from means."""
     analysis = make_text_analysis(MatchType.UNASSISTED)
 
     assert analysis.ter_effort_saved is None
 
 
-def test_ter_effort_saved_reads_through_to_metrics():
+def test_ter_effort_saved_reads_through_to_metrics() -> None:
     analysis = make_text_analysis(
         MatchType.EDITED,
         metrics=make_editing_result(0.42),
@@ -212,7 +217,7 @@ def make_lookup(
     )
 
 
-def test_lookup_set_partitions_are_derived_consistently():
+def test_lookup_set_partitions_are_derived_consistently() -> None:
     """kept, dropped, added, and saved_not_offered follow from the three sets."""
     analysis = make_lookup(
         offered={1, 2, 3},
@@ -228,7 +233,7 @@ def test_lookup_set_partitions_are_derived_consistently():
     assert analysis.saved_not_offered == frozenset({9})
 
 
-def test_lookup_partitions_are_empty_when_nothing_was_picked():
+def test_lookup_partitions_are_empty_when_nothing_was_picked() -> None:
     analysis = make_lookup(
         offered={1, 2},
         picked=set(),
@@ -248,7 +253,7 @@ def test_lookup_partitions_are_empty_when_nothing_was_picked():
 # ---------------------------------------------------------------------------
 
 
-def test_result_models_are_immutable():
+def test_result_models_are_immutable() -> None:
     """Frozen dataclasses prevent a result from being altered after analysis."""
     analysis = make_text_analysis(MatchType.UNASSISTED)
 
@@ -263,9 +268,9 @@ def test_result_models_are_immutable():
 # impossible rather than merely discouraged.
 
 
-def test_specification_documents_every_match_type():
+def test_specification_documents_every_match_type() -> None:
     """Every outcome name must appear in the analysis specification."""
-    specification = Path("docs/analysis-specification.md").read_text(encoding="utf-8")
+    specification = SPECIFICATION.read_text(encoding="utf-8")
 
     for outcome in MatchType:
         assert outcome.value in specification, (
@@ -273,7 +278,7 @@ def test_specification_documents_every_match_type():
         )
 
 
-def test_package_exposes_its_public_api():
+def test_package_exposes_its_public_api() -> None:
     """A missing __init__.py would make this an implicit namespace package."""
     assert package.__file__ is not None
     assert package.__version__ == "0.1.0"

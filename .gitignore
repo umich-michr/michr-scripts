@@ -38,11 +38,18 @@ htmlcov/
 junit.xml
 
 # ---------------------------------------------------------------------------
-# Program output (regenerated on every run; never committed)
+# Generated reports (regenerated on every run; never committed)
 # ---------------------------------------------------------------------------
-output/
 reports/
+packages/*/reports/
+programs/*/reports/
 *.log
+
+# ---------------------------------------------------------------------------
+# Local environment files
+# ---------------------------------------------------------------------------
+.env
+.env.*
 
 # ---------------------------------------------------------------------------
 # Editors and operating systems

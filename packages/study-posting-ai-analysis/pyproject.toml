@@ -1,0 +1,93 @@
+# ===========================================================================
+# study-posting-ai-analysis
+#
+# A pure analysis library: three decoded objects in, per-field results out.
+# No input or output of any kind.
+#
+# Shared Ruff, mypy, and bandit configuration lives in the workspace root.
+# pytest and coverage are configured here, because this package runs its own
+# suite from its own directory.
+# ===========================================================================
+[project]
+name = "study-posting-ai-analysis"
+version = "0.1.0"
+description = "Post-editing metrics for AI-assisted form field suggestions."
+readme = "README.md"
+requires-python = ">=3.14"
+license = "MIT"
+authors = [{ name = "University of Michigan" }]
+keywords = ["ter", "hter", "post-editing", "edit-distance", "llm-evaluation"]
+
+dependencies = [
+    "michr-text-post-editing>=0.1.0",
+    "sacrebleu>=2.6.0,<3.0",
+    "rapidfuzz>=3.14.6,<4.0",
+]
+
+[tool.uv.sources]
+michr-text-post-editing = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/study_posting_ai_analysis"]
+
+# ===========================================================================
+# pytest
+# ===========================================================================
+[tool.pytest.ini_options]
+minversion = "9.0"
+testpaths = ["tests"]
+addopts = [
+    "--import-mode=importlib",
+    "--strict-markers",
+    "--strict-config",
+    "-ra",
+    "--showlocals",
+    "--tb=short",
+    "--durations=10",
+]
+markers = ["slow: randomized differential tests; excluded by 'make test-fast'"]
+filterwarnings = ["error"]
+log_cli = false
+log_cli_level = "INFO"
+log_cli_format = "%(levelname)-8s %(name)s: %(message)s"
+
+# ===========================================================================
+# Coverage
+# ===========================================================================
+[tool.coverage.run]
+source = ["study_posting_ai_analysis"]
+branch = true
+parallel = false
+relative_files = true
+
+[tool.coverage.paths]
+source = [
+    "src/study_posting_ai_analysis",
+    "*/site-packages/study_posting_ai_analysis",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+skip_empty = true
+precision = 2
+fail_under = 95
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "@overload",
+    "@abstractmethod",
+    "if __name__ == .__main__.:",
+    "class .*\\(Protocol\\):",
+]
+
+[tool.coverage.html]
+directory = "reports/htmlcov"
+
+[tool.coverage.xml]
+output = "reports/coverage.xml"

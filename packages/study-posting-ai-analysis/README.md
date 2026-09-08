@@ -52,10 +52,10 @@ suggested, selected, final = parse_analysis_inputs(
 # One structured result per analyzed form field.
 results = analyze_objects(suggested, selected, final)
 
-results["title"].match                       # MatchType.EDITED
-results["title"].ter_effort_saved            # 0.83
+results["title"].match  # MatchType.EDITED
+results["title"].ter_effort_saved  # 0.83
 results["title"].policy_adjusted_effort_saved  # 0.83
-results["topics"].similarity                 # 0.33 (Jaccard)
+results["topics"].similarity  # 0.33 (Jaccard)
 
 # One flat dictionary per field, ready for CSV, a DataFrame, or a table insert.
 rows = flatten_analysis_results(results, record_id="audit-1234")

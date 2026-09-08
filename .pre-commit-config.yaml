@@ -54,6 +54,8 @@ repos:
       - id: debug-statements
       - id: name-tests-test
         args: [--pytest-test-first]
+        # Test helpers are not test modules.
+        exclude: ^packages/.*/tests/helpers/
       # Blocks committing a file named exactly "id_rsa", "*.pem", etc.
       - id: detect-private-key
 
@@ -87,22 +89,20 @@ repos:
       # so it runs via "uv run" rather than in an isolated hook environment.
       - id: mypy
         name: mypy (strict)
-        entry: uv run mypy
+        entry: bash -c 'root=$(pwd); for m in packages/*; do (cd "$m" && MYPYPATH=src uv run mypy --config-file "$root/pyproject.toml" src tests) || exit 1; done; uv run mypy --config-file "$root/pyproject.toml" scripts'
         language: system
         types_or: [python, pyi]
-        # Pass no filenames: mypy uses the "files" setting in pyproject.toml
-        # so it always type-checks the whole project consistently.
         pass_filenames: false
         require_serial: true
 
       # Bandit examines only our own source tree.
       - id: bandit
         name: bandit (security)
-        entry: uv run bandit --configfile pyproject.toml --quiet
+        entry: bash -c 'uv run bandit --configfile pyproject.toml --recursive packages/*/src --quiet'
         language: system
         types: [python]
-        files: ^src/
-        exclude: ^tests/
+        files: ^packages/.*/src/
+        pass_filenames: false
 
       # Requires a specification update when a metric or rule module changes.
       # See scripts/check_docs_sync.py for the pairings.

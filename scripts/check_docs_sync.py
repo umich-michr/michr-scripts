@@ -7,59 +7,60 @@ advisory reminder only, so the blocking signal stays credible.
 Amend REQUIRED_PAIRS or ADVISORY_PAIRS when the module layout changes.
 """
 
+import shutil
 import subprocess
 import sys
 
-# Blocking: these modules determine published numbers. A silent change here
-# would invalidate the specification.
+PACKAGE = "packages/study-posting-ai-analysis"
+
+# Blocking: these modules determine published numbers.
 REQUIRED_PAIRS: dict[str, tuple[str, str]] = {
-    "src/study_posting_ai_analysis/metrics.py": (
-        "docs/analysis-specification.md",
+    f"{PACKAGE}/src/study_posting_ai_analysis/metrics.py": (
+        f"{PACKAGE}/docs/analysis-specification.md",
         "metric formulas are specified in section 7",
     ),
-    "src/study_posting_ai_analysis/text_normalization.py": (
-        "docs/analysis-specification.md",
+    f"{PACKAGE}/src/study_posting_ai_analysis/text_normalization.py": (
+        f"{PACKAGE}/docs/analysis-specification.md",
         "preprocessing is specified in section 9",
     ),
-    "src/study_posting_ai_analysis/field_specs.py": (
-        "docs/analysis-specification.md",
+    f"{PACKAGE}/src/study_posting_ai_analysis/field_specs.py": (
+        f"{PACKAGE}/docs/analysis-specification.md",
         "requiredness rules are specified in section 4",
     ),
-    "src/study_posting_ai_analysis/field_analysis.py": (
-        "docs/analysis-specification.md",
+    f"{PACKAGE}/src/study_posting_ai_analysis/field_analysis.py": (
+        f"{PACKAGE}/docs/analysis-specification.md",
         "outcome rules are specified in sections 5, 10, and 11",
     ),
 }
 
 # Advisory: usually implies a documentation update, but not always.
 ADVISORY_PAIRS: dict[str, tuple[str, str]] = {
-    "src/study_posting_ai_analysis/flattening.py": (
-        "README.md",
+    f"{PACKAGE}/src/study_posting_ai_analysis/flattening.py": (
+        f"{PACKAGE}/README.md",
         "FLATTENED_COLUMNS is described under 'What it reports'",
     ),
-    "src/study_posting_ai_analysis/__init__.py": (
-        "README.md",
+    f"{PACKAGE}/src/study_posting_ai_analysis/__init__.py": (
+        f"{PACKAGE}/README.md",
         "the public API table lists the exported names",
     ),
-    "src/study_posting_ai_analysis/parsing.py": (
-        "README.md",
-        "the usage example shows parse_analysis_inputs",
-    ),
-    "pyproject.toml": (
-        "README.md",
+    f"{PACKAGE}/pyproject.toml": (
+        f"{PACKAGE}/README.md",
         "the reproducibility table lists pinned versions",
     ),
-    "Makefile": (
-        "README.md",
-        "the commands table lists Make targets",
-    ),
+    "Makefile": ("README.md", "the commands table lists Make targets"),
 }
 
 
 def staged_files() -> set[str]:
     """Return repository-relative paths staged for commit."""
-    completed = subprocess.run(
-        ["git", "diff", "--cached", "--name-only", "--diff-filter=ACMR"],  # noqa: S607
+    git = shutil.which("git")
+
+    if git is None:
+        message = "git executable not found on PATH"
+        raise RuntimeError(message)
+
+    completed = subprocess.run(  # noqa: S603
+        [git, "diff", "--cached", "--name-only", "--diff-filter=ACMR"],
         capture_output=True,
         text=True,
         check=True,

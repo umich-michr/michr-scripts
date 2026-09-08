@@ -40,8 +40,8 @@ Runtime dependencies are **`sacrebleu` and `rapidfuzz`, and nothing else**.
 
 ```python
 suggested, selected, final = parse_analysis_inputs(a, b, c)  # JSON in
-results = analyze_objects(suggested, selected, final)        # dict[str, AnalysisResult]
-rows = flatten_analysis_results(results, record_id="x")      # list[dict[str, object]]
+results = analyze_objects(suggested, selected, final)  # dict[str, AnalysisResult]
+rows = flatten_analysis_results(results, record_id="x")  # list[dict[str, object]]
 ```
 
 Flattened rows contain only `None`, `bool`, `int`, `float`, or `str` — never a

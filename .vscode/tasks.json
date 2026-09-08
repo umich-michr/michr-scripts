@@ -125,7 +125,7 @@
     },
     {
       "label": "Clean",
-      "detail": "Remove output, reports, and tool caches",
+      "detail": "Remove reports and tool caches",
       "type": "shell",
       "command": "make clean",
       "problemMatcher": [],
@@ -168,25 +168,13 @@
       }
     },
     {
-      "label": "App: analyze with limit",
-      "detail": "Analyze only the first N eligible records",
-      "type": "shell",
-      "command": "make run LIMIT=${input:recordLimit} LOG_LEVEL=DEBUG",
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "clear": true
-      }
-    },
-    {
       "label": "Docs sync check",
       "detail": "Verify documentation accompanies rule changes",
       "type": "shell",
       "command": "make docs-check",
       "problemMatcher": [],
       "presentation": { "reveal": "always", "panel": "shared", "clear": true }
-    },
+    }
   ],
 
   // Prompted values keep task arguments named without editing this file.
