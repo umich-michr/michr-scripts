@@ -449,7 +449,7 @@ Documentation lives with the code it governs:
 | Workspace structure and common workflow | Root `README.md` |
 | Reusable package API | Package `README.md` |
 | Program CLI and configuration | Program `README.md` |
-| Study methodology and form policy | `study-posting-ai-analysis/docs/` |
+| Study methodology and form policy | `packages/study-posting-ai-analysis/docs/` |
 | Shared agent rules | `.github/copilot-instructions.md` |
 | Member-specific agent rules | `.github/instructions/` |
 
