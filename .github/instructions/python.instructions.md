@@ -1,132 +1,160 @@
 ---
-applyTo: "src/**/*.py"
+applyTo: "**/*.py"
 ---
 
-# Source code instructions
+# Shared Python instructions
 
-## Module template
+These conventions apply across the `michr-scripts` uv workspace. Package-specific
+and program-specific instruction files may impose additional constraints.
 
-Every module opens with a NumPy-style docstring stating its layer and its
-dependency constraints.
+## Determine ownership first
 
-```python
-"""Weighted text post-editing metrics.
+Before editing a Python file, identify its workspace member:
 
-Domain layer. Pure functions only: no database, filesystem, pandas, or
-logging dependencies. All inputs are NFC-normalized before measurement.
+- `packages/<name>/` contains an importable library;
+- `programs/<name>/` contains an independently runnable application;
+- `scripts/` contains repository-maintenance utilities.
 
-See docs/analysis-specification.md section 7 for the formulas.
-"""
+Read that member's `pyproject.toml`, README, and scoped instruction file before
+making changes.
 
-## Dataclass conventions
+Do not assume every workspace member has the same purity or dependency rules.
 
-Result objects are immutable and slotted:
+## Shared conventions
 
-```python
-@dataclass(frozen=True, slots=True)
-class TerResult:
-    """TER and its effort-saved transformation.
+- Python 3.14.
+- Full type annotations.
+- Root `mypy --strict` configuration must pass.
+- Ruff owns formatting, import ordering, and linting.
+- Line length is 88.
+- NumPy-style docstrings for public modules, classes, and functions.
+- Use PEP 695 `type` statements for type aliases.
+- Prefer frozen, slotted dataclasses for immutable value objects.
+- Prefer `StrEnum` for closed string vocabularies.
+- Use keyword-only parameters for flags and optional behavior.
+- Prefer descriptive names over abbreviations.
+- Use `pathlib.Path` rather than `os.path` when filesystem work is appropriate.
+- Raise precise exceptions with actionable messages.
+- Do not add broad lint or type suppressions.
 
-    Attributes
-    ----------
-    ter_rate
-        TER expressed as a proportion. May exceed 1.
-    effort_saved_raw
-        1 - TER. May be negative.
-    effort_saved
-        effort_saved_raw bounded to [0, 1] for reporting.
-    """
+## Dependency boundaries
 
-    ter_rate: float
-    effort_saved_raw: float
-    effort_saved: float
+Dependencies point from specific members toward reusable members:
+
+```text
+reusable package
+       ↑
+specific package
+       ↑
+runnable program
 ```
 
-Derived values are `@property`, never stored fields, so they cannot drift out ofsync. `flag_accepted`, `flag_changed`, `kept, dropped`, `added`, and `policy_adjusted_effort_saved` are all properties.
+Rules:
 
-## Validation style
+1. A package must never import a program.
+2. A more reusable package must not import a more specific package.
+3. Do not duplicate behavior already owned by another workspace member.
+4. Add a dependency only to the member that needs it.
+5. Explain why the standard library and existing dependencies are insufficient.
 
-Validate at the boundary of a public function, before any calculation. Raisewith the field name and, where available, the record identifier.
+Use:
 
-```python
-if not isinstance(field_name, str) or not field_name.strip():
-    raise ValueError("field_name must be a non-empty string")
+```bash
+uv add --package <distribution-name> <dependency>
 ```
 
-bool must be rejected explicitly where an int is expected, because bool subclasses int:
+Never edit `uv.lock` manually.
 
-```python
-if not isinstance(value, int) or isinstance(value, bool):
-    raise TypeError(f"{field}: must contain integer IDs only")
-```
+## I/O and logging depend on the member
 
-Optional Booleans use type(value) is not bool for the same reason.
+Do not apply one universal purity rule.
 
-## Metric implementation rules
+- Pure analysis packages may prohibit database, filesystem, pandas, logging, and
+  CLI behavior. Follow their scoped instructions.
+- Row-source packages may perform database, CSV, and filesystem I/O as part of
+  their explicit contract.
+- Programs may use configuration, logging, databases, CSV, pandas, and CLI
+  entry points when required by their responsibilities.
 
-- Normalize with `unicode_nfc_normalize_text` before measuring.
-- Reject a zero-length or zero-word final text: the denominator would be zero.
-- Return both the raw and the clamped score.
-- `_TER` is constructed once at module scope with every argument explicit, forreproducibility. Do not change its configuration.
-- `normalized_word_distance` is `@lru_cache`-decorated. Keep it a module-level function taking two str arguments so caching remains effective.
-- The soft-word implementation keeps two dynamic-programming rows. Do not replace it with a full matrix; the full matrix exists in tests/helpers/ asthe verification reference.
+Do not add I/O to a pure package merely because one consumer needs it. Put the
+behavior in the correct package or program.
+
+## Validation at trust boundaries
+
+Values from JSON, CSV, databases, environment variables, and command-line
+arguments have no static type guarantee.
+
+Validate them before use. If static analysis reports that an inline
+`isinstance()` check is redundant because a parameter is already annotated,
+move runtime validation into a helper accepting `object`; do not replace the
+check with unsafe truthiness logic.
+
+Container validation should:
+
+1. narrow the outer container;
+2. validate each element;
+3. construct a correctly typed result.
+
+Do not return `list[Unknown]` or `dict[Unknown, Unknown]` as a typed container.
 
 ## Exceptions
 
-This library raises only `TypeError`, `ValueError`, and `InputParseError`, which
-subclasses `ValueError`. Callers therefore need no special handling to use it
-idiomatically.
+Use exception types appropriate to the owning member:
 
-Do not introduce an exception hierarchy. Record-level, repository, and
-configuration error types belong to consuming programs.
+- reusable package input errors generally derive from `TypeError` or
+  `ValueError`;
+- programs may define configuration, source, or record-processing exceptions;
+- never silently swallow an exception;
+- never catch bare `Exception` unless the application boundary deliberately
+  records unexpected failures and then re-raises or exits.
 
-Messages name the field, prefixed where applicable:
+Pure libraries raise and do not log. Programs may log, but must avoid sensitive
+payloads.
 
-```python
-raise ValueError(f"{field_name}: final saved text must not be blank")
-```
+## SQL and database code
 
-Never catch a bare `Exception`. Never log; raising is how this library reports a
-problem.
+These rules apply only in members whose explicit contract includes database
+access:
 
-Include the audit record ID and field name in the message whenever available. Never catch a bare `Exception` in the domain layer.
+- parameterized SQL values only;
+- never interpolate credentials or user input into SQL;
+- validate identifiers before interpolating table or column names;
+- stream rows rather than calling `fetchall()` for unbounded queries;
+- close cursors and connections deterministically;
+- do not log credentials, connection strings containing secrets, or row
+  payloads;
+- database drivers belong only to the package or program that owns database
+  access.
 
-## Logging
+## Filesystem and CSV code
 
-The domain layer does not log. In the application and presentation layers use amodule-level logger and lazy `%s` formatting:
+These rules apply only where file I/O belongs:
 
-```python
-logger = logging.getLogger(__name__)
-logger.warning("Record %s failed: %s", record.audit_id, error)
-```
+- accept `Path` or `str | Path` at public boundaries;
+- open text files with an explicit encoding;
+- use `newline=""` with the standard-library CSV module;
+- stream rows rather than reading an unbounded file into memory;
+- avoid writing generated output into source directories;
+- use temporary paths in tests.
 
-Never log selected or final field text above `DEBUG`.
+## Security and privacy
 
-## Purity
+- Never hard-code credentials, tokens, DSNs, or institutional hostnames.
+- Never commit real audit exports or production payloads.
+- Never place real study text in tests, examples, snapshots, or logs.
+- Use synthetic fixtures.
+- Do not log selected or final free text unless explicitly required and handled
+  under an approved data policy.
 
-Every module in `src/` is pure. None may import `sqlite3`, `oracledb`, `pandas`,
-`pathlib`, `os`, `logging`, or call `open`.
+## Change discipline
 
-Module docstrings state this constraint explicitly, so a reader or agent opening
-the file sees it before writing anything:
+Before completing a change:
 
-```python
-"""Weighted text post-editing metrics.
+1. run the narrow tests for the owning member;
+2. run `make lint`;
+3. run `make typecheck`;
+4. run `make check`;
+5. inspect `git diff`;
+6. update documentation if the public contract or behavior changed.
 
-Pure functions only: no database, filesystem, pandas, or logging dependencies.
-All inputs are NFC-normalized before measurement.
-
-See docs/analysis-specification.md section 7 for the formulas.
-"""
-```
-
-If a task appears to require I/O, it belongs in a consuming program. Say so.
-
-## Type annotation notes
-
-- Prefer frozenset[int] over set[int] in result objects.
-- TypeAlias for repeated shapes, for example
-- Suggestions: TypeAlias = dict[str, list[str]].
-- Use Protocol for the repository interface, not an abstract base class.
-- Return X | None explicitly rather than Optional[X].
-Guard imports used only for typing with if TYPE_CHECKING:.
+Do not describe a behavior-changing analytical modification as a refactor.

@@ -1,275 +1,251 @@
-# Project context for AI coding agents
+# MICHR scripts workspace context
 
-## What this library is
+## Repository purpose
 
-`study-posting-ai-analysis` measures how much **AI-generated text assistance
-survived into final human-authored content**.
+`michr-scripts` is one Git repository containing reusable Python libraries and
+independently runnable Python programs.
 
-Given three inputs — the suggestions an AI offered, the suggestions a user
-selected, and the values the user ultimately saved — it reports, per form field,
-what became of the suggestion and how much textual post-editing was required.
+The repository uses a **uv workspace**:
 
-Built for the University of Michigan eResearch study-posting form.
+```text
+michr-scripts/
+├── packages/    Importable libraries
+└── programs/    Independently runnable applications
+```
 
-The authoritative description of the analysis is
-**`docs/analysis-specification.md`**. Treat it as the specification of record.
-If code and that document disagree, the document governs unless the user says
-otherwise.
+A library is imported by other members. A program declares a command-line entry
+point and composes one or more libraries.
 
-## Scope: what this library does NOT do
+## Current workspace members
 
-This is a **pure analysis library**. It performs no input or output.
+### `packages/michr-text-post-editing`
 
-It has no knowledge of, and must never gain knowledge of:
+Pure, reusable technical post-editing metrics.
 
-- databases, connections, queries, or drivers;
-- files, paths, CSV, or the filesystem;
-- audit-table schemas, eligibility filtering, or record identity beyond an
-  opaque `record_id` label;
-- pandas or any DataFrame;
-- logging;
-- command-line arguments or configuration.
-
-Those concerns belong to separate consuming programs. If a task appears to
-require any of them, the task belongs in a different package — say so rather than
-adding the capability here.
-
-Runtime dependencies are **`sacrebleu` and `rapidfuzz`, and nothing else**.
-
-## Public contract
+Contract:
 
 ```python
-suggested, selected, final = parse_analysis_inputs(a, b, c)  # JSON in
-results = analyze_objects(suggested, selected, final)  # dict[str, AnalysisResult]
-rows = flatten_analysis_results(results, record_id="x")  # list[dict[str, object]]
+result = analyze_post_edit(
+    suggestion="generated text",
+    final="human-edited text",
+)
 ```
 
-Flattened rows contain only `None`, `bool`, `int`, `float`, or `str` — never a
-nested structure. `FLATTENED_COLUMNS` defines every column and its order.
+Owns TER, character Levenshtein metrics, weighted soft-word metrics, metric text
+normalization, and `PostEditingResult`.
 
-## Modules
+### `packages/study-posting-ai-analysis`
 
-| Module | Responsibility |
-|---|---|
-| `models.py` | Enums and frozen dataclasses. Derived values are properties, never stored fields. |
-| `validation.py` | Runtime type checks. Accepts `object` so `isinstance` narrowing is genuine. |
-| `text_normalization.py` | NFC normalization, cosmetic equivalence, `clamp01`, token counting. |
-| `metrics.py` | TER, character Levenshtein, weighted soft-word. Pure calculations. |
-| `field_specs.py` | `FIELD_SPECS`, contact field names, requiredness configuration. |
-| `field_analysis.py` | Match classification and the four per-kind analyzers. |
-| `parsing.py` | JSON input decoding. |
-| `flattening.py` | Results to tabular rows. |
-| `errors.py` | `InputParseError` only. |
+Pure study-posting business analysis.
 
-### Hard rules
+Contract:
 
-1. **No I/O anywhere.** No `sqlite3`, `oracledb`, `pandas`, `pathlib`, `open`,
-   `os`, or `logging` in `src/`.
-2. **Functions raise; they never log.** Error handling is the caller's decision.
-3. **Results are immutable.** Frozen, slotted dataclasses.
-4. **No new dependency without asking.** Two runtime dependencies is a feature.
+```python
+results = analyze_objects(
+    suggested_object,
+    selected_object,
+    final_object,
+)
+```
 
-## Domain rules you must not change without explicit instruction
+Owns form-field policy, selection validation, outcome classification,
+requiredness, contact, compensation, lookup analysis, JSON parsing, and
+flattening.
 
-### Match classification
+Depends on `michr-text-post-editing` for technical text comparisons.
 
-| Outcome | Condition |
-|---|---|
-| `EXACT` | Selected and final Python strings are equal. |
-| `COSMETIC_EQUIVALENT` | Equal after `normalize_text_for_equivalence`. |
-| `EDITED` | Nonblank final text with substantive differences remaining. |
-| `REMOVED` | A suggestion was selected but the optional final value is blank. |
-| `UNASSISTED` | No suggestion or lookup value was selected. |
+### Future members
 
-Evaluation order is **blank, then exact, then cosmetic, then edited**.
+Planned reusable components include:
 
-Metrics are calculated for all three nonblank outcomes, so an exact match records
-a measured score rather than an assumed one.
+- a row-stream package with interchangeable database and CSV sources;
+- a study-posting audit-report program that composes row streaming and study
+  analysis.
 
-### Metrics
+Do not add those concerns to either existing analysis library.
 
-| Metric | Formula | Role | Case |
-|---|---|---|---|
-| TER-derived | `1 - TER`, from SacreBLEU | **Primary** | insensitive |
-| Character | `1 - levenshtein / final_char_count` | Secondary | sensitive |
-| Soft-word | `1 - weighted_distance / final_word_count` | Robustness | sensitive |
-| Characters saved | `max(0, final_chars - char_distance)` | Absolute proxy | sensitive |
+## Dependency direction
 
-The case asymmetry is deliberate. Do not "fix" it.
+Dependencies point from more specific members toward more reusable members:
 
-Every raw score may be negative and is retained alongside its `clamp01` bounded
-counterpart. Never discard the raw value.
+```text
+michr-text-post-editing
+          ↑
+study-posting-ai-analysis
+          ↑
+future study-posting-audit-report
+```
 
-Soft-word substitution cost is the RapidFuzz **normalized** character distance.
-Insertion and deletion each cost `1.0` by default. The implementation keeps two
-dynamic-programming rows; the full matrix exists only in `tests/helpers/` as the
-verification reference.
+Rules:
 
-`_TER` is constructed once at module scope with every argument explicit. Changing
-its configuration changes published results.
+1. A lower-level package must never import a higher-level package.
+2. Programs may compose packages; packages must not import programs.
+3. A package must not gain application concerns merely because one consumer
+   needs them.
+4. Shared behavior belongs in a package only when at least one coherent,
+   reusable contract can be stated for it.
 
-### Requiredness
+## Package and program boundaries
 
-Required: `title`, `purpose`, `description`, `contact.email`, `contact.name`.
-Optional: `about`, `contact.phone`, `contact.website`.
-Compensation text is required exactly when the **saved** `offersCompensation`
-value is `True`. That Boolean must be `True` or `False`, never absent.
+### Packages
 
-A blank required final value raises. It is not a metric of zero.
+Packages belong under `packages/<distribution-name>/`.
 
-### Lookup fields
+Each package owns:
 
-`department`, `locations`, `topics` hold sets of integer identifiers. Booleans are
-rejected because `bool` subclasses `int`. Picked identifiers must have been
-offered. Similarity is Jaccard between picked and saved. When nothing was picked,
-the outcome is `UNASSISTED` and similarity is the **policy value `0.0`**, not a
-calculated one.
+- its `pyproject.toml`;
+- its `README.md`;
+- its `src/` package;
+- its tests;
+- package-specific technical documentation;
+- its pytest and coverage configuration.
 
-Lookup rows leave the TER and policy columns as `None` in flattened output, so a
-mean over text rows cannot be contaminated by a similarity value.
+Packages should expose a small public API through `__init__.py`.
 
-### Preprocessing invariants
+### Programs
 
-- Metric inputs are normalized with Unicode **NFC**.
-- `normalize_text_for_equivalence` uses **NFKD** plus casefolding, combining-mark
-  removal, and punctuation-to-space. It is used **only** for classification and
-  must never preprocess a metric input.
-- Whitespace tokenization only. No stemming, lemmatization, embeddings, or
-  semantic similarity.
+Programs belong under `programs/<program-name>/`.
 
-## Interpretation discipline
+Each program owns:
 
-These metrics measure **technical post-editing effort**. In code, docstrings,
-comments, and documentation, never describe them as measuring time saved,
-keystrokes avoided, cognitive effort, or user satisfaction.
+- its `pyproject.toml`;
+- its CLI entry point;
+- configuration and logging;
+- orchestration;
+- external I/O;
+- program-specific tests and documentation.
 
-Use the established vocabulary:
+Programs may use database drivers, CSV, pandas, logging, and configuration when
+their responsibilities require them.
 
-| Statistic | Label |
-|---|---|
-| Fields with an offer ÷ analyzed text fields | Suggestion offer coverage |
-| Fields with a selection ÷ fields with an offer | Suggestion selection rate |
-| Mean policy score among fields with an offer | Realized suggestion utility |
-| Mean policy score among selected suggestions | Selected-suggestion utility |
-| Mean `ter_effort_saved` among nonblank post-edits | TER-derived post-editing score |
+## Shared tooling
 
-Every mean must state its denominator. Never average lookup similarity together
-with text effort-saved scores.
+The workspace root owns:
 
-## Coding conventions
+- `.python-version`;
+- `uv.lock`;
+- the shared virtual environment;
+- Ruff configuration;
+- mypy strict configuration;
+- Bandit configuration;
+- pre-commit;
+- CI;
+- VS Code settings;
+- the root `Makefile`.
 
-- Python 3.14. Full type annotations. `mypy --strict` must pass.
-- Ruff formats and lints; line length 88. Do not hand-format around it.
-- NumPy-style docstrings on every public module, class, and function. Module
-  docstrings state the purity constraint.
-- Frozen dataclasses with `slots=True` for results. Derived values are
-  `@property`.
-- `StrEnum` for closed vocabularies. PEP 695 `type` statements for aliases.
-- Keyword-only (`*`) for flag parameters.
-- Descriptive names: `number_of_final_words`, not `n`.
-- Exception messages name the field, prefixed for contact and compensation.
-
-## Validation at trust boundaries
-
-Values arriving from decoded JSON carry no static type guarantee. Validate them
-through `validation.py`, whose helpers accept `object` so that `isinstance`
-narrowing is genuine rather than statically redundant.
-
-Never replace an `isinstance` check with a truthiness test on a method result:
-`None` must raise `TypeError`, not `AttributeError`, and the exception type for
-each failure is asserted by tests.
-
-Never silence a "redundant isinstance" diagnostic with `# noqa` or
-`# type: ignore`. Move the check into a helper that accepts `object`.
-
-Validate what the boundary genuinely permits, and no more. `isinstance(x, dict)`
-after `json.loads` is necessary, because JSON has six value types. Re-checking
-that keys are strings is not, because JSON guarantees it.
-
-## Testing conventions
-
-- pytest. Plain functions with `assert`. No `unittest.TestCase`.
-- `pytest.raises(..., match=r"...")`. Escape regex metacharacters, including the
-  dot in `contact\.email`.
-- Compare enum members with `is`, not `==`.
-- Mark randomized differential tests `@pytest.mark.slow`.
-- Seed every generator explicitly: `random.Random(42)`.
-- `pytest.approx(reference, abs=1e-12)` for float comparisons.
-- `pytest-randomly` shuffles order; tests must not depend on order or shared
-  state.
-- Use the `valid_audit_objects` fixture and modify exactly one field to isolate
-  the behavior under test.
-- Synthetic text only. Never real or realistic study content.
-
-Coverage sits near 99 percent with a 95 percent gate. The four uncovered lines
-are defensive guards for states the type system prevents; leave them uncovered.
-
-## Documentation is part of the change
-
-Certain edits are incomplete without a matching documentation change. Before
-finishing, check this table and state in your summary which documents you updated
-or why none were needed.
-
-| If you changed | Also update |
-|---|---|
-| A metric formula, threshold, or normalization step | `docs/analysis-specification.md` §7 or §9 |
-| Requiredness of any field | `docs/analysis-specification.md` §4 |
-| A `MatchType` outcome or its evaluation order | `docs/analysis-specification.md` §5, `docs/program-flow.md` §4 |
-| Lookup similarity policy | `docs/analysis-specification.md` §11 |
-| Compensation Boolean or text rules | `docs/analysis-specification.md` §10, `docs/program-flow.md` §6 |
-| `FLATTENED_COLUMNS` | `README.md` "What it reports", `docs/program-flow.md` §8 |
-| Added, removed, or renamed a module | `README.md` architecture, `docs/program-flow.md` §1 |
-| The public API in `__init__.py` | `README.md` "Public API" |
-| A dependency or version bound | `README.md` reproducibility table |
-
-A pre-commit hook enforces the first five rows. If it blocks a commit, open the
-named section rather than bypassing the hook.
-
-## Workflow
-
-Always use `make`; never invoke `pip`, and never activate the venv manually.
+Use `make`; do not invoke `pip` or activate the virtual environment manually.
 
 ```bash
-make setup       # bootstrap a fresh clone
-make format      # Ruff format and import ordering
-make lint        # Ruff lint
-make typecheck   # mypy strict
-make test        # pytest, clean start
-make test-fast   # skip slow randomized tests
-make coverage    # coverage reports into reports/
-make audit       # pip-audit and bandit
-make check       # everything; the gate before any commit
-make clean       # remove reports and caches
+make setup
+make format
+make lint
+make typecheck
+make test
+make coverage
+make audit
+make check
 ```
 
-## Things to never do
+Target one member with:
 
-- Add I/O, pandas, logging, or a database driver to this package.
-- Change a metric formula, normalization step, or threshold without updating
-  `docs/analysis-specification.md`.
-- Add a dependency without asking. Two runtime dependencies is deliberate.
-- Loosen `mypy` strictness, or add a broad `# type: ignore`. If an ignore is
-  unavoidable, make it code-specific and comment why.
-- "Simplify" a validation block. Values from decoded JSON have no static type
-  guarantee, and the exception type for each failure is asserted by tests.
-- Use `normalize_text_for_equivalence` as preprocessing for a metric. It exists
-  only for classification and would hide real edits.
-- Discard a raw effort-saved score in favor of only its bounded counterpart.
-- Combine lookup similarity with text effort-saved scores in one average.
-- Put real or realistic study text in a test, fixture, example, or docstring.
-  Invent synthetic content such as "Participants receive a $50 gift card."
-- Silence a lint or type diagnostic to make an error disappear rather than
-  addressing what it reports.
+```bash
+make test PACKAGE=michr-text-post-editing
+make coverage PACKAGE=study-posting-ai-analysis
+```
 
-## When you are unsure
+`make check` is the required local and CI gate.
 
-Ask, and state the specific ambiguity. Order of authority:
+## Python conventions
 
-1. An explicit instruction in the current conversation.
-2. `docs/analysis-specification.md`.
-3. Existing behavior and its tests.
-4. This file.
+- Python 3.14.
+- Full type annotations; root `mypy --strict` configuration must pass.
+- Ruff owns formatting, imports, and linting.
+- NumPy-style docstrings for public modules, classes, and functions.
+- PEP 695 `type` statements for aliases.
+- Frozen, slotted dataclasses for immutable result objects.
+- Keyword-only arguments for optional flags and configuration.
+- Descriptive names rather than abbreviations.
+- Narrow validation at trust boundaries.
+- Do not silence diagnostics merely to make a gate pass.
 
-Prefer a small, reviewable change with a test over a large refactor. If a task
-seems to require I/O, a data source, or a DataFrame, it belongs in a consuming
-program rather than here — say so instead of adding the capability.
+## Tests
+
+- pytest with plain functions and `assert`.
+- Use `pytest.raises(..., match=r"...")` for failure behavior.
+- Compare enum members with `is`.
+- Use `pytest.approx` for floating-point results.
+- Seed randomized tests explicitly.
+- Mark expensive randomized tests `@pytest.mark.slow`.
+- Tests must be independent of order and state.
+- Test data must be synthetic.
+
+Run tests from the owning workspace member. Each member owns its coverage gate.
+
+## Dependencies
+
+Do not add a dependency without explaining:
+
+1. what contract requires it;
+2. why the standard library or an existing dependency is insufficient;
+3. which workspace member owns it;
+4. whether it affects reported analytical results.
+
+Use:
+
+```bash
+uv add --package <member> <dependency>
+```
+
+Commit both the member `pyproject.toml` and root `uv.lock`.
+
+Never edit `uv.lock` manually.
+
+## Documentation obligations
+
+Documentation belongs with the code it governs:
+
+- package behavior → package README or package docs;
+- program behavior → program README or program docs;
+- workspace organization → root README;
+- shared development workflow → root contributing guidance.
+
+Before completing a change, state which documents were updated or why no
+documentation change was necessary.
+
+Changes to formulas, normalization, requiredness, classifications, public API,
+flattened columns, CLI arguments, or package boundaries require documentation in
+the same change.
+
+## Agent behavior
+
+Before editing:
+
+1. identify the owning workspace member;
+2. read its `pyproject.toml` and README;
+3. read the scoped instruction file matching that member;
+4. inspect existing tests for the behavior;
+5. avoid crossing package boundaries without an explicit architectural reason.
+
+After editing:
+
+1. run the narrow member tests;
+2. run `make lint`;
+3. run `make typecheck`;
+4. run `make check`;
+5. review the complete Git diff;
+6. report documentation changes.
+
+Do not suggest reloading VS Code as generic troubleshooting. Use concrete command
+output, file inspection, and tool diagnostics first.
+
+## Never do these things
+
+- Put database, filesystem, CSV, DataFrame, logging, or CLI behavior into a pure
+  analysis package.
+- Duplicate behavior already owned by another workspace package.
+- Import a more specific package from a more reusable package.
+- Change analytical formulas or policy while describing the change as a
+  refactor.
+- Add broad lint or type suppressions.
+- Add real institutional data to tests, examples, logs, or documentation.
+- Commit credentials, environment files, database wallets, or generated reports.

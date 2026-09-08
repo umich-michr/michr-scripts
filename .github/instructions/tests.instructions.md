@@ -1,86 +1,139 @@
 ---
-applyTo: "tests/**/*.py"
+applyTo: "**/tests/**/*.py"
 ---
 
-# Test instructions
+# Shared test instructions
+
+These conventions apply to tests in every workspace member. Package-scoped
+instructions may add domain-specific requirements.
 
 ## Style
 
-New tests are plain functions. Name them after the behavior asserted, not the
-function called.
+Use pytest with plain functions and bare `assert`.
 
 ```python
-def test_cosmetic_equivalence_does_not_suppress_character_edit_distance():
-    match, metrics = compare_selected_text(
-        field="title",
-        selected="Résumé: Data Analysis",
-        final="resume data analysis",
-        allow_empty_final=False,
-    )
+def test_identical_text_has_zero_distance() -> None:
+    result = calculate_character_metrics("data", "data")
 
-    assert match is MatchType.COSMETIC_EQUIVALENT
-    assert metrics is not None
-    assert metrics.character_edit_distance > 0
+    assert result.distance == 0
 ```
 
-Compare enum members with is, not ==.
-
-## Assertions on errors
-
-Always constrain the message:
-
+Use explicit return annotations on test functions:
 
 ```python
-with pytest.raises(ValueError, match="final saved text must not be blank"):
+def test_example() -> None: ...
+```
+
+Compare enum members with `is`, not `==`.
+
+## Exceptions
+
+Constrain both type and message:
+
+```python
+with pytest.raises(ValueError, match=r"final text must not be blank"):
     ...
 ```
 
+`match=` is a regular expression. Escape metacharacters such as the dot in
+`contact\.email`, or use `re.escape()` for dynamic literal messages.
+
 ## Parameterization
 
-Use `pytest.mark.parametrize` with `ids` so a failure names the case:
+Use `pytest.mark.parametrize` with descriptive IDs:
 
 ```python
 @pytest.mark.parametrize(
-    ("suggestion", "final", "expected"),
+    ("value", "expected"),
     [
-        ("data", "data", 0),
-        ("data", "date", 1),
-        ("", "data", 4),
+        ("", True),
+        ("text", False),
     ],
-    ids=["identical", "one-substitution", "empty-suggestion"],
+    ids=["empty", "nonempty"],
 )
-def test_character_distance(suggestion, final, expected):
-    result = calculate_character_metrics(suggestion, final)
-    assert result.distance == expected
+def test_is_blank(value: str, expected: bool) -> None:
+    assert is_blank(value) is expected
 ```
 
-## Markers
+Annotate every parametrized argument.
 
-- @pytest.mark.slow — randomized differential tests. Excluded bymake test-fast.
-- @pytest.mark.oracle — needs a live database. Must skip automatically:pytest.mark.skipif(not oracle_configured(), reason="...").
-- @pytest.mark.integration — exercises more than one layer.
+## Floating-point results
 
-## Fixtures
+Use `pytest.approx`:
 
-Shared fixtures live in tests/conftest.py. Provide a valid_audit_objectsfixture returning the baseline suggested/selected/final triple, so a test canmodify exactly one field to isolate the behavior under test. This mirrors themake_valid_objects helper from the original notebook suite.
-Use tmp_path for any file or SQLite database. Never write into the repositorytree, and never rely on a database created by another test.
+```python
+assert result.effort_saved == pytest.approx(0.8)
+```
 
-## Determinism
-
-Seed every random generator explicitly: random.Random(42). pytest-randomlyshuffles test order, so tests must not depend on execution order or on stateleft by another test.
-
-## Floating point
-
-Use pytest.approx. Match the reference implementation to 12 decimal places:
+For differential algorithms near zero, use an explicit absolute tolerance:
 
 ```python
 assert optimized == pytest.approx(reference, abs=1e-12)
 ```
 
-## Data
+## Randomness and test order
 
-Never use real study text. Invent synthetic content such as"Participants receive a $50 gift card." Fixture CSV files belong indata/sample/ and must contain only synthetic rows.
+- Seed every generator explicitly, such as `random.Random(42)`.
+- Mark expensive randomized tests with `@pytest.mark.slow`.
+- Tests must not depend on execution order.
+- Tests must not share mutable state.
+- `pytest-randomly` may reorder tests.
 
-## Coverage expectations
+## Files and external resources
 
-metrics.py, text_normalization.py, and field_analysis.py should approachfull statement and branch coverage, including every validation error path. EachMatchType outcome needs at least one direct test.
+- Unit tests must not access a live network service.
+- Use `tmp_path` for filesystem tests.
+- Use fake or stub connections for database unit tests.
+- Live integration tests must use a marker defined by the owning member and
+  skip automatically when their required configuration is unavailable.
+- Never require credentials for the default workspace test run.
+- Never write generated files into the repository tree.
+
+Do not impose an Oracle-specific marker on every package. A future package that
+owns Oracle integration may define its own marker in that member's
+`pyproject.toml`.
+
+## Fixtures and data
+
+- Shared fixtures belong in the owning member's `tests/conftest.py`.
+- Test data must be synthetic.
+- Never use real study content, production identifiers, credentials, or database
+  extracts.
+- Modify only the fixture fields relevant to the behavior being tested.
+
+## Package boundaries
+
+Test behavior in the package that owns it.
+
+Examples:
+
+- TER, character distance, soft-word distance, and metric normalization belong
+  to `michr-text-post-editing`.
+- Study field requiredness, classification, compensation, contact, lookup, and
+  flattening belong to `study-posting-ai-analysis`.
+- A future row-stream package owns database and CSV streaming tests.
+- A future reporting program owns orchestration and output tests.
+
+Do not duplicate a complete low-level test suite in a consuming package. Add a
+small integration test proving that the consumer uses the dependency correctly.
+
+## Coverage
+
+Each workspace member owns its own pytest and coverage configuration.
+
+Run one member:
+
+```bash
+make test PACKAGE=<member-name>
+make coverage PACKAGE=<member-name>
+```
+
+Run the workspace gate:
+
+```bash
+make check
+```
+
+Coverage should include meaningful validation and branch behavior. Do not create
+artificial states solely to execute defensive guards that the type system or
+configuration makes unreachable.
