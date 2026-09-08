@@ -61,7 +61,7 @@ results["topics"].similarity  # 0.33 (Jaccard)
 
 # One flat dictionary per field, ready for CSV, a DataFrame, or a table insert.
 rows = flatten_analysis_results(results, record_id="audit-1234")
-```  
+```
 
 Text fields with a selected, nonblank suggestion contain a
 `michr_text_post_editing.PostEditingResult` in `editing_metrics`. Field identity
@@ -75,10 +75,10 @@ title.match  # MatchType.EDITED
 title.pick.kind  # "title"
 title.editing_metrics  # PostEditingResult
 title.ter_effort_saved  # convenience property
-```  
+```
 
-Callers that need to compare two texts independently should use the genericpackage directly:
-
+Callers that need to compare two texts independently should use the generic
+package directly:
 
 ```python
 from michr_text_post_editing import analyze_post_edit
