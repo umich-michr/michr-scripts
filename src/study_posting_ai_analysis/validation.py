@@ -1,6 +1,6 @@
 """Runtime validation helpers for values arriving from decoded JSON.
 
-Domain layer. Pure functions only.
+Pure functions only.
 
 Public analysis functions annotate their parameters with the types they
 document, but the values ultimately originate from JSON columns and carry no

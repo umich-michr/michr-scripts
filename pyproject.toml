@@ -178,10 +178,7 @@ addopts = [
     "--tb=short",
     "--durations=10",
 ]
-markers = [
-    "slow: randomized differential tests; excluded by 'make test-fast'",
-    "integration: exercises more than one layer together",
-]
+markers = ["slow: randomized differential tests; excluded by 'make test-fast'"]
 filterwarnings = ["error"]
 log_cli = false
 log_cli_level = "INFO"

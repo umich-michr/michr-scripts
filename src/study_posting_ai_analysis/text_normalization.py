@@ -1,6 +1,6 @@
 """Unicode normalization, cosmetic equivalence, and small numeric helpers.
 
-Domain layer. Pure functions only: no database, filesystem, pandas, or logging
+Pure functions only: no database, filesystem, pandas, or logging
 dependencies.
 
 Two distinct normalizations live here and must not be confused:

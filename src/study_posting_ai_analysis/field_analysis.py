@@ -1,6 +1,6 @@
 """Business rules for classifying and analyzing each form field.
 
-Domain layer. Pure functions only: no database, filesystem, pandas, or logging
+Pure functions only: no database, filesystem, pandas, or logging
 dependencies. Functions raise on invalid input rather than logging or returning
 a sentinel.
 

@@ -168,30 +168,6 @@
       }
     },
     {
-      "label": "App: load CSV into SQLite",
-      "detail": "Rebuild the local SQLite database from a CSV export",
-      "type": "shell",
-      "command": "make load-csv CSV_PATH=\"${input:csvPath}\"",
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "clear": true
-      }
-    },
-    {
-      "label": "App: analyze (SQLite)",
-      "detail": "Analyze eligible records and write CSV output",
-      "type": "shell",
-      "command": "make run",
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "clear": true
-      }
-    },
-    {
       "label": "App: analyze with limit",
       "detail": "Analyze only the first N eligible records",
       "type": "shell",

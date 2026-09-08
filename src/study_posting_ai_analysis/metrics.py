@@ -1,6 +1,6 @@
 """Technical post-editing metrics for applied LLM text suggestions.
 
-Domain layer. Pure functions only: no database, filesystem, pandas, or logging
+Pure functions only: no database, filesystem, pandas, or logging
 dependencies.
 
 This module compares an LLM suggestion that was applied to an editable field

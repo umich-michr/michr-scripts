@@ -1,6 +1,6 @@
 """Domain vocabulary and result models.
 
-Domain layer. Contains enumerations and frozen dataclasses only. This module
+Contains enumerations and frozen dataclasses only. This module
 must not import a database driver, pandas, the filesystem, or logging.
 
 Result objects are immutable and slotted. Values that can be derived from other

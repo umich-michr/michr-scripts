@@ -253,18 +253,6 @@ check: format-check lint typecheck audit coverage
 
 ci: check
 
-# ---------------------------------------------------------------------------
-# Application
-# ---------------------------------------------------------------------------
-# All arguments are named. --reset rebuilds the local database from scratch so
-# each load starts clean.
-load-csv:
-	$(RUN) study-posting-analysis load-csv \
-	  --csv-path=$(CSV_PATH) \
-	  --sqlite-path=$(SQLITE_PATH) \
-	  --log-level=$(LOG_LEVEL) \
-	  --reset
-
 run: clean-output
 	@mkdir -p $(OUTPUT_DIR)
 	$(RUN) study-posting-analysis analyze $(RUN_ARGS)

@@ -1,6 +1,6 @@
 """Form field configuration and requiredness rules.
 
-Domain layer. Contains configuration data only; no calculations and no I/O.
+Contains configuration data only; no calculations and no I/O.
 
 Requiredness is enforced before any normalized post-editing metric is
 calculated, because a blank required field is a validation error rather than a

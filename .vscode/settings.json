@@ -32,7 +32,6 @@
   "python.analysis.inlayHints.callArgumentNames": "partial",
   "python.analysis.completeFunctionParens": false,
   "python.analysis.packageIndexDepths": [
-    { "name": "pandas", "depth": 3 },
     { "name": "rapidfuzz", "depth": 3 },
     { "name": "sacrebleu", "depth": 3 }
   ],
@@ -103,7 +102,7 @@
   ],
   "github.copilot.chat.reviewSelection.instructions": [
     {
-      "text": "Verify that metric formulas match docs/analysis-specification.md exactly. Flag any change that could alter a reported score without a corresponding specification update. Confirm the domain layer imports no database or pandas code."
+      "text": "Verify that metric formulas match docs/analysis-specification.md exactly. Flag any change that could alter a reported score without a corresponding specification update. Confirm no module imports I/O, pandas, or logging."
     }
   ],
   "github.copilot.chat.commitMessageGeneration.instructions": [
@@ -182,8 +181,7 @@
   },
 
   "files.associations": {
-    "*.instructions.md": "markdown",
-    ".env.example": "dotenv"
+    "*.instructions.md": "markdown"
   },
 
   // ---------------------------------------------------------------------
