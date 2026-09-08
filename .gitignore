@@ -45,23 +45,6 @@ reports/
 *.log
 
 # ---------------------------------------------------------------------------
-# Local databases and secrets
-# ---------------------------------------------------------------------------
-*.db
-*.sqlite
-*.sqlite3
-.env
-.env.*
-!.env.example
-
-# Oracle wallet / TLS credentials must never be committed.
-wallet/
-tnsnames.ora
-sqlnet.ora
-cwallet.sso
-*.p12
-
-# ---------------------------------------------------------------------------
 # Editors and operating systems
 # ---------------------------------------------------------------------------
 # .vscode/ is committed intentionally so the team shares one configuration.

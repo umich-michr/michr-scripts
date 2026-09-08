@@ -3,13 +3,13 @@
 ## Before you start
 
 ```bash
-make setup      # idempotent; safe to re-run any time
+make setup      # idempotent; safe to re-run
 make check      # confirm a clean baseline before changing anything
 ```
 
-Read [`docs/analysis-specification.md`](docs/analysis-specification.md) first.
-It is the specification of record. If code and that document disagree, the
-document wins — or the document must be updated in the same change.
+Read [`docs/analysis-specification.md`](docs/analysis-specification.md) first. It
+is the specification of record. If code and that document disagree, the document
+governs — or it must be amended in the same change.
 
 ---
 
@@ -22,14 +22,14 @@ git switch -c feat/short-description
 
 make format      # Ruff format and import ordering
 make test        # fast feedback while iterating
-make check       # full gate: format, lint, types, audit, coverage
+make check       # the full gate
 
 git add -A
 git commit       # pre-commit hooks run automatically
 git push -u origin HEAD
 ```
 
-`make check` is the same gate CI runs. If it passes locally, CI should pass.
+`make check` runs the same commands as CI. If it passes locally, CI should pass.
 
 ---
 
@@ -41,8 +41,8 @@ Conventional Commits, enforced by a `commit-msg` hook:
 type(scope): imperative summary under 72 characters
 ```
 
-Allowed types: `feat`, `fix`, `docs`, `test`, `refactor`, `perf`, `build`,
-`ci`, `chore`, `revert`.
+Allowed types: `feat`, `fix`, `docs`, `test`, `refactor`, `perf`, `build`, `ci`,
+`chore`, `revert`.
 
 ```
 feat(metrics): add soft-word robustness score
@@ -51,15 +51,10 @@ docs(spec): clarify lookup similarity policy value
 test(compensation): cover flag change with removed text
 ```
 
-A rejected message is explained by the hook. Amend and retry:
+A rejected message is explained by the hook. Amend and retry with
+`git commit --amend`.
 
-```bash
-git commit --amend
-```
-
----
-
-## Hooks modify files, then fail the commit
+### Hooks modify files, then fail the commit
 
 When `ruff-format` reformats a staged file, pre-commit aborts and leaves the
 corrected file in your working tree. This is normal:
@@ -69,34 +64,39 @@ git add -A
 git commit    # re-run; now passes
 ```
 
-Bypassing hooks with `--no-verify` is strongly discouraged. CI runs the same
-checks and will fail instead.
+`--no-verify` is strongly discouraged. CI runs the same checks.
 
 ---
 
-## Architectural rules
+## Scope: what belongs here
 
-Dependencies point inward only.
+This is a **pure analysis library**. Three decoded objects in, structured results
+out. It performs no input or output.
 
-| Layer | Modules | May import |
-|---|---|---|
-| Presentation | `cli.py`, `reporting.py` | anything |
-| Application | `pipeline.py` | domain, `repository` Protocol |
-| Domain | `models`, `text_normalization`, `metrics`, `field_specs`, `field_analysis` | **stdlib, sacrebleu, rapidfuzz only** |
-| Adapter | `adapters/*` | domain, database drivers |
+It must never gain:
 
-Four rules that must not be broken:
+- database access, drivers, or connection handling;
+- file or CSV reading;
+- pandas or any DataFrame;
+- logging;
+- command-line arguments or configuration;
+- audit-table schema knowledge, eligibility filtering, or record identity beyond
+  an opaque `record_id` label.
 
-1. **The domain layer performs no I/O.** No `sqlite3`, `oracledb`, `pandas`,
-   `logging`, or filesystem access.
-2. **`pandas` appears only in `reporting.py`.**
-3. **`oracledb` is imported lazily**, inside the Oracle adapter, so the package
-   works without the optional extra installed.
-4. **`pipeline.py` depends on the `AuditRecordRepository` Protocol**, never on a
-   concrete adapter.
+Those belong to separate consuming programs. If a proposed change requires any of
+them, it belongs in a different package.
 
-Domain functions raise; they do not log. Logging belongs to the application and
-presentation layers.
+Runtime dependencies are `sacrebleu` and `rapidfuzz`. Keeping it to two is
+deliberate: the library must remain importable in a notebook, a service, or a
+scheduled job with a minimal footprint.
+
+### Three rules
+
+1. **No I/O in `src/`.** No `sqlite3`, `oracledb`, `pandas`, `pathlib`, `os`,
+   `open`, or `logging`.
+2. **Functions raise; they never log.** Error handling is the caller's decision.
+3. **Results are immutable.** Frozen, slotted dataclasses with derived
+   properties rather than stored duplicates.
 
 ---
 
@@ -108,10 +108,10 @@ Metric changes alter published results. Treat them as a protocol amendment.
    first, stating the old behavior, the new behavior, and the rationale.
 2. Change the implementation.
 3. Add or amend a test asserting the new behavior explicitly.
-4. Note the change in the commit body, not only the summary.
+4. Explain the change in the commit body, not only the summary.
 
-Do **not** change any of the following without an explicit decision recorded in
-the specification:
+Do **not** change any of the following without a decision recorded in the
+specification:
 
 - The `_TER` configuration (`normalized`, `no_punct`, `asian_support`,
   `case_sensitive`).
@@ -119,13 +119,25 @@ the specification:
   equivalence classification only.
 - Soft-word insertion and deletion costs, or the use of RapidFuzz normalized
   distance as the substitution cost.
-- Requiredness rules, or the evaluation order
-  *blank → exact → cosmetic → edited*.
-- The policy that unpicked lookup sets receive similarity `0.0` as a policy
+- Requiredness rules, or the evaluation order *blank → exact → cosmetic →
+  edited*.
+- The policy that an unpicked lookup set receives similarity `0.0` as a policy
   value rather than a calculated one.
+- The deliberate case asymmetry: TER is case-insensitive; character and soft-word
+  measures are case-sensitive.
 
 `normalize_text_for_equivalence` must never preprocess a metric input. It exists
 solely for classification; using it upstream of a metric would hide real edits.
+
+---
+
+## Changing the public API
+
+`FLATTENED_COLUMNS` and the names exported from `__init__.py` are the library's
+published contract. A consumer writes a CSV header from that tuple.
+
+Adding a column is a minor version change; removing or renaming one is a breaking
+change. Either way, update `README.md` in the same commit.
 
 ---
 
@@ -135,26 +147,38 @@ Ruff and mypy enforce most of this; `make check` is the arbiter.
 
 - Full type annotations. `mypy --strict` must pass with no new ignores. If an
   ignore is unavoidable, make it code-specific and comment why:
-  `# type: ignore[arg-type]  # sacrebleu lacks stubs for this overload`
+  `# type: ignore[arg-type]  # sacrebleu lacks a stub for this overload`
 - NumPy-style docstrings on every public module, class, and function. Module
-  docstrings state the layer and its dependency constraints.
-- Frozen dataclasses with `slots=True` for result objects. Derived values are
+  docstrings state the purity constraint.
+- Frozen dataclasses with `slots=True` for results. Derived values are
   `@property`, never stored fields.
-- `StrEnum` for closed vocabularies.
+- `StrEnum` for closed vocabularies. PEP 695 `type` statements for aliases.
 - Keyword-only (`*`) for flag parameters.
 - Descriptive names: `number_of_final_words`, not `n`.
-- `pathlib.Path`, never `os.path`.
-- Exception messages name the field and, where available, the record ID.
-- Parameterized SQL only. A table identifier from configuration must be
-  validated against a strict pattern before interpolation, with a comment
-  explaining the validation.
+- Exception messages name the field, prefixed for contact and compensation.
+
+### Validation at trust boundaries
+
+Values from decoded JSON carry no static type guarantee. Validate them through
+the helpers in `validation.py`, which accept `object` so that `isinstance`
+narrowing is genuine rather than statically redundant.
+
+Never replace an `isinstance` check with a truthiness test on a method result:
+`None` must raise `TypeError`, not `AttributeError`, and the exception type for
+each failure is asserted by tests.
+
+Never silence a "redundant isinstance" diagnostic with `# noqa` or
+`# type: ignore`. Move the check into a helper that accepts `object`.
+
+Validate what the boundary genuinely permits, and no more. `isinstance(x, dict)`
+after `json.loads` is necessary, because JSON has six value types. Re-checking
+that keys are strings is not, because JSON guarantees it.
 
 ---
 
 ## Testing
 
-New tests are plain functions with `assert`. `unittest.TestCase` classes ported
-from the original notebook may remain; do not rewrite them unasked.
+New tests are plain functions with `assert`.
 
 ```bash
 make test                                  # full suite, clean start
@@ -165,25 +189,24 @@ make coverage-open                         # HTML report in a browser
 
 Requirements:
 
-- Constrain error assertions: `pytest.raises(ValueError, match="...")`.
+- Constrain error assertions: `pytest.raises(ValueError, match=r"...")`. Escape
+  regex metacharacters, including the dot in `contact\.email`.
 - Compare enum members with `is`, not `==`.
 - Mark randomized differential tests `@pytest.mark.slow`.
-- Mark tests needing a live database `@pytest.mark.oracle`; they must skip
-  automatically when unconfigured.
-- Unit tests never open a network or file-based database connection.
 - Seed every random generator explicitly: `random.Random(42)`.
 - Use `pytest.approx(reference, abs=1e-12)` for float comparisons.
-- Use `tmp_path` for any file. Never write into the repository tree.
+- Use the `valid_audit_objects` fixture and modify exactly one field, so a
+  failure identifies the behavior under test.
+- Synthetic text only. Never real or realistic study content.
 
 `pytest-randomly` shuffles test order, so tests must not depend on execution
-order or on state left behind by another test. Reproduce a specific ordering
-with the seed printed in the pytest header, or disable it with
-`-p no:randomly`.
+order or on state left by another test. Reproduce a specific ordering with the
+seed printed in the pytest header, or disable it with `-p no:randomly`.
 
-Coverage must not fall below the `fail_under` gate in `pyproject.toml`.
-`metrics.py`, `text_normalization.py`, and `field_analysis.py` should approach
-full statement and branch coverage, including every validation error path. Each
-`MatchType` outcome needs at least one direct test.
+Coverage sits near 99 percent against a 95 percent gate. Four lines are
+uncovered: defensive guards for states the current configuration and type system
+prevent. Leave them uncovered rather than constructing artificial states to reach
+them.
 
 ---
 
@@ -191,44 +214,45 @@ full statement and branch coverage, including every validation error path. Each
 
 Project context is supplied automatically from
 [`.github/copilot-instructions.md`](.github/copilot-instructions.md) and the
-scoped files in `.github/instructions/`. Keep them accurate — a stale
-instruction file produces confidently wrong code.
+scoped files in `.github/instructions/`. Keep them accurate — a stale instruction
+file produces confidently wrong code.
 
 What works well:
 
 - Ask for one function or one test file at a time, then run `make check`.
-- Reference the specification section by name in your prompt, for example
-  "per section 7.3 of the analysis specification".
-- Use the **Coverage Gutters: Watch** command after `make coverage` to see which
-  branches agent-written code has not exercised.
-- Review generated code against the architectural rules above. Agents readily
-  reach for `pandas` or a direct database call inside the domain layer.
+- Reference the specification section by name: "per section 7.3 of the analysis
+  specification".
+- Run **Coverage Gutters: Watch** after `make coverage` to see which branches
+  agent-written code has not exercised.
+- End a session by asking the agent to review the branch diff against the
+  specification and README, and list anything now inaccurate. Agents audit an
+  existing diff far better than they remember an obligation mid-task.
 
 What to check every time:
 
-- No new dependency was added silently. Dependencies are a discussed decision
-  added with `uv add`.
+- No I/O, pandas, or logging import was added.
+- No dependency was added silently.
 - No metric formula, normalization step, or threshold changed incidentally.
+- No validation block was "simplified".
 - No `# type: ignore` or lint suppression was added to make an error disappear.
-- No real or realistic study text appears in a test or docstring. Use synthetic
-  content such as "Participants receive a $50 gift card."
-- No exception is silently swallowed. A per-record failure is recorded by the
-  pipeline and processing continues; anything else propagates.
+- No real or realistic study text appears in a test or docstring.
 
-Never let an agent edit `.env`, `uv.lock`, or `data/` contents.
+Never let an agent edit `uv.lock` directly.
 
 ---
 
 ## Adding a dependency
 
 ```bash
-uv add <package>              # runtime
-uv add --dev <package>        # development only
-uv add --optional oracle <package>
+uv add <package>          # runtime — expect to justify this
+uv add --dev <package>    # development only
 ```
 
-Commit both `pyproject.toml` and `uv.lock`. Bound the major version if the
-package could affect a reported metric. Explain the need in the pull request.
+Commit both `pyproject.toml` and `uv.lock`. Bound the major version if the package
+could affect a reported metric. Explain the need in the pull request.
+
+A new runtime dependency should be rare. Two is the current count, and both are
+metric implementations.
 
 ---
 
@@ -243,24 +267,13 @@ make doctor          # note the versions now installed
 ```
 
 Reconcile the two: if Ruff moved from `0.16.6` to `0.17.2`, update the floor in
-`pyproject.toml` **and** the `rev:` in `.pre-commit-config.yaml`. If they drift
-apart, editor diagnostics and `make lint` will disagree.
+`pyproject.toml` **and** the `rev:` in `.pre-commit-config.yaml`. If they drift,
+editor diagnostics and `make lint` will disagree.
 
 ```bash
 make hooks-clean && make hooks-run && make check
 git commit -am "build: update development tooling versions"
 ```
-
----
-
-## Handling data responsibly
-
-- Never commit real audit exports. `data/` is git-ignored except
-  `data/sample/`, which contains synthetic rows only.
-- Never commit credentials. `.env`, Oracle wallets, and `tnsnames.ora` are
-  ignored, and a pre-commit hook blocks them by filename.
-- Field text is not logged above `DEBUG`, and is excluded from CSV exports
-  unless `--include-text` is passed deliberately.
 
 ---
 
@@ -270,9 +283,8 @@ git commit -am "build: update development tooling versions"
 - `make check` passes locally.
 - Tests accompany any behavior change.
 - The specification is updated alongside any metric or rule change.
-- The description states what changed, why, and whether any reported metric
-  could differ as a result.
+- The description states what changed, why, and whether any reported metric could
+  differ as a result.
 
-The required status check is **CI success**. Failures appear as inline
-annotations on the changed lines, with a coverage table and test summary on the
-run page.
+The required status check is **CI success**. Failures appear as inline annotations
+on the changed lines, with a coverage table and test summary on the run page.

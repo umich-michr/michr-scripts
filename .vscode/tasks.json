@@ -140,14 +140,6 @@
       "presentation": { "reveal": "always", "panel": "shared", "clear": true }
     },
     {
-      "label": "Install: with Oracle driver",
-      "detail": "uv sync --extra oracle",
-      "type": "shell",
-      "command": "make install-oracle",
-      "problemMatcher": [],
-      "presentation": { "reveal": "always", "panel": "shared", "clear": true }
-    },
-    {
       "label": "Doctor",
       "detail": "Print interpreter, tooling, and library versions",
       "type": "shell",
@@ -210,28 +202,24 @@
         "panel": "dedicated",
         "clear": true
       }
-    }
+    },
+    {
+      "label": "Docs sync check",
+      "detail": "Verify documentation accompanies rule changes",
+      "type": "shell",
+      "command": "make docs-check",
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true }
+    },
   ],
 
   // Prompted values keep task arguments named without editing this file.
-  "inputs": [
+ "inputs": [
     {
       "id": "testKeyword",
       "type": "promptString",
       "description": "pytest -k expression",
       "default": "soft_word"
-    },
-    {
-      "id": "csvPath",
-      "type": "promptString",
-      "description": "Path to the CSV export",
-      "default": "data/sample/audit_records_sample.csv"
-    },
-    {
-      "id": "recordLimit",
-      "type": "promptString",
-      "description": "Maximum number of eligible records to analyze",
-      "default": "10"
     }
   ]
 }

@@ -2,122 +2,16 @@
   // =======================================================================
   // Debug configurations
   //
-  // Press F5 to run the default configuration, or pick one from the
-  // Run and Debug sidebar. All application arguments are named.
+  // This library has no command-line interface, so the configurations below
+  // debug tests and scratch files.
   //
-  // The CLI is invoked as a module ("python -m study_posting_ai_analysis")
-  // so src-layout imports resolve exactly as they do in production.
+  // justMyCode is false for tests so you can step into rapidfuzz or
+  // sacrebleu when verifying a metric result.
   // =======================================================================
   "version": "0.2.0",
 
   "configurations": [
     {
-      // Default: analyze eligible records from the local SQLite database.
-      "name": "Analyze: SQLite (local)",
-      "type": "debugpy",
-      "request": "launch",
-      "module": "study_posting_ai_analysis",
-      "args": [
-        "analyze",
-        "--source=sqlite",
-        "--sqlite-path=data/local_audit_records.db",
-        "--output-dir=output",
-        "--log-level=DEBUG"
-      ],
-      "console": "integratedTerminal",
-      "cwd": "${workspaceFolder}",
-      "justMyCode": true,
-      "env": {
-        "PYTHONDONTWRITEBYTECODE": "1"
-      }
-    },
-    {
-      // Analyze only the first N records. Useful when stepping through the
-      // dispatch and metric layers without waiting for a full run.
-      "name": "Analyze: SQLite, first 5 records",
-      "type": "debugpy",
-      "request": "launch",
-      "module": "study_posting_ai_analysis",
-      "args": [
-        "analyze",
-        "--source=sqlite",
-        "--sqlite-path=data/local_audit_records.db",
-        "--output-dir=output",
-        "--limit=5",
-        "--log-level=DEBUG"
-      ],
-      "console": "integratedTerminal",
-      "cwd": "${workspaceFolder}",
-      "justMyCode": true
-    },
-    {
-      // Analyze one specific audit record by ID. The primary configuration
-      // for investigating an unexpected metric value.
-      "name": "Analyze: single record (prompts for ID)",
-      "type": "debugpy",
-      "request": "launch",
-      "module": "study_posting_ai_analysis",
-      "args": [
-        "analyze",
-        "--source=sqlite",
-        "--sqlite-path=data/local_audit_records.db",
-        "--output-dir=output",
-        "--record-id=${input:auditRecordId}",
-        "--log-level=DEBUG"
-      ],
-      "console": "integratedTerminal",
-      "cwd": "${workspaceFolder}",
-      "justMyCode": true
-    },
-    {
-      // Load a CSV export into the local SQLite database.
-      "name": "Load CSV into SQLite",
-      "type": "debugpy",
-      "request": "launch",
-      "module": "study_posting_ai_analysis",
-      "args": [
-        "load-csv",
-        "--csv-path=${input:csvPath}",
-        "--sqlite-path=data/local_audit_records.db",
-        "--reset",
-        "--log-level=DEBUG"
-      ],
-      "console": "integratedTerminal",
-      "cwd": "${workspaceFolder}",
-      "justMyCode": true
-    },
-    {
-      // Analyze from Oracle. Reads credentials from .env; never hard-code
-      // them here, because this file is committed.
-      "name": "Analyze: Oracle",
-      "type": "debugpy",
-      "request": "launch",
-      "module": "study_posting_ai_analysis",
-      "args": [
-        "analyze",
-        "--source=oracle",
-        "--output-dir=output",
-        "--limit=10",
-        "--log-level=DEBUG"
-      ],
-      "console": "integratedTerminal",
-      "cwd": "${workspaceFolder}",
-      "envFile": "${workspaceFolder}/.env",
-      "justMyCode": true
-    },
-    {
-      // Debug the file currently open in the editor.
-      "name": "Python: current file",
-      "type": "debugpy",
-      "request": "launch",
-      "program": "${file}",
-      "console": "integratedTerminal",
-      "cwd": "${workspaceFolder}",
-      "justMyCode": true
-    },
-    {
-      // Debug the whole test suite. justMyCode is false so you can step into
-      // rapidfuzz or sacrebleu when verifying a metric result.
       "name": "Tests: all",
       "type": "debugpy",
       "request": "launch",
@@ -128,7 +22,6 @@
       "justMyCode": false
     },
     {
-      // Debug the test file currently open.
       "name": "Tests: current file",
       "type": "debugpy",
       "request": "launch",
@@ -139,8 +32,6 @@
       "justMyCode": false
     },
     {
-      // Debug tests matching a keyword expression, e.g. "soft_word" or
-      // "compensation and not flag".
       "name": "Tests: by keyword (prompts)",
       "type": "debugpy",
       "request": "launch",
@@ -156,31 +47,34 @@
       "console": "integratedTerminal",
       "cwd": "${workspaceFolder}",
       "justMyCode": false
+    },
+    {
+      "name": "Tests: fast only",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["tests", "-p", "no:randomly", "-m", "not slow", "-vv"],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": false
+    },
+    {
+      "name": "Python: current file",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${file}",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": true
     }
   ],
 
-  // Prompted values. Using inputs keeps arguments named and avoids editing
-  // this file for routine debugging.
   "inputs": [
-    {
-      "id": "auditRecordId",
-      "type": "promptString",
-      "description": "AUDIT_RECORDS.ID to analyze",
-      "default": "1"
-    },
-    {
-      "id": "csvPath",
-      "type": "promptString",
-      "description": "Path to the CSV export",
-      "default": "data/sample/audit_records_sample.csv"
-    },
     {
       "id": "testKeyword",
       "type": "promptString",
       "description": "pytest -k expression",
       "default": "soft_word"
     }
-  ],
-
-  "compounds": []
+  ]
 }

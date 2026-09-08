@@ -33,21 +33,25 @@ REQUIRED_PAIRS: dict[str, tuple[str, str]] = {
 
 # Advisory: usually implies a documentation update, but not always.
 ADVISORY_PAIRS: dict[str, tuple[str, str]] = {
-    "src/study_posting_ai_analysis/reporting.py": (
+    "src/study_posting_ai_analysis/flattening.py": (
         "README.md",
-        "output columns are listed under 'What the analysis produces'",
+        "FLATTENED_COLUMNS is described under 'What it reports'",
     ),
-    "src/study_posting_ai_analysis/cli.py": (
+    "src/study_posting_ai_analysis/__init__.py": (
         "README.md",
-        "commands and named arguments are documented in the README",
+        "the public API table lists the exported names",
     ),
-    "Makefile": (
+    "src/study_posting_ai_analysis/parsing.py": (
         "README.md",
-        "the commands table lists Make targets",
+        "the usage example shows parse_analysis_inputs",
     ),
     "pyproject.toml": (
         "README.md",
         "the reproducibility table lists pinned versions",
+    ),
+    "Makefile": (
+        "README.md",
+        "the commands table lists Make targets",
     ),
 }
 
