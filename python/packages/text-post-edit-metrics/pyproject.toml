@@ -1,26 +1,38 @@
 # ===========================================================================
 # text-post-edit-metrics
 #
-# Reusable technical post-editing metrics for comparing an AI suggestion with
-# the final human-edited text.
+# Pure directional technical post-editing metrics:
+#   initial or generated text + represented edited text -> PostEditingResult
 #
 # Shared Ruff, mypy, and Bandit configuration lives at the workspace root.
-# pytest and coverage are configured here because this package owns its suite
-# and coverage gate.
+# This file owns package metadata, runtime dependencies, pytest behavior, and
+# package coverage.
 # ===========================================================================
+
 [project]
 name = "text-post-edit-metrics"
 version = "0.1.0"
-description = "Technical post-editing metrics for AI-generated text."
+description = "Directional technical post-editing metrics for initial and revised text."
 readme = "README.md"
 requires-python = ">=3.14"
 license = "MIT"
 authors = [{ name = "University of Michigan" }]
-keywords = ["ter", "hter", "post-editing", "edit-distance", "llm-evaluation"]
+keywords = [
+    "ter",
+    "hter",
+    "post-editing",
+    "edit-distance",
+    "text-revision",
+    "llm-evaluation",
+]
 
-# These dependencies remain temporarily declared by the study-posting package
-# as well. They move exclusively here after the metric implementation moves.
+# Major versions are bounded because dependency upgrades could change reported
+# metric values.
 dependencies = ["sacrebleu>=2.6.0,<3.0", "rapidfuzz>=3.14.6,<4.0"]
+
+# ===========================================================================
+# Build
+# ===========================================================================
 
 [build-system]
 requires = ["hatchling"]
@@ -32,6 +44,7 @@ packages = ["src/text_post_edit_metrics"]
 # ===========================================================================
 # pytest
 # ===========================================================================
+
 [tool.pytest.ini_options]
 minversion = "9.0"
 testpaths = ["tests"]
@@ -53,12 +66,15 @@ log_cli_format = "%(levelname)-8s %(name)s: %(message)s"
 # ===========================================================================
 # Coverage
 # ===========================================================================
+
 [tool.coverage.run]
 source = ["text_post_edit_metrics"]
 branch = true
 parallel = false
 relative_files = true
 
+# Map installed-package paths back to workspace source for stable local and CI
+# reports.
 [tool.coverage.paths]
 source = [
     "src/text_post_edit_metrics",

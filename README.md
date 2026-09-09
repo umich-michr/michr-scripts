@@ -1,66 +1,46 @@
 # michr-scripts
 
-A Python monorepo containing reusable MICHR libraries and independently runnable
-programs.
+A polyglot monorepo for reusable MICHR libraries, independently runnable
+programs, and operational scripts.
 
-The repository is managed as a [uv workspace](https://docs.astral.sh/uv/).
-Every member has its own package metadata, source code, tests, documentation,
-and dependency declaration, while the workspace shares:
-
-- one Git repository;
-- one `uv.lock`;
-- one `.venv`;
-- one Python version;
-- one Make-based development workflow;
-- shared linting, type checking, security, editor, and CI configuration.
+Python projects are managed as a
+[uv workspace](https://docs.astral.sh/uv/). The repository shares one Git
+history, Python lockfile, virtual environment, development workflow, and CI
+configuration.
 
 ---
 
-## Repository organization
+## Repository layout
 
 ```text
 michr-scripts/
-├── python/packages/    Reusable importable Python libraries
-├── python/programs/    Independently runnable Python applications
-├── scripts/     Repository-maintenance utilities
-├── pyproject.toml
-├── uv.lock
-└── Makefile
+├── python/
+│   ├── packages/    Reusable Python libraries
+│   └── programs/    Independently runnable Python applications
+├── shell/           Shell scripts and projects, organized by purpose
+├── lua/             Lua scripts and projects, organized by purpose
+├── tools/           Utilities that maintain this repository
+├── Makefile         Repository-wide development interface
+├── pyproject.toml   Python workspace and shared tool configuration
+└── uv.lock          Locked dependencies for all Python workspace members
 ```
 
-### Packages
-
-A package exposes reusable Python behavior through imports. It does not declare
-a command-line entry point unless it is intentionally both a library and an
-application.
-
-Current packages:
-
-| Member | Import name | Purpose |
-|---|---|---|
-| [`text-post-edit-metrics`](python/packages/text-post-edit-metrics/) | `text_post_edit_metrics` | Generic technical post-editing metrics for comparing generated text with final human-edited text |
-| [`study-posting-ai-analysis`](python/packages/study-posting-ai-analysis/) | `study_posting_ai_analysis` | Study-posting field policy, selection analysis, requiredness, contact, compensation, lookup analysis, parsing, and flattening |
-
-### Programs
-
-A program is independently runnable and may compose one or more packages. It
-owns its CLI, configuration, logging, orchestration, and external I/O.
-
-No programs have been added yet.
-
-Planned programs and reusable components include:
-
-- a reusable row-stream package with interchangeable database and CSV sources;
-- a study-posting audit-report program that combines row streaming with
-  `study-posting-ai-analysis`;
-- additional reporting or administrative programs as needs evolve.
-
-Planned members are not part of the current public API until implemented and
-tested.
+`uv` manages only members under `python/`. Shell and Lua projects use their own
+toolchains as they are introduced. The root `Makefile` is the common developer
+interface.
 
 ---
 
-## Dependency direction
+## Current Python packages
+
+| Package | Import | Purpose |
+|---|---|---|
+| [`text-post-edit-metrics`](python/packages/text-post-edit-metrics/) | `text_post_edit_metrics` | Directional technical post-editing metrics for an initial text and its represented edited form |
+| [`study-posting-ai-analysis`](python/packages/study-posting-ai-analysis/) | `study_posting_ai_analysis` | Study-posting field policy, requiredness, selection analysis, contact, compensation, lookup analysis, parsing, and flattening |
+
+There are currently no runnable programs.
+
+### Dependency direction
 
 Dependencies point from specific behavior toward reusable behavior:
 
@@ -69,41 +49,33 @@ text-post-edit-metrics
           ↑
 study-posting-ai-analysis
           ↑
-future study-posting-audit-report program
+future study-posting-audit-report
 ```
 
 Rules:
 
-1. A reusable package must not import a more specific package.
-2. A package must never import a program.
-3. Programs may compose packages.
-4. Shared behavior belongs in a package only when it has a coherent reusable
+1. Programs may depend on packages.
+2. Packages must not depend on programs.
+3. More reusable packages must not depend on more specific packages.
+4. Programs should not import another program's internal modules.
+5. Logic shared by multiple programs should be extracted into a package.
+6. Cross-language integration should use a documented command-line or data
    contract.
-5. Application concerns must not be added to a pure library merely because one
-   consumer needs them.
 
-The current dependency graph is:
+Inspect the current Python dependency graph with:
 
 ```bash
 uv tree --package study-posting-ai-analysis
 ```
 
-Expected shape:
-
-```text
-study-posting-ai-analysis
-└── text-post-edit-metrics
-    ├── rapidfuzz
-    └── sacrebleu
-```
-
 ---
 
-## Current package contracts
+## Package contracts
 
 ### `text-post-edit-metrics`
 
-Two texts in, one immutable technical post-editing result out:
+Compares an initial text with a value represented by the caller as its edited
+form:
 
 ```python
 from text_post_edit_metrics import analyze_post_edit
@@ -113,27 +85,30 @@ result = analyze_post_edit(
     final="Human-edited text",
 )
 
-result.ter_effort_saved
-result.character_edit_distance
-result.soft_word_edit_distance
+print(result.ter_effort_saved)
+print(result.character_edit_distance)
+print(result.soft_word_edit_distance)
 ```
 
 It owns:
 
-- TER;
+- TER and TER-derived scores;
 - character-level Levenshtein metrics;
 - weighted soft-word metrics;
 - metric text normalization;
-- descriptive text-length counts;
-- `PostEditingResult`.
+- descriptive length counts;
+- immutable `PostEditingResult` objects.
 
-It performs no database, CSV, filesystem, DataFrame, logging, or CLI work.
+It does not verify that the second text was actually produced by editing the
+first. Its metrics describe textual transformation, not elapsed time, cognitive
+effort, observed keystrokes, or user satisfaction.
 
-See its [README](python/packages/text-post-edit-metrics/README.md).
+See its
+[package README](python/packages/text-post-edit-metrics/README.md).
 
 ### `study-posting-ai-analysis`
 
-Three study-posting objects in, one structured result per field out:
+Analyzes AI suggestions, user selections, and final saved study-posting values:
 
 ```python
 from study_posting_ai_analysis import (
@@ -149,35 +124,34 @@ suggested, selected, final = parse_analysis_inputs(
 )
 
 results = analyze_objects(suggested, selected, final)
-rows = flatten_analysis_results(results, record_id="audit-1234")
+rows = flatten_analysis_results(
+    results,
+    record_id="audit-1234",
+)
 ```
 
 It owns:
 
-- field configuration;
-- selection validation;
-- exact, cosmetic-equivalent, edited, removed, and unassisted outcomes;
-- requiredness;
-- contact and compensation policy;
+- study-posting field configuration;
+- selection validation and outcome classification;
+- requiredness rules;
+- cosmetic-equivalence policy;
+- contact and compensation analysis;
 - lookup/Jaccard analysis;
-- JSON parsing;
+- JSON object parsing;
 - flattened study-analysis rows.
 
-It delegates technical text metrics to `text-post-edit-metrics`.
-
-It performs no database, CSV, filesystem, DataFrame, logging, or CLI work.
+It delegates technical text calculations to `text-post-edit-metrics`.
 
 See its:
 
-- [README](python/packages/study-posting-ai-analysis/README.md);
+- [package README](python/packages/study-posting-ai-analysis/README.md);
 - [analysis specification](python/packages/study-posting-ai-analysis/docs/analysis-specification.md);
 - [program flow](python/packages/study-posting-ai-analysis/docs/program-flow.md).
 
 ---
 
 ## Prerequisites
-
-Two tools are required before the workspace can bootstrap itself:
 
 | Tool | Check | Installation |
 |---|---|---|
@@ -189,52 +163,49 @@ and installs the required interpreter.
 
 ---
 
-## Initial setup
+## Setup
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/umich-michr/michr-scripts
 cd michr-scripts
 make setup
 ```
 
-`make setup` is idempotent. It:
-
-1. installs all workspace members into `.venv`;
-2. installs pre-commit hooks;
-3. prints an environment and workspace summary.
+`make setup` is idempotent. It installs all Python workspace members, installs
+Git hooks, and prints an environment summary.
 
 Verify the workspace:
 
 ```bash
-make doctor
 make members
+make doctor
 make check
 ```
 
 ---
 
-## Common commands
+## Development commands
 
-### Whole workspace
+### Whole repository
 
 | Command | Purpose |
 |---|---|
 | `make setup` | Bootstrap a fresh clone |
-| `make install` | Synchronize all workspace members |
-| `make members` | List packages and programs |
-| `make doctor` | Print interpreter, tool, and workspace information |
-| `make format` | Format all workspace Python code |
-| `make lint` | Run Ruff across the workspace |
-| `make typecheck` | Run strict mypy checks per member |
-| `make test` | Run every member's test suite |
-| `make coverage` | Run every member's coverage gate |
-| `make audit` | Audit dependencies and source code |
+| `make install` | Synchronize all Python workspace members |
+| `make members` | List discovered packages and programs |
+| `make doctor` | Show interpreter, tools, and workspace members |
+| `make format` | Format Python code and organize imports |
+| `make lint` | Run Ruff |
+| `make typecheck` | Run strict mypy checks |
+| `make test` | Run every Python member's tests |
+| `make coverage` | Run every Python member's coverage gate |
+| `make audit` | Audit dependencies and Python source |
 | `make check` | Run the complete quality gate |
 | `make clean` | Remove reports and tool caches |
 
-Run `make` with no arguments to list every available target.
+Run `make` without arguments to list all available targets.
 
-### One workspace member
+### One Python member
 
 ```bash
 make test PACKAGE=text-post-edit-metrics
@@ -244,7 +215,7 @@ make test PACKAGE=study-posting-ai-analysis
 make coverage PACKAGE=study-posting-ai-analysis
 ```
 
-Pass additional pytest arguments:
+Pass additional pytest options:
 
 ```bash
 make test \
@@ -259,9 +230,7 @@ make test-slow PACKAGE=text-post-edit-metrics
 make test-fast PACKAGE=text-post-edit-metrics
 ```
 
----
-
-## Quality gate
+### Quality gate
 
 Before committing:
 
@@ -269,33 +238,97 @@ Before committing:
 make check
 ```
 
-The gate includes:
+The gate includes formatting, linting, strict type checking, documentation
+synchronization, dependency auditing, source security scanning, tests, and
+coverage.
 
-1. formatting verification;
-2. Ruff linting;
-3. strict mypy type checking;
-4. documentation synchronization checks;
-5. dependency vulnerability auditing;
-6. Bandit source-code security scanning;
-7. each member's pytest suite;
-8. each member's coverage threshold.
-
-Pre-commit hooks run a faster subset automatically. If a hook modifies a file,
-review the diff, stage the correction, and commit again.
-
-Never use `--no-verify` merely to bypass a failing check.
+Pre-commit hooks may modify files and stop the commit. When that happens, review
+the diff, stage the corrected files, and commit again. Do not use `--no-verify`
+merely to bypass a failing check.
 
 ---
 
-## Adding a reusable package
+## Finding and running programs
 
-Create packages under:
+List discovered Python workspace members:
 
-```text
-python/packages/<distribution-name>/
+```bash
+make members
 ```
 
-Recommended layout:
+Python programs live under `python/programs/`. Each program must document:
+
+- its purpose;
+- installed command name;
+- named CLI arguments;
+- configuration;
+- input and output formats;
+- examples;
+- exit behavior.
+
+### Current programs
+
+| Program | Language | Purpose | Command |
+|---|---|---|---|
+| _No runnable programs yet_ | — | — | — |
+
+### Running a Python program
+
+A Python program declares an executable command:
+
+```toml
+[project.scripts]
+example-program = "example_program.cli:main"
+```
+
+Run it from the repository root:
+
+```bash
+uv run --package example-program example-program --help
+```
+
+A program uses sibling packages through workspace dependencies:
+
+```toml
+[project]
+dependencies = [
+    "study-posting-ai-analysis>=0.1.0",
+]
+
+[tool.uv.sources]
+study-posting-ai-analysis = { workspace = true }
+```
+
+Commonly used programs may also receive explicit root Make targets after their
+commands exist and can be tested.
+
+---
+
+## Where should new code go?
+
+| Need | Location |
+|---|---|
+| Reusable Python behavior | `python/packages/<distribution-name>/` |
+| Runnable Python application | `python/programs/<program-name>/` |
+| Small shell script | `shell/<purpose>/<name>.sh` |
+| Larger shell project | `shell/<purpose>/<name>/` |
+| Small Lua script | `lua/<purpose>/<name>.lua` |
+| Larger Lua project | `lua/<purpose>/<name>/` |
+| Repository-maintenance utility | `tools/` |
+
+A small shell or Lua script may remain one documented file. Promote it to a
+directory when it gains tests, fixtures, configuration, documentation, or
+supporting modules.
+
+If reusable shell functions or Lua modules emerge, introduce a language-specific
+`lib/` or `packages/` directory at that time. Do not create unused abstractions
+in advance.
+
+---
+
+## Adding a Python package
+
+Create:
 
 ```text
 python/packages/example-package/
@@ -309,17 +342,16 @@ python/packages/example-package/
     └── test_package.py
 ```
 
-### Required steps
+Required steps:
 
-1. Create the member directory and `pyproject.toml`.
-2. Add a `src`-layout import package.
-3. Add `py.typed` when publishing inline types.
-4. Add a member README describing its contract and exclusions.
-5. Add pytest and coverage configuration to the member `pyproject.toml`.
+1. Define the package and dependencies in its `pyproject.toml`.
+2. Use a `src` layout.
+3. Add `py.typed` when shipping inline type information.
+4. Document the package's contract and exclusions.
+5. Configure pytest and coverage in the member `pyproject.toml`.
 6. Add tests.
 7. Add the import name to Ruff's root `known-first-party` list.
-8. Add scoped Copilot instructions when the member has important architectural
-   or domain rules.
+8. Add scoped Copilot instructions when important domain rules apply.
 9. Run:
 
 ```bash
@@ -328,19 +360,17 @@ uv sync --all-packages
 make check
 ```
 
-The root workspace declaration currently discovers:
+The root workspace discovers members under:
 
 ```toml
 [tool.uv.workspace]
-members = ["python/packages/*", "python/programs/*"]
+members = [
+    "python/packages/*",
+    "python/programs/*",
+]
 ```
 
-Therefore, adding a valid member under `python/packages/` normally requires no explicit
-workspace-list edit.
-
-### Adding an internal dependency
-
-From the workspace root:
+Add an internal dependency with:
 
 ```bash
 uv add \
@@ -348,27 +378,20 @@ uv add \
   dependency-distribution
 ```
 
-For a workspace dependency, ensure the consuming member declares:
+Ensure the consumer declares the workspace source:
 
 ```toml
 [tool.uv.sources]
 dependency-distribution = { workspace = true }
 ```
 
-The dependency direction must remain from specific members toward reusable
-members.
+Never edit `uv.lock` manually.
 
 ---
 
-## Adding a runnable program
+## Adding a Python program
 
-Create programs under:
-
-```text
-python/programs/<program-name>/
-```
-
-Recommended layout:
+Create:
 
 ```text
 python/programs/example-program/
@@ -384,33 +407,44 @@ python/programs/example-program/
 
 Programs may own:
 
-- CLI arguments;
-- environment or file configuration;
-- logging;
-- database access;
+- command-line arguments;
+- configuration and logging;
+- database and filesystem access;
 - CSV input and output;
 - DataFrames;
-- record loops;
-- retry and failure policy;
+- record loops and failure policy;
 - report generation.
 
-Declare a named command in the program's `pyproject.toml`:
+Programs should compose packages rather than copy their logic.
 
-```toml
-[project.scripts]
-example-program = "example_program.cli:main"
+All nonstandard CLI options should use named arguments unless a positional
+argument is an established and unambiguous convention.
+
+---
+
+## Shell and Lua organization
+
+Shell and Lua projects are organized by operational purpose rather than by an
+empty package/program distinction.
+
+Possible categories include:
+
+```text
+shell/
+├── sysadmin/
+├── reporting/
+└── data-maintenance/
+
+lua/
+├── reporting/
+├── transformations/
+└── integrations/
 ```
 
-All CLI arguments should be named rather than positional unless a positional
-argument is a well-established and unambiguous command convention.
+These categories should be created only when real projects require them.
 
-A program should remain independently runnable:
-
-```bash
-uv run example-program --help
-```
-
-It should compose packages rather than copy their logic.
+Every runnable script or project should have nearby documentation explaining its
+purpose, requirements, arguments, output, and examples.
 
 ---
 
@@ -421,19 +455,9 @@ Add a dependency only to the member that directly imports it.
 Examples:
 
 - SacreBLEU and RapidFuzz belong to `text-post-edit-metrics`.
-- `study-posting-ai-analysis` depends only on
-  `text-post-edit-metrics`.
+- `study-posting-ai-analysis` depends on `text-post-edit-metrics`.
 - A future Oracle row-source package would own `oracledb`.
-- A reporting program would own pandas only if its reporting implementation
-  requires pandas.
-
-Use:
-
-```bash
-uv add --package <member> <dependency>
-```
-
-Never edit `uv.lock` manually.
+- A reporting program would own pandas only if its implementation requires it.
 
 When a dependency can affect analytical results, bound its major version and
 document the compatibility rationale.
@@ -442,18 +466,18 @@ document the compatibility rationale.
 
 ## Documentation ownership
 
-Documentation lives with the code it governs:
-
 | Documentation | Location |
 |---|---|
-| Workspace structure and common workflow | Root `README.md` |
-| Reusable package API | Package `README.md` |
-| Program CLI and configuration | Program `README.md` |
+| Repository layout and shared workflow | Root `README.md` |
+| Python package API | Package `README.md` |
+| Python program CLI and configuration | Program `README.md` |
+| Shell or Lua usage | Documentation beside the script or project |
 | Study methodology and form policy | `python/packages/study-posting-ai-analysis/docs/` |
 | Shared agent rules | `.github/copilot-instructions.md` |
 | Member-specific agent rules | `.github/instructions/` |
 
-A behavior change is incomplete until its owning documentation is updated.
+A behavior or public-contract change is incomplete until its owning
+documentation is updated.
 
 ---
 
@@ -464,39 +488,38 @@ A behavior change is incomplete until its owning documentation is updated.
 - Never commit real audit exports or institutional data.
 - Use synthetic data in tests, examples, and documentation.
 - Keep generated reports out of version control.
-- Avoid logging sensitive row payloads or free text.
+- Avoid logging sensitive payloads or free text.
 - Database and file access belong only to members whose explicit contract
   requires them.
 
-The root `.gitignore`, pre-commit hooks, dependency audit, and Bandit scan provide
-guardrails, but they do not replace review.
+The repository's ignore rules, hooks, audits, and CI checks are guardrails; they
+do not replace review or institutional policy.
 
 ---
 
 ## CI
 
-GitHub Actions runs the workspace quality gate for pushes and pull requests.
+GitHub Actions runs workspace quality checks for pushes and pull requests.
 
 Failures are surfaced through:
 
-- failed required status checks;
+- required status checks;
 - inline annotations where supported;
 - test and coverage summaries;
 - GitHub workflow notifications.
 
-The required aggregate check is intended to remain stable as new workspace
-members are added.
+The stable aggregate branch-protection check is `CI success`.
 
 ---
 
 ## Current status
 
-| Member | Tests | Coverage gate |
-|---|---:|---:|
-| `text-post-edit-metrics` | Metric, normalization, model, and differential tests | 95% |
-| `study-posting-ai-analysis` | Field policy, parsing, flattening, and integration tests | 95% |
+| Member | Coverage gate |
+|---|---:|
+| `text-post-edit-metrics` | 95% |
+| `study-posting-ai-analysis` | 95% |
 
-Use `make coverage` for current counts and measured coverage.
+Run `make coverage` for current test counts and measured coverage.
 
 ---
 

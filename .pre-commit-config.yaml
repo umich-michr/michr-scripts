@@ -81,37 +81,34 @@ repos:
       - id: uv-lock
 
   # -----------------------------------------------------------------------
-  # Local hooks that must use the project virtual environment
+  # Local hooks using the workspace environment and Makefile
   # -----------------------------------------------------------------------
   - repo: local
     hooks:
-      # mypy needs the real installed packages and type stubs to be useful,
-      # so it runs via "uv run" rather than in an isolated hook environment.
+      # Delegate to Make so local hooks, manual checks, and CI cannot drift.
       - id: mypy
         name: mypy (strict)
-        entry: bash -c 'root=$(pwd); for m in python/packages/*; do (cd "$m" && MYPYPATH=src uv run mypy --config-file "$root/pyproject.toml" src tests) || exit 1; done; uv run mypy --config-file "$root/pyproject.toml" scripts'
-        language: system
-        types_or: [python, pyi]
-        pass_filenames: false
-        require_serial: true
-
-      # Bandit examines only our own source tree.
-      - id: bandit
-        name: bandit (security)
-        entry: bash -c 'uv run bandit --configfile pyproject.toml --recursive python/packages/*/src --quiet'
-        language: system
-        types: [python]
-        files: ^python/packages/.*/src/
-        pass_filenames: false
-
-      # Requires a specification update when a metric or rule module changes.
-      # See scripts/check_docs_sync.py for the pairings.
-      - id: docs-sync
-        name: documentation sync check
-        entry: uv run python scripts/check_docs_sync.py
+        entry: make typecheck
         language: system
         pass_filenames: false
         always_run: true
+        require_serial: true
+
+      - id: bandit
+        name: bandit (security)
+        entry: make audit-code
+        language: system
+        pass_filenames: false
+        files: ^(python/(packages|programs)/.*/src/|tools/).*\.pyi?$
+        require_serial: true
+
+      - id: docs-sync
+        name: documentation synchronization
+        entry: make docs-check
+        language: system
+        pass_filenames: false
+        always_run: true
+        require_serial: true
 
   # -----------------------------------------------------------------------
   # Commit message format

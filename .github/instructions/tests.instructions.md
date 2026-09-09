@@ -4,12 +4,12 @@ applyTo: "**/tests/**/*.py"
 
 # Shared test instructions
 
-These conventions apply to tests in every workspace member. Package-scoped
-instructions may add domain-specific requirements.
+These rules apply across Python workspace members. Package-specific instructions
+may add domain requirements.
 
 ## Style
 
-Use pytest with plain functions and bare `assert`.
+Use pytest, plain functions, complete annotations, and bare assertions:
 
 ```python
 def test_identical_text_has_zero_distance() -> None:
@@ -18,17 +18,11 @@ def test_identical_text_has_zero_distance() -> None:
     assert result.distance == 0
 ```
 
-Use explicit return annotations on test functions:
-
-```python
-def test_example() -> None: ...
-```
-
-Compare enum members with `is`, not `==`.
+Compare enum members with `is`.
 
 ## Exceptions
 
-Constrain both type and message:
+Assert both type and message:
 
 ```python
 with pytest.raises(ValueError, match=r"final text must not be blank"):
@@ -40,7 +34,7 @@ with pytest.raises(ValueError, match=r"final text must not be blank"):
 
 ## Parameterization
 
-Use `pytest.mark.parametrize` with descriptive IDs:
+Use descriptive IDs and annotate all parameters:
 
 ```python
 @pytest.mark.parametrize(
@@ -55,8 +49,6 @@ def test_is_blank(value: str, expected: bool) -> None:
     assert is_blank(value) is expected
 ```
 
-Annotate every parametrized argument.
-
 ## Floating-point results
 
 Use `pytest.approx`:
@@ -65,75 +57,67 @@ Use `pytest.approx`:
 assert result.effort_saved == pytest.approx(0.8)
 ```
 
-For differential algorithms near zero, use an explicit absolute tolerance:
+For differential calculations near zero, specify an absolute tolerance:
 
 ```python
 assert optimized == pytest.approx(reference, abs=1e-12)
 ```
 
-## Randomness and test order
+## Determinism
 
-- Seed every generator explicitly, such as `random.Random(42)`.
-- Mark expensive randomized tests with `@pytest.mark.slow`.
-- Tests must not depend on execution order.
-- Tests must not share mutable state.
-- `pytest-randomly` may reorder tests.
+- Seed random generators explicitly.
+- Mark expensive randomized tests `@pytest.mark.slow`.
+- Do not depend on test order or shared mutable state.
+- Assume `pytest-randomly` may reorder tests.
 
-## Files and external resources
+## Files and external services
 
-- Unit tests must not access a live network service.
+- Unit tests must not contact live services.
 - Use `tmp_path` for filesystem tests.
-- Use fake or stub connections for database unit tests.
-- Live integration tests must use a marker defined by the owning member and
-  skip automatically when their required configuration is unavailable.
-- Never require credentials for the default workspace test run.
-- Never write generated files into the repository tree.
+- Use fakes or stubs for database unit tests.
+- Live integration tests require a member-defined marker and must skip when
+  configuration is unavailable.
+- The default workspace test run must not require credentials.
+- Never write generated test output into the repository tree.
 
-Do not impose an Oracle-specific marker on every package. A future package that
-owns Oracle integration may define its own marker in that member's
-`pyproject.toml`.
+Do not impose database-specific markers on unrelated members.
 
 ## Fixtures and data
 
 - Shared fixtures belong in the owning member's `tests/conftest.py`.
-- Test data must be synthetic.
-- Never use real study content, production identifiers, credentials, or database
-  extracts.
-- Modify only the fixture fields relevant to the behavior being tested.
+- Use synthetic data only.
+- Never include real study text, production identifiers, credentials, or
+  database exports.
+- Modify only fixture fields relevant to the tested behavior.
 
-## Package boundaries
-
-Test behavior in the package that owns it.
+## Test behavior in its owning member
 
 Examples:
 
-- TER, character distance, soft-word distance, and metric normalization belong
-  to `text-post-edit-metrics`.
-- Study field requiredness, classification, compensation, contact, lookup, and
-  flattening belong to `study-posting-ai-analysis`.
-- A future row-stream package owns database and CSV streaming tests.
-- A future reporting program owns orchestration and output tests.
+- text metrics and normalization belong to `text-post-edit-metrics`;
+- study field policy, contact, compensation, lookup, parsing, and flattening
+  belong to `study-posting-ai-analysis`;
+- future row-source packages own database and CSV streaming tests;
+- programs own orchestration and output tests.
 
-Do not duplicate a complete low-level test suite in a consuming package. Add a
-small integration test proving that the consumer uses the dependency correctly.
+Do not duplicate a dependency's full low-level test suite in a consumer. Add
+small integration tests proving that the consumer uses the dependency correctly.
 
-## Coverage
+## Running tests
 
-Each workspace member owns its own pytest and coverage configuration.
-
-Run one member:
+One member:
 
 ```bash
 make test PACKAGE=<member-name>
 make coverage PACKAGE=<member-name>
 ```
 
-Run the workspace gate:
+Whole workspace:
 
 ```bash
 make check
 ```
 
-Coverage should include meaningful validation and branch behavior. Do not create
-artificial states solely to execute defensive guards that the type system or
-configuration makes unreachable.
+Test meaningful boundary and validation behavior. Do not construct artificial
+states solely to execute defensive guards that current types or configuration
+make unreachable.

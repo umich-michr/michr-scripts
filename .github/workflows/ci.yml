@@ -1,16 +1,8 @@
-# ===========================================================================
-# Continuous integration for the michr-scripts uv workspace
+# Continuous integration for the michr-scripts workspace.
 #
-# The workflow delegates to the root Makefile so local development and CI use
-# the same commands. Each workspace member owns its pytest and coverage
-# configuration.
-#
-# GitHub reports failures through:
-#   - failed status checks;
-#   - inline annotations from Ruff, mypy, and pytest;
-#   - command output and workflow summaries;
-#   - standard GitHub Actions notifications.
-# ===========================================================================
+# The workflow delegates to the root Makefile so local and CI behavior remain
+# aligned. Each Python member owns its pytest and coverage configuration.
+
 name: CI
 
 on:
@@ -32,9 +24,6 @@ env:
   FORCE_COLOR: "1"
 
 jobs:
-  # -------------------------------------------------------------------------
-  # Workspace-wide static checks and security audits
-  # -------------------------------------------------------------------------
   quality:
     name: Quality and security
     runs-on: ubuntu-latest
@@ -50,30 +39,35 @@ jobs:
           enable-cache: true
           cache-dependency-glob: uv.lock
 
-      - name: Install the pinned Python version
+      - name: Install pinned Python
         run: uv python install
 
-      - name: Install all workspace members
+      - name: Install all Python workspace members
         run: uv sync --locked --all-packages
 
       - name: Verify formatting
         run: make format-check
 
-      - name: Run Ruff
+      - name: Run Ruff with GitHub annotations
         if: always()
+        shell: bash
         run: |
+          mapfile -t python_files < <(
+            find python/packages python/programs tools \
+              -type f \
+              <math><mrow><mo>−</mo></mrow><mrow><mi>n</mi><mi>a</mi><mi>m</mi><msup><mi>e</mi><mo lspace="0em" rspace="0em" class="tml-prime">′</mo></msup><mo>∗</mo></mrow><mrow><mi>.</mi><mi>p</mi><msup><mi>y</mi><mo lspace="0em" rspace="0em" class="tml-prime">′</mo></msup><mo>−</mo></mrow><mrow><mi>o</mi><mo>−</mo></mrow><mrow><mi>n</mi><mi>a</mi><mi>m</mi><msup><mi>e</mi><mo lspace="0em" rspace="0em" class="tml-prime">′</mo></msup><mo>∗</mo></mrow><mrow><mi>.</mi><mi>p</mi><mi>y</mi><msup><mi>i</mi><mo lspace="0em" rspace="0em" class="tml-prime">′</mo></msup></mrow></math> \
+              -print 2>/dev/null
+          )
+
+          if [ "${#python_files[@]}" -eq 0 ]; then
+            echo "No Python files found."
+            exit 0
+          fi
+
           uv run ruff check \
+            --config pyproject.toml \
             --output-format=github \
-            python/packages/*/src \
-            python/packages/*/tests \
-            python/programs/*/src \
-            python/programs/*/tests \
-            scripts 2>/dev/null || \
-          uv run ruff check \
-            --output-format=github \
-            python/packages/*/src \
-            python/packages/*/tests \
-            scripts
+            "${python_files[@]}"
 
       - name: Run strict type checking
         if: always()
@@ -87,27 +81,24 @@ jobs:
         if: always()
         run: make audit-deps
 
-      - name: Scan source code for security issues
+      - name: Scan Python source for security issues
         if: always()
         run: make audit-code
 
-      - name: Quality summary
+      - name: Write quality summary
         if: always()
         run: |
           {
             echo "## Workspace quality"
             echo
             echo "- Formatting: see **Verify formatting**"
-            echo "- Linting: see **Run Ruff**"
+            echo "- Linting: see **Run Ruff with GitHub annotations**"
             echo "- Types: see **Run strict type checking**"
             echo "- Documentation: see **Check documentation synchronization**"
             echo "- Dependencies: see **Audit locked dependencies**"
-            echo "- Source security: see **Scan source code for security issues**"
+            echo "- Source security: see **Scan Python source for security issues**"
           } >> "$GITHUB_STEP_SUMMARY"
 
-  # -------------------------------------------------------------------------
-  # Per-member tests and coverage
-  # -------------------------------------------------------------------------
   test:
     name: Tests and coverage
     runs-on: ubuntu-latest
@@ -123,17 +114,14 @@ jobs:
           enable-cache: true
           cache-dependency-glob: uv.lock
 
-      - name: Install the pinned Python version
+      - name: Install pinned Python
         run: uv python install
 
-      - name: Install all workspace members
+      - name: Install all Python workspace members
         run: uv sync --locked --all-packages
 
-      # pytest-github-actions-annotate-failures is installed by the root
-      # development dependency group and creates annotations for failures.
-      #
-      # Test ordering is fixed in CI so a failure can be reproduced locally
-      # with the same command. Local default runs remain randomized.
+      # Fixed ordering makes CI failures reproducible. Local default test runs
+      # remain randomized.
       - name: Run all member coverage gates
         run: make coverage PYTEST_ARGS="-p no:randomly"
 
@@ -146,8 +134,8 @@ jobs:
 
           report_paths = sorted(
               [
-                  *Path("packages").glob("*/reports"),
-                  *Path("programs").glob("*/reports"),
+                  *Path("python/packages").glob("*/reports"),
+                  *Path("python/programs").glob("*/reports"),
               ]
           )
 
@@ -157,40 +145,59 @@ jobs:
               print("No member reports were produced.")
               raise SystemExit(0)
 
-          print("| Member | Tests | Passed | Failed | Errors | Skipped | Lines | Branches |")
+          print(
+              "| Member | Tests | Passed | Failed | Errors | Skipped "
+              "| Lines | Branches |"
+          )
           print("|---|---:|---:|---:|---:|---:|---:|---:|")
 
           for report_directory in report_paths:
               member = report_directory.parent.name
-
               junit_path = report_directory / "junit.xml"
               coverage_path = report_directory / "coverage.xml"
 
-              tests = passed = failures = errors = skipped = 0
-              line_rate = branch_rate = 0.0
+              tests = 0
+              failures = 0
+              errors = 0
+              skipped = 0
+              line_rate = 0.0
+              branch_rate = 0.0
 
               if junit_path.is_file():
-                  root = ET.parse(junit_path).getroot()
+                  junit_root = ET.parse(junit_path).getroot()
                   suites = (
-                      list(root.findall("testsuite"))
-                      if root.tag == "testsuites"
-                      else [root]
+                      list(junit_root.findall("testsuite"))
+                      if junit_root.tag == "testsuites"
+                      else [junit_root]
                   )
 
-                  tests = sum(int(suite.get("tests", 0)) for suite in suites)
+                  tests = sum(
+                      int(suite.get("tests", 0))
+                      for suite in suites
+                  )
                   failures = sum(
-                      int(suite.get("failures", 0)) for suite in suites
+                      int(suite.get("failures", 0))
+                      for suite in suites
                   )
-                  errors = sum(int(suite.get("errors", 0)) for suite in suites)
+                  errors = sum(
+                      int(suite.get("errors", 0))
+                      for suite in suites
+                  )
                   skipped = sum(
-                      int(suite.get("skipped", 0)) for suite in suites
+                      int(suite.get("skipped", 0))
+                      for suite in suites
                   )
-                  passed = tests - failures - errors - skipped
+
+              passed = tests - failures - errors - skipped
 
               if coverage_path.is_file():
-                  root = ET.parse(coverage_path).getroot()
-                  line_rate = float(root.get("line-rate", 0.0)) * 100
-                  branch_rate = float(root.get("branch-rate", 0.0)) * 100
+                  coverage_root = ET.parse(coverage_path).getroot()
+                  line_rate = (
+                      float(coverage_root.get("line-rate", 0.0)) * 100
+                  )
+                  branch_rate = (
+                      float(coverage_root.get("branch-rate", 0.0)) * 100
+                  )
 
               print(
                   f"| `{member}` | {tests} | {passed} | {failures} | "
@@ -199,9 +206,6 @@ jobs:
               )
           PYTHON
 
-  # -------------------------------------------------------------------------
-  # One stable status check for branch protection
-  # -------------------------------------------------------------------------
   ci-success:
     name: CI success
     runs-on: ubuntu-latest

@@ -30,13 +30,17 @@ MEMBERS := $(PACKAGES) $(PROGRAMS)
 SRC_DIRS := \
 	$(wildcard python/packages/*/src) \
 	$(wildcard python/programs/*/src) \
-	scripts
+	tools
 
 TEST_DIRS := \
 	$(wildcard python/packages/*/tests) \
 	$(wildcard python/programs/*/tests)
 
-LINT_DIRS := $(SRC_DIRS) $(TEST_DIRS)
+EXAMPLE_DIRS := \
+	$(wildcard python/packages/*/examples) \
+	$(wildcard python/programs/*/examples)
+
+LINT_DIRS := $(SRC_DIRS) $(TEST_DIRS) $(EXAMPLE_DIRS)
 
 REPORTS_DIR ?= reports
 
@@ -60,7 +64,7 @@ endif
         format format-check lint lint-fix typecheck docs-check \
         audit audit-deps audit-code \
         test test-fast test-slow coverage coverage-open \
-        check ci members \
+        check ci members validate-package \
         clean clean-reports clean-caches clean-venv distclean \
         hooks hooks-run hooks-update hooks-clean doctor
 
@@ -142,14 +146,24 @@ help:
 	@echo ""
 
 members:
-	@echo "Packages:"
-	@for member in $(PACKAGES); do echo "  $$member"; done
-	@echo "Programs:"
-	@if [ -z "$(strip $(PROGRAMS))" ]; then \
-	  echo "  (none yet)"; \
-	else \
-	  for member in $(PROGRAMS); do echo "  $$member"; done; \
-	fi
+	@echo "Python packages:"
+	@$(if $(strip $(PACKAGES)),\
+	  $(foreach member,$(PACKAGES),echo "  $(member)";),\
+	  echo "  (none)")
+	@echo "Python programs:"
+	@$(if $(strip $(PROGRAMS)),\
+	  $(foreach member,$(PROGRAMS),echo "  $(member)";),\
+	  echo "  (none)")
+
+validate-package:
+ifneq ($(strip $(PACKAGE)),)
+	@test -n "$(strip $(TEST_TARGETS))" || { \
+	  echo "ERROR: unknown Python workspace member: $(PACKAGE)"; \
+	  echo "Run 'make members' to list available members."; \
+	  exit 2; \
+	}
+endif
+
 
 # ---------------------------------------------------------------------------
 # Setup
@@ -209,10 +223,10 @@ doctor:
 	@$(RUN) pytest --version
 	@echo "--- Workspace members -----------------------------------------"
 	@$(MAKE) --no-print-directory members
-	@echo "--- Installed packages ----------------------------------------"
-	@$(RUN) python -c "import sacrebleu, rapidfuzz; \
-	print('sacrebleu', sacrebleu.__version__); \
-	print('rapidfuzz', rapidfuzz.__version__)"
+	@echo "--- Analytical packages ---------------------------------------"
+	@$(RUN) python -c "import text_post_edit_metrics as m; \
+	print('text-post-edit-metrics', m.__version__)" \
+	  2>/dev/null || echo "text-post-edit-metrics  not importable"
 	@$(RUN) python -c "import study_posting_ai_analysis as m; \
 	print('study-posting-ai-analysis', m.__version__, \
 	'-', len(m.__all__), 'exports,', len(m.FLATTENED_COLUMNS), 'columns')" \
@@ -237,11 +251,11 @@ lint-fix:
 typecheck:
 	@$(call for_each_member,MYPYPATH=src $(RUN) mypy --config-file $(CURDIR)/pyproject.toml src tests)
 	@echo ""
-	@echo "==> scripts"
-	@$(RUN) mypy --config-file $(CURDIR)/pyproject.toml scripts
+	@echo "==> tools"
+	@$(RUN) mypy --config-file $(CURDIR)/pyproject.toml tools
 
 docs-check:
-	$(RUN) python scripts/check_docs_sync.py
+	$(RUN) python tools/check_docs_sync.py
 
 # ---------------------------------------------------------------------------
 # Security
@@ -257,21 +271,21 @@ audit-deps:
 
 audit-code:
 	$(RUN) bandit --configfile pyproject.toml --recursive \
-	  $(wildcard python/packages/*/src) $(wildcard python/programs/*/src) --quiet
+	  $(SRC_DIRS) --quiet
 
 # ---------------------------------------------------------------------------
 # Tests: each member runs its own suite from its own directory
 # ---------------------------------------------------------------------------
-test: clean-caches
+test: validate-package clean-caches
 	@$(call for_each_target,$(RUN) pytest $(PYTEST_ARGS))
 
-test-fast: clean-caches
+test-fast: validate-package clean-caches
 	@$(call for_each_target,$(RUN) pytest -m "not slow" $(PYTEST_ARGS))
 
-test-slow: clean-caches
+test-slow: validate-package clean-caches
 	@$(call for_each_target,$(RUN) pytest -m slow $(PYTEST_ARGS))
 
-coverage: clean-caches clean-reports
+coverage: validate-package clean-caches clean-reports
 	@$(call for_each_target,mkdir -p $(REPORTS_DIR) && $(RUN) pytest --cov --cov-report=term-missing:skip-covered --cov-report=html --cov-report=xml --junitxml=$(REPORTS_DIR)/junit.xml $(PYTEST_ARGS))
 	@echo ""
 	@echo "HTML coverage reports:"

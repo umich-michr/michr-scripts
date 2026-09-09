@@ -4,46 +4,52 @@ applyTo: "python/packages/text-post-edit-metrics/**"
 
 # text-post-edit-metrics instructions
 
-## Package contract
+## Contract and scope
 
-This package performs a directional technical comparison:
+This pure package performs a directional text comparison:
 
 ```python
-PostEditingResult = analyze_post_edit(
-    suggestion=generated_or_original_text,
-    final=human_edited_reference_text,
+result = analyze_post_edit(
+    suggestion=initial_text,
+    final=represented_edited_text,
 )
 ```
 
-The argument direction must never be reversed. Every normalized denominator uses
-the final text length.
+The package measures the pair under a post-editing interpretation. It does not
+verify that `final` was actually produced by editing `suggestion`.
 
-## Scope
-
-This package owns only:
+It owns:
 
 - Unicode NFC metric normalization;
 - TER and TER-derived scores;
 - character-level Levenshtein metrics;
 - weighted soft-word metrics;
-- the estimated-characters-saved proxy;
-- descriptive text-length counts;
-- generic immutable result models.
+- estimated characters saved;
+- descriptive text counts;
+- immutable generic result models.
 
-It must not contain:
+It must not contain form fields, selection policy, record identifiers,
+study-posting rules, JSON audit parsing, database or file I/O, pandas, logging,
+or CLI behavior.
 
-- study-posting fields or requiredness;
-- selection or acceptance policy;
-- cosmetic-equivalence policy;
-- contact, compensation, or lookup behavior;
-- JSON audit-object parsing;
-- database, CSV, filesystem, pandas, logging, or CLI code.
+## Direction and result model
+
+Never reverse the arguments. All normalized denominators use final-text length.
+
+`PostEditingResult` contains only metric values and text counts. Do not add:
+
+- field or record identity;
+- source information;
+- selection status;
+- product-policy classification.
+
+Those belong to consumers.
 
 ## Metric invariants
 
 ### TER
 
-SacreBLEU TER configuration is fixed:
+The SacreBLEU configuration is fixed:
 
 ```python
 TER(
@@ -54,15 +60,12 @@ TER(
 )
 ```
 
-Changing any argument changes reported results and requires explicit
-documentation and compatibility tests.
-
 ```text
 ter_effort_saved_raw = 1 - ter_rate
 ter_effort_saved = clamp01(ter_effort_saved_raw)
 ```
 
-TER may exceed `1`; the raw score may be negative.
+TER may exceed `1`; retain negative raw scores.
 
 ### Character metric
 
@@ -71,7 +74,7 @@ character_effort_saved_raw =
     1 - character_edit_distance / final_character_count
 ```
 
-The standard combined API is case-sensitive for this metric.
+The combined API is case-sensitive for this metric.
 
 ### Weighted soft-word metric
 
@@ -79,7 +82,7 @@ The standard combined API is case-sensitive for this metric.
 - insertion cost `1.0`;
 - deletion cost `1.0`;
 - substitution cost is RapidFuzz normalized character distance;
-- no phrase-shift operation;
+- no phrase shifts;
 - two-row Wagner–Fischer implementation.
 
 ```text
@@ -96,53 +99,32 @@ estimated_characters_saved =
     max(0, final_character_count - character_edit_distance)
 ```
 
-Never describe this as observed keystrokes or literal avoided typing.
+Do not describe this as observed keystrokes or literal avoided typing.
 
-## Validation
+## Validation and interpretation
 
 - Empty suggestion: valid.
-- Empty final text: invalid.
-- Whitespace-only final text: invalid.
+- Empty or whitespace-only final text: invalid.
 - Non-string arguments: `TypeError`.
 - Zero final denominator: `ValueError`.
 
-Runtime validators accept `object` so `isinstance` checks are meaningful to
-Pylance and mypy.
+These metrics describe technical textual transformation. They do not directly
+measure time, cognition, observed keystrokes, semantic equivalence, or user
+satisfaction.
 
-## Result model
+## Change control
 
-`PostEditingResult` contains only metric values and text counts. Do not add:
+Changes to formulas, preprocessing, case behavior, TER configuration, operation
+costs, denominators, or result fields can change reported values. Such changes
+require:
 
-- field name;
-- record identifier;
-- source name;
-- selection status;
-- policy classification.
+- updated package documentation;
+- direct boundary and formula tests;
+- compatibility review with consuming packages;
+- seeded differential tests where applicable.
 
-Those belong to the consuming package.
-
-## Interpretation
-
-These values describe technical textual transformation. They do not directly
-measure:
-
-- elapsed time;
-- cognitive effort;
-- observed keystrokes;
-- semantic equivalence;
-- user satisfaction.
-
-## Verification
-
-Any implementation change must preserve or deliberately update:
-
-- direct unit tests;
-- boundary tests;
-- case and Unicode tests;
-- raw and bounded formulas;
-- 1,500 seeded differential cases;
-- public API tests;
-- package README.
+The optimized soft-word implementation must continue to agree with the
+full-matrix reference across the established 1,500 seeded random cases.
 
 Run:
 

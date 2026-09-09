@@ -1,40 +1,118 @@
 # study-posting-ai-analysis
 
-Measures how much **AI-generated text assistance survived into final
-human-authored content**.
+Analyzes AI suggestions, user selections, and final saved values for the
+University of Michigan eResearch study-posting form.
 
-Given three inputs — the suggestions an AI offered, the suggestions a user
-selected, and the values the user ultimately saved — this library reports, per
-form field, what became of the suggestion and how much textual post-editing was
-required.
+Given three objects—suggested, selected, and final—the package returns one
+structured analysis result per configured field.
 
-Built for the University of Michigan eResearch study-posting form, where an LLM
-suggests values for fields such as title, purpose, description, compensation
-text, and contact details.
+It answers questions such as:
 
-> **Interpretation note.** These metrics quantify *technical post-editing
-> effort*. They do not measure time saved, keystrokes avoided, cognitive effort,
-> or user satisfaction. See
-> [interpretation limits](docs/analysis-specification.md#16-interpretation-limits).
+- Was a suggestion offered?
+- Was an offered suggestion selected?
+- Was selected text retained exactly, changed cosmetically, substantively
+  edited, or removed?
+- How much technical text post-editing was required?
+- Were selected lookup IDs retained?
+- Was the suggested compensation Boolean retained?
 
----
+> These results describe technical textual post-editing and realized
+> assistance. They do not directly measure elapsed time, cognitive effort,
+> observed keystrokes, semantic equivalence, user satisfaction, or overall
+> usefulness.
 
-## Scope
-
-This library performs **no input or output**. It has no knowledge of databases,
-files, audit-table schemas, or command lines. Three dictionaries in, analysis
-results out.
-
-Reading rows from a data source, looping over them, aggregating results, and
-writing reports are the responsibility of the programs that consume it.
-
-The package depends on [`text-post-edit-metrics`](../text-post-edit-metrics/)
-for technical text metrics. It does not directly depend on SacreBLEU or
-RapidFuzz and contains no metric implementation of its own.
+The
+[analysis specification](docs/analysis-specification.md)
+is the authoritative source for study policy and interpretation.
 
 ---
 
-## Usage
+## Package contract
+
+Three objects in:
+
+```python
+results = analyze_objects(
+    suggested_object,
+    selected_object,
+    final_object,
+)
+```
+
+One structured result per analyzed field out:
+
+```python
+title = results["title"]
+
+print(title.match)
+print(title.ter_effort_saved)
+print(title.policy_adjusted_effort_saved)
+```
+
+The inputs represent:
+
+| Input | Meaning |
+|---|---|
+| `suggested_object` | Text suggestions, lookup IDs, contact values, compensation suggestions, and the suggested compensation Boolean offered by the AI |
+| `selected_object` | Suggestions and lookup IDs selected or applied by the user |
+| `final_object` | Values ultimately saved in the study posting |
+
+The package can optionally decode the three objects from JSON strings or UTF-8
+bytes.
+
+It performs no:
+
+- database or SQL access;
+- audit-record eligibility filtering;
+- CSV or filesystem I/O;
+- DataFrame construction;
+- logging;
+- command-line processing;
+- batch iteration;
+- report aggregation or publication.
+
+Those responsibilities belong to consuming packages and programs.
+
+---
+
+## Dependency boundary
+
+Technical text metrics are implemented by the sibling
+[`text-post-edit-metrics`](../text-post-edit-metrics/) package.
+
+```text
+text-post-edit-metrics
+          ↑
+study-posting-ai-analysis
+```
+
+This package owns:
+
+- study-posting field configuration;
+- field requiredness;
+- suggestion-selection validation;
+- outcome classification;
+- cosmetic-equivalence policy;
+- contact and compensation behavior;
+- lookup and Jaccard analysis;
+- JSON-object parsing;
+- flattened study-analysis rows.
+
+It does not implement:
+
+- TER;
+- character-level Levenshtein distance;
+- weighted soft-word distance;
+- generic metric normalization.
+
+Canonical generic metric documentation:
+
+- [methodology](../text-post-edit-metrics/docs/methodology.md);
+- [verification](../text-post-edit-metrics/docs/verification.md).
+
+---
+
+## Basic usage
 
 ```python
 from study_posting_ai_analysis import (
@@ -43,53 +121,330 @@ from study_posting_ai_analysis import (
     parse_analysis_inputs,
 )
 
-# Decode JSON payloads from wherever they came from: a database column, a CSV
-# cell, an HTTP request. Already-decoded dictionaries pass straight through.
 suggested, selected, final = parse_analysis_inputs(
-    suggestions_json,
-    selections_json,
-    final_json,
+    suggested_payload,
+    selected_payload,
+    final_payload,
 )
 
-# One structured result per analyzed form field.
-results = analyze_objects(suggested, selected, final)
+results = analyze_objects(
+    suggested,
+    selected,
+    final,
+)
 
-results["title"].match  # MatchType.EDITED
-results["title"].ter_effort_saved  # 0.83
-results["title"].policy_adjusted_effort_saved  # 0.83
-results["topics"].similarity  # 0.33 (Jaccard)
+title = results["title"]
 
-# One flat dictionary per field, ready for CSV, a DataFrame, or a table insert.
-rows = flatten_analysis_results(results, record_id="audit-1234")
+print("Match:", title.match)
+print("TER-derived score:", title.ter_effort_saved)
+print("Policy score:", title.policy_adjusted_effort_saved)
+
+rows = flatten_analysis_results(
+    results,
+    record_id="audit-1234",
+)
 ```
 
-Text fields with a selected, nonblank suggestion contain a
-`text_post_edit_metrics.PostEditingResult` in `editing_metrics`. Field identity
-is not duplicated inside that metric result: it remains the key in the result
-dictionary and, for selected values, in `Pick.kind`.
+`parse_analysis_inputs()` accepts:
+
+- JSON strings;
+- UTF-8 bytes;
+- already-decoded dictionaries.
+
+A caller that already has dictionaries may call `analyze_objects()` directly.
+
+---
+
+## Text analysis
+
+For selected, nonblank text, the package calls:
+
+```python
+from text_post_edit_metrics import analyze_post_edit
+```
+
+The returned `PostEditingResult` is stored in:
+
+```python
+text_result.editing_metrics
+```
+
+Field identity is not duplicated inside `PostEditingResult`. It remains in:
+
+- the result-dictionary key;
+- `Pick.kind` when a suggestion was selected;
+- `field_name` in flattened output.
+
+For example:
 
 ```python
 title = results["title"]
 
-title.match  # MatchType.EDITED
-title.pick.kind  # "title"
-title.editing_metrics  # PostEditingResult
-title.ter_effort_saved  # convenience property
+title.match
+title.pick
+title.editing_metrics
+title.ter_effort_saved
+title.policy_adjusted_effort_saved
 ```
 
-Callers that need to compare two texts independently should use the generic
-package directly:
+Callers comparing two texts independently should use the generic package
+directly:
 
 ```python
 from text_post_edit_metrics import analyze_post_edit
 
 metrics = analyze_post_edit(
-    suggestion="Original text",
-    final="Human-edited text",
+    suggestion="Initial text",
+    final="Represented edited text",
 )
 ```
 
-Writing the rows out is the consumer's job:
+---
+
+## Outcome classification
+
+### Text outcomes
+
+| Outcome | Meaning |
+|---|---|
+| `EXACT` | Selected and final strings are exactly equal |
+| `COSMETIC_EQUIVALENT` | Strings differ but become equal under the study cosmetic transformation |
+| `EDITED` | Selected and nonblank final text differ substantively |
+| `REMOVED` | A suggestion was selected for an optional field, then the final value was cleared |
+| `UNASSISTED` | No AI suggestion was selected |
+
+Classification order is:
+
+```text
+blank → exact → cosmetic-equivalent → edited
+```
+
+For `EXACT`, `COSMETIC_EQUIVALENT`, and `EDITED`,
+`editing_metrics` contains a `PostEditingResult`.
+
+For `REMOVED` and `UNASSISTED`, `editing_metrics` is `None`.
+
+### Policy-adjusted text score
+
+| Outcome | Score |
+|---|---:|
+| `EXACT` | `1.0` |
+| `COSMETIC_EQUIVALENT` | `1.0` |
+| `EDITED` | Bounded TER-derived score |
+| `REMOVED` | `0.0` |
+| `UNASSISTED` | `0.0` |
+
+This is a study-product policy score, not a standardized TER result.
+
+---
+
+## Cosmetic equivalence
+
+The cosmetic-equivalence transformation applies:
+
+1. Unicode NFKD decomposition;
+2. Unicode-aware case folding;
+3. combining-mark removal;
+4. punctuation and symbol replacement with spaces;
+5. whitespace collapsing and trimming.
+
+It is used only for classification.
+
+Cosmetically transformed text is never passed to the technical metrics because
+doing so would hide actual edits. The original selected and final strings are
+passed to `text_post_edit_metrics.analyze_post_edit()`.
+
+---
+
+## Required fields
+
+| Field | Rule |
+|---|---|
+| `title` | Required |
+| `purpose` | Required |
+| `description` | Required |
+| `about` | Optional |
+| `contact.email` | Required |
+| `contact.name` | Required |
+| `contact.phone` | Optional |
+| `contact.website` | Optional |
+| Compensation text | Required when final `offersCompensation` is `True` |
+| `offersCompensation` | Must be saved as `True` or `False` |
+
+A blank required value raises `ValueError`. It is not represented as a score of
+zero.
+
+A selected suggestion cleared from an optional field is `REMOVED`.
+
+An optional blank field with no selection is `UNASSISTED`.
+
+---
+
+## Contact analysis
+
+The top-level `contact` object expands into four separately reported fields:
+
+- `contact.email`;
+- `contact.name`;
+- `contact.phone`;
+- `contact.website`.
+
+Each contact subfield offers at most one suggestion.
+
+A selected contact value must have been offered and must equal the offered value
+before final editing.
+
+Unknown contact fields are rejected.
+
+---
+
+## Compensation analysis
+
+Compensation combines:
+
+- categorized compensation-text suggestions;
+- the suggested `offersCompensation` Boolean;
+- the final saved Boolean;
+- final compensation text.
+
+Text categories:
+
+- `genericCompensation`;
+- `specificCompensation`.
+
+At most one text suggestion may be selected across both categories.
+
+The result reports:
+
+| Field | Meaning |
+|---|---|
+| `flag_suggested` | AI-recommended Boolean, if available |
+| `flag_saved` | Final saved Boolean |
+| `flag_accepted` | Whether saved matched suggested |
+| `flag_changed` | Whether saved differed from suggested |
+| `compensation_text_required` | Whether final saved Boolean requires text |
+
+Boolean acceptance and text post-editing are separate outcomes.
+
+Examples:
+
+| Scenario | Text outcome |
+|---|---|
+| AI suggested `False`; user saved `True` and wrote text independently | `UNASSISTED` |
+| User selected text, saved `False`, and cleared text | `REMOVED` |
+
+---
+
+## Lookup analysis
+
+Lookup fields are:
+
+- `department`;
+- `locations`;
+- `topics`.
+
+Values are integer IDs. Booleans are rejected because `bool` is a subclass of
+`int`.
+
+Every picked ID must have been offered.
+
+For assisted outcomes:
+
+```text
+lookup_similarity =
+    |picked ∩ saved| / |picked ∪ saved|
+```
+
+The result also reports:
+
+- `offered`;
+- `picked`;
+- `saved`;
+- `kept`;
+- `dropped`;
+- `added`;
+- `saved_not_offered`.
+
+When nothing was picked:
+
+- outcome = `UNASSISTED`;
+- similarity = study-policy value `0.0`;
+- no empty-set Jaccard calculation is performed.
+
+Lookup similarity must not be averaged with text effort-saved scores.
+
+---
+
+## Parsing
+
+### `parse_json_object()`
+
+Accepts:
+
+- JSON strings;
+- UTF-8 bytes;
+- already-decoded dictionaries.
+
+Rejects:
+
+- missing values;
+- blank strings;
+- invalid UTF-8;
+- malformed JSON;
+- valid JSON values that are not objects.
+
+Malformed input raises `InputParseError`, which subclasses `ValueError`.
+
+### `parse_analysis_inputs()`
+
+Applies the same behavior to all three analysis inputs:
+
+```python
+suggested, selected, final = parse_analysis_inputs(
+    suggested_payload,
+    selected_payload,
+    final_payload,
+)
+```
+
+Database column names, row identifiers, eligibility rules, and source-schema
+mapping belong to the consuming program.
+
+---
+
+## Flattened output
+
+`flatten_analysis_results()` returns:
+
+```python
+list[dict[str, object]]
+```
+
+It produces one row per analyzed field:
+
+```python
+rows = flatten_analysis_results(
+    results,
+    record_id="audit-1234",
+    include_text=False,
+)
+```
+
+Every row:
+
+- contains every name in `FLATTENED_COLUMNS`;
+- preserves canonical column order;
+- contains only `None`, `bool`, `int`, `float`, or `str`;
+- excludes selected and final free text by default.
+
+Lookup ID sets are serialized as sorted JSON arrays.
+
+Lookup rows leave text-metric and policy-adjusted text columns as `None`.
+
+`FLATTENED_COLUMNS` is a published contract. Adding, removing, or renaming a
+column requires documentation and compatibility review.
+
+### Writing CSV is a consumer responsibility
 
 ```python
 import csv
@@ -97,226 +452,148 @@ import csv
 from study_posting_ai_analysis import FLATTENED_COLUMNS
 
 with open("analysis.csv", "w", newline="", encoding="utf-8") as handle:
-    writer = csv.DictWriter(handle, fieldnames=FLATTENED_COLUMNS)
+    writer = csv.DictWriter(
+        handle,
+        fieldnames=FLATTENED_COLUMNS,
+    )
     writer.writeheader()
     writer.writerows(rows)
 ```
 
----
-
-## What it reports
-
-### Outcome classification
-
-Every field receives a `MatchType`:
-
-| Outcome | Meaning |
-|---|---|
-| `EXACT` | The suggestion and the saved value are identical |
-| `COSMETIC_EQUIVALENT` | They differ only in case, diacritics, punctuation, or whitespace |
-| `EDITED` | A suggestion was applied and substantive differences remain |
-| `REMOVED` | A suggestion was selected, then the optional field was cleared |
-| `UNASSISTED` | No suggestion was selected |
-
-### Metrics
-
-| Measure | Formula | Role |
-|---|---|---|
-| TER-derived | `1 − TER` | **Primary**, case-insensitive |
-| Character | `1 − levenshtein / final_chars` | Secondary robustness |
-| Soft-word | `1 − weighted_distance / final_words` | Robustness |
-| Characters saved | `max(0, final_chars − distance)` | Absolute proxy |
-
-Raw scores may be negative and are always retained alongside their bounded
-`[0, 1]` counterparts, so a suggestion that cost more to fix than to rewrite
-remains identifiable.
-
-Lookup fields report **Jaccard similarity** between picked and saved identifier
-sets. Compensation reports the Boolean flag outcome **separately** from its text
-outcome. Neither may be averaged together with text effort-saved scores.
-
-### Flattened output
-
-`FLATTENED_COLUMNS` defines 38 columns present on every row: identification,
-suggestion counts, the classification, all metric variants, compensation flag
-outcomes, and lookup identifier sets. Values are only `None`, `bool`, `int`,
-`float`, or `str` — no nested structures.
-
-Free text is excluded unless `include_text=True` is passed.
+The library itself does not open or write files.
 
 ---
 
 ## Public API
 
-| Function | Purpose |
+| Name | Purpose |
 |---|---|
-| `analyze_objects(suggested, selected, final)` | Analyze every configured study-posting field |
-| `parse_analysis_inputs(...)` | Decode the three JSON payloads |
-| `parse_json_object(value, name=...)` | Decode one JSON object |
-| `flatten_analysis_results(results, ...)` | Convert results to flat rows |
-| `analyze_text_field(...)` | Analyze one configured text field |
-| `analyze_contact(...)` | Analyze contact subfields |
-| `analyze_compensation(...)` | Analyze compensation text and Boolean policy |
-| `analyze_lookup_values(...)` | Analyze offered, picked, and saved lookup IDs |
-| `compare_selected_text(...)` | Classify a selected suggestion against its final text |
+| `analyze_objects()` | Analyze all configured fields |
+| `analyze_text_field()` | Analyze one ordinary text field |
+| `analyze_contact()` | Analyze contact subfields |
+| `analyze_compensation()` | Analyze compensation text and Boolean policy |
+| `analyze_lookup_values()` | Analyze offered, picked, and saved lookup IDs |
+| `compare_selected_text()` | Classify selected text against its final value |
+| `parse_analysis_inputs()` | Decode the three JSON inputs |
+| `parse_json_object()` | Decode one JSON object |
+| `flatten_analysis_results()` | Convert structured results to flat rows |
+| `FLATTENED_COLUMNS` | Canonical flattened output columns |
+| `FIELD_SPECS` | Configured study-posting fields |
+| `CONTACT_FIELDS` | Configured contact subfields |
+| `REQUIRED_CONTACT_FIELDS` | Required contact subfields |
+| `COMPENSATION_KINDS` | Compensation suggestion categories |
 
-Technical metric functions and result models are intentionally **not**
-re-exported. Import them from `text_post_edit_metrics`:
-
-```python
-from text_post_edit_metrics import (
-    PostEditingResult,
-    analyze_post_edit,
-    calculate_character_metrics,
-    calculate_soft_word_metrics,
-    calculate_ter_metrics,
-)
-```
-
-Configuration is exposed as `FIELD_SPECS`, `CONTACT_FIELDS`,
-`REQUIRED_CONTACT_FIELDS`, and `COMPENSATION_KINDS`.
-
-Invalid input raises `TypeError` or `ValueError`. Malformed JSON raises
-`InputParseError`, which subclasses `ValueError`.
+Technical text metrics and `PostEditingResult` are imported from
+`text_post_edit_metrics`, not re-exported by this package.
 
 ---
 
-## Development
+## Reporting guidance
 
-### Prerequisites
+Report statistics separately because they answer different questions and use
+different denominators.
 
-| Tool | Check | Install |
+| Statistic | Denominator | Recommended label |
 |---|---|---|
-| **uv** | `uv --version` | `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
-| **make** | `make --version` | macOS: `xcode-select --install` |
+| Fields with an offer | All analyzed text fields | Suggestion offer coverage |
+| Fields with a selection | Text fields with an offer | Suggestion selection rate |
+| Mean policy score among offered fields | Offered text fields | Realized suggestion utility |
+| Mean policy score among selected fields | Selected text fields | Selected-suggestion utility |
+| Mean bounded TER-derived score | Selected suggestions with nonblank final values | TER-derived post-editing score |
 
-Python is not a prerequisite; `uv` reads `.python-version` and downloads the
-interpreter.
+Always report the denominator or sample count with a mean.
 
-### Setup
+Do not:
 
-```bash
-git clone <repository-url>
-cd study-posting-ai-analysis
-make setup      # idempotent; re-run any time
-make check      # the full gate
-```
-
-### Commands
-
-| Command | Purpose |
-|---|---|
-| `make setup` | Bootstrap a fresh clone |
-| `make check` | Format, lint, types, security audit, coverage. **Run before committing.** |
-| `make test` | Test suite, clean start |
-| `make test-fast` | Skip slow randomized differential tests |
-| `make coverage-open` | Coverage, then open the HTML report |
-| `make format` | Format and organize imports |
-| `make lint` / `make typecheck` | Ruff · mypy strict |
-| `make audit` | Dependency and source security scan |
-| `make clean` | Remove reports and caches |
-| `make doctor` | Environment summary |
-
-Run a subset:
-
-```bash
-make test PYTEST_ARGS="-k compensation -vv"
-```
-
-Run `make` alone to list every target.
+- describe an all-text-fields average simply as “effort saved”;
+- combine lookup similarity with text effort-saved scores;
+- combine compensation-Boolean acceptance with compensation-text metrics.
 
 ---
 
 ## Architecture
 
-The study package owns form interpretation, not metric implementation.
-
 ```text
 src/study_posting_ai_analysis/
-├── models.py             Study-specific enums and result models
-├── validation.py         Runtime checks at JSON trust boundaries
-├── text_normalization.py Cosmetic-equivalence and blank-text policy
+├── __init__.py
+├── errors.py             InputParseError
+├── field_analysis.py     Field classification and analyzers
 ├── field_specs.py        Field configuration and requiredness
-├── field_analysis.py     Classification and per-field analyzers
-├── parsing.py            JSON input decoding
-├── flattening.py         Study results to tabular rows
-└── errors.py             InputParseError
+├── flattening.py         Structured results to tabular rows
+├── models.py             Study-specific result models
+├── parsing.py            JSON-object decoding
+├── text_normalization.py Cosmetic equivalence and blank-text policy
+├── validation.py         Runtime checks at trust boundaries
+└── py.typed              PEP 561 typing marker
 ```
 
-Text analysis delegates to the sibling package:
+Text metrics are delegated:
 
 ```text
 study-posting-ai-analysis
           │
           └── text-post-edit-metrics
                 ├── TER
-                ├── character Levenshtein
-                ├── weighted soft-word distance
+                ├── character Levenshtein metrics
+                ├── weighted soft-word metrics
                 ├── metric normalization
                 └── PostEditingResult
 ```
 
-Four constraints hold:
+---
 
-1. **No I/O.** No database, filesystem, DataFrame, CLI, or logging behavior.
-2. **No metric implementation.** Text calculations belong to
-   `text-post-edit-metrics`.
-3. **Functions raise; they do not log.**
-4. **Study results are immutable.** Text metrics use the generic immutable
-   `PostEditingResult`.
+## Development
 
-See [`docs/program-flow.md`](docs/program-flow.md) for the flow diagrams.
+Run commands from the repository root.
+
+```bash
+make test PACKAGE=study-posting-ai-analysis
+make coverage PACKAGE=study-posting-ai-analysis
+```
+
+Run a focused subset:
+
+```bash
+make test \
+  PACKAGE=study-posting-ai-analysis \
+  PYTEST_ARGS="-k compensation -vv"
+```
+
+Run the complete workspace gate:
+
+```bash
+make check
+```
+
+Shared setup, contribution, CI, and workspace guidance are documented in the
+[root README](../../../README.md).
 
 ---
 
 ## Documentation
 
-| Document | Contents |
+| Document | Purpose |
 |---|---|
-| [`docs/analysis-specification.md`](docs/analysis-specification.md) | **The specification of record.** Formulas, requiredness rules, outcome vocabulary, reporting terminology, interpretation limits, references. |
-| [`docs/program-flow.md`](docs/program-flow.md) | Control-flow diagrams. |
-| [`CONTRIBUTING.md`](CONTRIBUTING.md) | Workflow, conventions, the metric-change protocol, AI-agent guidance. |
-| [`.github/copilot-instructions.md`](.github/copilot-instructions.md) | Context supplied automatically to Copilot Chat. |
+| [`docs/analysis-specification.md`](docs/analysis-specification.md) | Specification of record for study methodology and field policy |
+| [`docs/program-flow.md`](docs/program-flow.md) | Study-analysis control-flow diagrams |
+| [`../text-post-edit-metrics/README.md`](../text-post-edit-metrics/README.md) | Generic metric API overview |
+| [`../text-post-edit-metrics/docs/methodology.md`](../text-post-edit-metrics/docs/methodology.md) | Canonical generic metric methodology |
+| [`../text-post-edit-metrics/docs/verification.md`](../text-post-edit-metrics/docs/verification.md) | Canonical generic metric verification |
+| [`../../../README.md`](../../../README.md) | Repository organization and workflow |
 
-If code and the specification disagree, **the specification governs** — or it
-must be amended in the same change. A pre-commit hook enforces this for the
-modules that determine reported numbers.
-
----
-
-## Reporting guidance for consumers
-
-Each statistic below has a different denominator and answers a different
-question. Report them separately, and always state the denominator.
-
-| Statistic | Denominator | Label |
-|---|---|---|
-| Fields with an offer ÷ analyzed text fields | all text fields | Suggestion offer coverage |
-| Fields with a selection ÷ fields with an offer | offered fields | Suggestion selection rate |
-| Mean policy score among offered fields | offered fields | Realized suggestion utility |
-| Mean policy score among selected suggestions | selected fields | Selected-suggestion utility |
-| Mean `ter_effort_saved` among nonblank post-edits | measurable post-edits | TER-derived post-editing score |
-
-Two rules that matter:
-
-- Never report an all-text-fields average simply as "effort saved" without
-  stating its denominator.
-- Never average lookup similarity together with text effort-saved scores; they
-  measure different constructs.
-
-Lookup rows deliberately leave the TER and policy columns as `None` so that a
-mean over text rows cannot be contaminated by a similarity value.
+If implementation and the study specification disagree, either implementation
+is wrong or the specification must be amended in the same change.
 
 ---
 
-## Handling data responsibly
+## Data handling
 
-- Free text is excluded from flattened rows unless `include_text=True` is passed
-  deliberately.
-- This library never logs. A consumer that logs field text should do so only at
-  `DEBUG`.
-- Test fixtures contain synthetic text only. Real study content must never
-  appear in a test, example, or docstring.
+- Free text is excluded from flattened rows unless `include_text=True`.
+- The library never logs.
+- Tests and examples use synthetic content.
+- Real study content, production identifiers, credentials, and database exports
+  must not appear in tests or documentation.
+- Consumers are responsible for appropriate handling of source and output data.
 
 ---
 
@@ -325,22 +602,21 @@ mean over text rows cannot be contaminated by a similarity value.
 | Component | Version |
 |---|---|
 | Python | 3.14 |
-| `text-post-edit-metrics` | 0.1.x — reusable metric implementation |
-| SacreBLEU | 2.6.x — transitive TER implementation |
-| RapidFuzz | 3.14.x — transitive Levenshtein implementation |
+| `study-posting-ai-analysis` | 0.1.x |
+| `text-post-edit-metrics` | 0.1.x |
+| SacreBLEU | 2.6.x, owned by `text-post-edit-metrics` |
+| RapidFuzz | 3.14.x, owned by `text-post-edit-metrics` |
 
-The study package pins the compatible `text-post-edit-metrics` version. That
-package, in turn, bounds the metric libraries whose behavior can affect reported
-scores.
+Exact resolved versions are recorded in the repository root `uv.lock`.
 
-Major versions are bounded deliberately: a major release of either library could
-change reported scores. `uv.lock` is committed so every clone and CI run
-resolves identical versions.
+For published or archived analysis, record:
 
-For a publication or archived analysis, record the Python and package versions,
-the analysis date, the library version, random seeds, record counts, inclusion
-rules, and every aggregate denominator. See
-[specification section 17](docs/analysis-specification.md#17-reproducibility).
+- Python and package versions;
+- analysis date;
+- Git revision;
+- record and field-instance counts;
+- inclusion and exclusion rules;
+- every aggregate denominator.
 
 ---
 

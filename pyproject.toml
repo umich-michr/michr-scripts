@@ -116,7 +116,6 @@ mypy-init-return = true
     "S311",
 ]
 "**/src/*/__init__.py" = ["F401"]
-"scripts/*.py" = ["T201"]
 
 # ===========================================================================
 # mypy: shared across every member
@@ -143,10 +142,6 @@ enable_error_code = [
 [[tool.mypy.overrides]]
 module = ["sacrebleu.*"]
 implicit_reexport = true
-
-[[tool.mypy.overrides]]
-module = ["tests.*"]
-disallow_untyped_defs = false
 
 # ===========================================================================
 # Bandit: shared

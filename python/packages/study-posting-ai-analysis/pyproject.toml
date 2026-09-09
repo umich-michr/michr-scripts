@@ -1,27 +1,42 @@
 # ===========================================================================
 # study-posting-ai-analysis
 #
-# A pure analysis library: three decoded objects in, per-field results out.
-# No input or output of any kind.
+# Pure study-posting business analysis:
+#   suggested object + selected object + final object -> per-field results
 #
-# Shared Ruff, mypy, and bandit configuration lives in the workspace root.
-# pytest and coverage are configured here, because this package runs its own
-# suite from its own directory.
+# Technical text metrics are delegated to text-post-edit-metrics.
+# This package performs no database, filesystem, reporting, logging, or CLI I/O.
+#
+# Shared Ruff, mypy, and Bandit configuration lives at the workspace root.
+# This file owns package metadata, pytest behavior, and package coverage.
 # ===========================================================================
+
 [project]
 name = "study-posting-ai-analysis"
 version = "0.1.0"
-description = "Post-editing metrics for AI-assisted form field suggestions."
+description = "Study-posting policy analysis for AI suggestions, selections, and final values."
 readme = "README.md"
 requires-python = ">=3.14"
 license = "MIT"
 authors = [{ name = "University of Michigan" }]
-keywords = ["ter", "hter", "post-editing", "edit-distance", "llm-evaluation"]
+keywords = [
+    "study-posting",
+    "llm-evaluation",
+    "suggestion-analysis",
+    "post-editing",
+    "audit-analysis",
+]
 
 dependencies = ["text-post-edit-metrics>=0.1.0"]
 
+# During workspace development, resolve the dependency from its sibling member
+# rather than from a package index.
 [tool.uv.sources]
 text-post-edit-metrics = { workspace = true }
+
+# ===========================================================================
+# Build
+# ===========================================================================
 
 [build-system]
 requires = ["hatchling"]
@@ -33,6 +48,7 @@ packages = ["src/study_posting_ai_analysis"]
 # ===========================================================================
 # pytest
 # ===========================================================================
+
 [tool.pytest.ini_options]
 minversion = "9.0"
 testpaths = ["tests"]
@@ -45,7 +61,6 @@ addopts = [
     "--tb=short",
     "--durations=10",
 ]
-markers = ["slow: randomized differential tests; excluded by 'make test-fast'"]
 filterwarnings = ["error"]
 log_cli = false
 log_cli_level = "INFO"
@@ -54,12 +69,15 @@ log_cli_format = "%(levelname)-8s %(name)s: %(message)s"
 # ===========================================================================
 # Coverage
 # ===========================================================================
+
 [tool.coverage.run]
 source = ["study_posting_ai_analysis"]
 branch = true
 parallel = false
 relative_files = true
 
+# Map an installed-package path back to the workspace source tree so reports
+# remain clickable and comparable across local and CI environments.
 [tool.coverage.paths]
 source = [
     "src/study_posting_ai_analysis",
