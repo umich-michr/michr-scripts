@@ -41,8 +41,8 @@ junit.xml
 # Generated reports (regenerated on every run; never committed)
 # ---------------------------------------------------------------------------
 reports/
-packages/*/reports/
-programs/*/reports/
+python/packages/*/reports/
+python/programs/*/reports/
 *.log
 
 # ---------------------------------------------------------------------------

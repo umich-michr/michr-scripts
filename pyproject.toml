@@ -42,7 +42,7 @@ dev = [
 package = false
 
 [tool.uv.workspace]
-members = ["packages/*", "programs/*"]
+members = ["python/packages/*", "python/programs/*"]
 
 # ===========================================================================
 # Ruff: shared across every member
@@ -95,7 +95,7 @@ convention = "numpy"
 
 [tool.ruff.lint.isort]
 # Every workspace member is first-party. Add new members here.
-known-first-party = ["michr_text_post_editing", "study_posting_ai_analysis"]
+known-first-party = ["text_post_edit_metrics", "study_posting_ai_analysis"]
 force-sort-within-sections = true
 
 [tool.ruff.lint.pylint]

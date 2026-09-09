@@ -108,7 +108,7 @@ Test behavior in the package that owns it.
 Examples:
 
 - TER, character distance, soft-word distance, and metric normalization belong
-  to `michr-text-post-editing`.
+  to `text-post-edit-metrics`.
 - Study field requiredness, classification, compensation, contact, lookup, and
   flattening belong to `study-posting-ai-analysis`.
 - A future row-stream package owns database and CSV streaming tests.

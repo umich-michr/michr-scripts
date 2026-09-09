@@ -1,0 +1,88 @@
+# ===========================================================================
+# text-post-edit-metrics
+#
+# Reusable technical post-editing metrics for comparing an AI suggestion with
+# the final human-edited text.
+#
+# Shared Ruff, mypy, and Bandit configuration lives at the workspace root.
+# pytest and coverage are configured here because this package owns its suite
+# and coverage gate.
+# ===========================================================================
+[project]
+name = "text-post-edit-metrics"
+version = "0.1.0"
+description = "Technical post-editing metrics for AI-generated text."
+readme = "README.md"
+requires-python = ">=3.14"
+license = "MIT"
+authors = [{ name = "University of Michigan" }]
+keywords = ["ter", "hter", "post-editing", "edit-distance", "llm-evaluation"]
+
+# These dependencies remain temporarily declared by the study-posting package
+# as well. They move exclusively here after the metric implementation moves.
+dependencies = ["sacrebleu>=2.6.0,<3.0", "rapidfuzz>=3.14.6,<4.0"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/text_post_edit_metrics"]
+
+# ===========================================================================
+# pytest
+# ===========================================================================
+[tool.pytest.ini_options]
+minversion = "9.0"
+testpaths = ["tests"]
+addopts = [
+    "--import-mode=importlib",
+    "--strict-markers",
+    "--strict-config",
+    "-ra",
+    "--showlocals",
+    "--tb=short",
+    "--durations=10",
+]
+markers = ["slow: randomized differential tests; excluded by 'make test-fast'"]
+filterwarnings = ["error"]
+log_cli = false
+log_cli_level = "INFO"
+log_cli_format = "%(levelname)-8s %(name)s: %(message)s"
+
+# ===========================================================================
+# Coverage
+# ===========================================================================
+[tool.coverage.run]
+source = ["text_post_edit_metrics"]
+branch = true
+parallel = false
+relative_files = true
+
+[tool.coverage.paths]
+source = [
+    "src/text_post_edit_metrics",
+    "*/site-packages/text_post_edit_metrics",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+skip_empty = true
+precision = 2
+fail_under = 95
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "@overload",
+    "@abstractmethod",
+    "if __name__ == .__main__.:",
+    "class .*\\(Protocol\\):",
+]
+
+[tool.coverage.html]
+directory = "reports/htmlcov"
+
+[tool.coverage.xml]
+output = "reports/coverage.xml"

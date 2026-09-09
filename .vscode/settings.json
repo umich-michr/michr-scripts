@@ -18,7 +18,7 @@
   "python.terminal.activateEnvInCurrentTerminal": true,
 
   // src-layout support for editor tooling.
-  "python.analysis.extraPaths": ["${workspaceFolder}/packages/study-posting-ai-analysis/src"],
+  "python.analysis.extraPaths": ["${workspaceFolder}/python/packages/study-posting-ai-analysis/src"],
 
   // ---------------------------------------------------------------------
   // Pylance: strict analysis so the agent sees type errors as it writes
@@ -74,7 +74,7 @@
   // Deterministic ordering in the Test Explorer. Randomized ordering still
   // applies on the command line via "make test".
   "python.testing.pytestArgs": [
-    "packages/study-posting-ai-analysis/tests",
+    "python/packages/study-posting-ai-analysis/tests",
     "-p",
     "no:randomly"
   ],

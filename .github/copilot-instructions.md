@@ -9,8 +9,8 @@ The repository uses a **uv workspace**:
 
 ```text
 michr-scripts/
-├── packages/    Importable libraries
-└── programs/    Independently runnable applications
+├── python/packages/    Importable libraries
+└── python/programs/    Independently runnable applications
 ```
 
 A library is imported by other members. A program declares a command-line entry
@@ -18,7 +18,7 @@ point and composes one or more libraries.
 
 ## Current workspace members
 
-### `packages/michr-text-post-editing`
+### `python/packages/text-post-edit-metrics`
 
 Pure, reusable technical post-editing metrics.
 
@@ -34,7 +34,7 @@ result = analyze_post_edit(
 Owns TER, character Levenshtein metrics, weighted soft-word metrics, metric text
 normalization, and `PostEditingResult`.
 
-### `packages/study-posting-ai-analysis`
+### `python/packages/study-posting-ai-analysis`
 
 Pure study-posting business analysis.
 
@@ -52,7 +52,7 @@ Owns form-field policy, selection validation, outcome classification,
 requiredness, contact, compensation, lookup analysis, JSON parsing, and
 flattening.
 
-Depends on `michr-text-post-editing` for technical text comparisons.
+Depends on `text-post-edit-metrics` for technical text comparisons.
 
 ### Future members
 
@@ -69,7 +69,7 @@ Do not add those concerns to either existing analysis library.
 Dependencies point from more specific members toward more reusable members:
 
 ```text
-michr-text-post-editing
+text-post-edit-metrics
           ↑
 study-posting-ai-analysis
           ↑
@@ -89,7 +89,7 @@ Rules:
 
 ### Packages
 
-Packages belong under `packages/<distribution-name>/`.
+Packages belong under `python/packages/<distribution-name>/`.
 
 Each package owns:
 
@@ -104,7 +104,7 @@ Packages should expose a small public API through `__init__.py`.
 
 ### Programs
 
-Programs belong under `programs/<program-name>/`.
+Programs belong under `python/programs/<program-name>/`.
 
 Each program owns:
 
@@ -149,7 +149,7 @@ make check
 Target one member with:
 
 ```bash
-make test PACKAGE=michr-text-post-editing
+make test PACKAGE=text-post-edit-metrics
 make coverage PACKAGE=study-posting-ai-analysis
 ```
 

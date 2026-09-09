@@ -64,15 +64,15 @@ jobs:
         run: |
           uv run ruff check \
             --output-format=github \
-            packages/*/src \
-            packages/*/tests \
-            programs/*/src \
-            programs/*/tests \
+            python/packages/*/src \
+            python/packages/*/tests \
+            python/programs/*/src \
+            python/programs/*/tests \
             scripts 2>/dev/null || \
           uv run ruff check \
             --output-format=github \
-            packages/*/src \
-            packages/*/tests \
+            python/packages/*/src \
+            python/packages/*/tests \
             scripts
 
       - name: Run strict type checking

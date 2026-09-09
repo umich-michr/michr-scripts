@@ -55,7 +55,7 @@ repos:
       - id: name-tests-test
         args: [--pytest-test-first]
         # Test helpers are not test modules.
-        exclude: ^packages/.*/tests/helpers/
+        exclude: ^python/packages/.*/tests/helpers/
       # Blocks committing a file named exactly "id_rsa", "*.pem", etc.
       - id: detect-private-key
 
@@ -89,7 +89,7 @@ repos:
       # so it runs via "uv run" rather than in an isolated hook environment.
       - id: mypy
         name: mypy (strict)
-        entry: bash -c 'root=$(pwd); for m in packages/*; do (cd "$m" && MYPYPATH=src uv run mypy --config-file "$root/pyproject.toml" src tests) || exit 1; done; uv run mypy --config-file "$root/pyproject.toml" scripts'
+        entry: bash -c 'root=$(pwd); for m in python/packages/*; do (cd "$m" && MYPYPATH=src uv run mypy --config-file "$root/pyproject.toml" src tests) || exit 1; done; uv run mypy --config-file "$root/pyproject.toml" scripts'
         language: system
         types_or: [python, pyi]
         pass_filenames: false
@@ -98,10 +98,10 @@ repos:
       # Bandit examines only our own source tree.
       - id: bandit
         name: bandit (security)
-        entry: bash -c 'uv run bandit --configfile pyproject.toml --recursive packages/*/src --quiet'
+        entry: bash -c 'uv run bandit --configfile pyproject.toml --recursive python/packages/*/src --quiet'
         language: system
         types: [python]
-        files: ^packages/.*/src/
+        files: ^python/packages/.*/src/
         pass_filenames: false
 
       # Requires a specification update when a metric or rule module changes.

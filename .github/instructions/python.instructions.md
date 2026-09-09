@@ -11,8 +11,8 @@ and program-specific instruction files may impose additional constraints.
 
 Before editing a Python file, identify its workspace member:
 
-- `packages/<name>/` contains an importable library;
-- `programs/<name>/` contains an independently runnable application;
+- `python/packages/<name>/` contains an importable library;
+- `python/programs/<name>/` contains an independently runnable application;
 - `scripts/` contains repository-maintenance utilities.
 
 Read that member's `pyproject.toml`, README, and scoped instruction file before

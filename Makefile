@@ -14,15 +14,28 @@
 UV  := uv
 RUN := $(UV) run
 
-# --- Workspace members -----------------------------------------------------
-# Discovered rather than listed, so adding a package needs no Makefile change.
-PACKAGES := $(wildcard packages/*)
-PROGRAMS := $(wildcard programs/*)
-MEMBERS  := $(PACKAGES) $(PROGRAMS)
+# --- Python workspace members ----------------------------------------------
+# A directory is a workspace member only when it contains pyproject.toml.
+# This avoids treating documentation files such as python/programs/README.md
+# as runnable programs.
+PACKAGES := $(sort $(patsubst %/,%,$(dir \
+	$(wildcard python/packages/*/pyproject.toml))))
+
+PROGRAMS := $(sort $(patsubst %/,%,$(dir \
+	$(wildcard python/programs/*/pyproject.toml))))
+
+MEMBERS := $(PACKAGES) $(PROGRAMS)
 
 # --- Paths that Ruff and mypy examine --------------------------------------
-SRC_DIRS  := $(wildcard packages/*/src) $(wildcard programs/*/src) scripts
-TEST_DIRS := $(wildcard packages/*/tests) $(wildcard programs/*/tests)
+SRC_DIRS := \
+	$(wildcard python/packages/*/src) \
+	$(wildcard python/programs/*/src) \
+	scripts
+
+TEST_DIRS := \
+	$(wildcard python/packages/*/tests) \
+	$(wildcard python/programs/*/tests)
+
 LINT_DIRS := $(SRC_DIRS) $(TEST_DIRS)
 
 REPORTS_DIR ?= reports
@@ -244,7 +257,7 @@ audit-deps:
 
 audit-code:
 	$(RUN) bandit --configfile pyproject.toml --recursive \
-	  $(wildcard packages/*/src) $(wildcard programs/*/src) --quiet
+	  $(wildcard python/packages/*/src) $(wildcard python/programs/*/src) --quiet
 
 # ---------------------------------------------------------------------------
 # Tests: each member runs its own suite from its own directory
@@ -284,15 +297,15 @@ clean: clean-reports clean-caches
 
 clean-reports:
 	@rm -rf $(REPORTS_DIR)
-	@rm -rf packages/*/$(REPORTS_DIR) programs/*/$(REPORTS_DIR)
+	@rm -rf python/packages/*/$(REPORTS_DIR) python/programs/*/$(REPORTS_DIR)
 
 clean-caches:
 	@rm -rf .pytest_cache .ruff_cache .mypy_cache
 	@rm -rf .coverage .coverage.* coverage.xml htmlcov junit.xml
-	@rm -rf packages/*/.pytest_cache packages/*/.ruff_cache packages/*/.mypy_cache
-	@rm -rf packages/*/.coverage packages/*/.coverage.*
-	@rm -rf programs/*/.pytest_cache programs/*/.ruff_cache programs/*/.mypy_cache
-	@rm -rf programs/*/.coverage programs/*/.coverage.*
+	@rm -rf python/packages/*/.pytest_cache python/packages/*/.ruff_cache python/packages/*/.mypy_cache
+	@rm -rf python/packages/*/.coverage python/packages/*/.coverage.*
+	@rm -rf python/programs/*/.pytest_cache python/programs/*/.ruff_cache python/programs/*/.mypy_cache
+	@rm -rf python/programs/*/.coverage python/programs/*/.coverage.*
 	@find . -type d -name __pycache__ -not -path "./.venv/*" \
 	  -prune -exec rm -rf {} + 2>/dev/null || true
 	@find . -type f -name "*.py[co]" -not -path "./.venv/*" \
@@ -303,7 +316,7 @@ clean-venv:
 
 distclean: clean clean-venv
 	@rm -rf build dist wheels
-	@rm -rf packages/*/build packages/*/dist programs/*/build programs/*/dist
+	@rm -rf python/packages/*/build python/packages/*/dist python/programs/*/build python/programs/*/dist
 	@find . -type d -name "*.egg-info" -not -path "./.venv/*" \
 	  -prune -exec rm -rf {} + 2>/dev/null || true
 	@echo "Workspace reset. Run 'make setup' to rebuild."

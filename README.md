@@ -20,8 +20,8 @@ and dependency declaration, while the workspace shares:
 
 ```text
 michr-scripts/
-├── packages/    Reusable importable Python libraries
-├── programs/    Independently runnable Python applications
+├── python/packages/    Reusable importable Python libraries
+├── python/programs/    Independently runnable Python applications
 ├── scripts/     Repository-maintenance utilities
 ├── pyproject.toml
 ├── uv.lock
@@ -38,8 +38,8 @@ Current packages:
 
 | Member | Import name | Purpose |
 |---|---|---|
-| [`michr-text-post-editing`](packages/michr-text-post-editing/) | `michr_text_post_editing` | Generic technical post-editing metrics for comparing generated text with final human-edited text |
-| [`study-posting-ai-analysis`](packages/study-posting-ai-analysis/) | `study_posting_ai_analysis` | Study-posting field policy, selection analysis, requiredness, contact, compensation, lookup analysis, parsing, and flattening |
+| [`text-post-edit-metrics`](python/packages/text-post-edit-metrics/) | `text_post_edit_metrics` | Generic technical post-editing metrics for comparing generated text with final human-edited text |
+| [`study-posting-ai-analysis`](python/packages/study-posting-ai-analysis/) | `study_posting_ai_analysis` | Study-posting field policy, selection analysis, requiredness, contact, compensation, lookup analysis, parsing, and flattening |
 
 ### Programs
 
@@ -65,7 +65,7 @@ tested.
 Dependencies point from specific behavior toward reusable behavior:
 
 ```text
-michr-text-post-editing
+text-post-edit-metrics
           ↑
 study-posting-ai-analysis
           ↑
@@ -92,7 +92,7 @@ Expected shape:
 
 ```text
 study-posting-ai-analysis
-└── michr-text-post-editing
+└── text-post-edit-metrics
     ├── rapidfuzz
     └── sacrebleu
 ```
@@ -101,12 +101,12 @@ study-posting-ai-analysis
 
 ## Current package contracts
 
-### `michr-text-post-editing`
+### `text-post-edit-metrics`
 
 Two texts in, one immutable technical post-editing result out:
 
 ```python
-from michr_text_post_editing import analyze_post_edit
+from text_post_edit_metrics import analyze_post_edit
 
 result = analyze_post_edit(
     suggestion="Generated text",
@@ -129,7 +129,7 @@ It owns:
 
 It performs no database, CSV, filesystem, DataFrame, logging, or CLI work.
 
-See its [README](packages/michr-text-post-editing/README.md).
+See its [README](python/packages/text-post-edit-metrics/README.md).
 
 ### `study-posting-ai-analysis`
 
@@ -163,15 +163,15 @@ It owns:
 - JSON parsing;
 - flattened study-analysis rows.
 
-It delegates technical text metrics to `michr-text-post-editing`.
+It delegates technical text metrics to `text-post-edit-metrics`.
 
 It performs no database, CSV, filesystem, DataFrame, logging, or CLI work.
 
 See its:
 
-- [README](packages/study-posting-ai-analysis/README.md);
-- [analysis specification](packages/study-posting-ai-analysis/docs/analysis-specification.md);
-- [program flow](packages/study-posting-ai-analysis/docs/program-flow.md).
+- [README](python/packages/study-posting-ai-analysis/README.md);
+- [analysis specification](python/packages/study-posting-ai-analysis/docs/analysis-specification.md);
+- [program flow](python/packages/study-posting-ai-analysis/docs/program-flow.md).
 
 ---
 
@@ -237,8 +237,8 @@ Run `make` with no arguments to list every available target.
 ### One workspace member
 
 ```bash
-make test PACKAGE=michr-text-post-editing
-make coverage PACKAGE=michr-text-post-editing
+make test PACKAGE=text-post-edit-metrics
+make coverage PACKAGE=text-post-edit-metrics
 
 make test PACKAGE=study-posting-ai-analysis
 make coverage PACKAGE=study-posting-ai-analysis
@@ -255,8 +255,8 @@ make test \
 Run only or exclude tests marked `slow`:
 
 ```bash
-make test-slow PACKAGE=michr-text-post-editing
-make test-fast PACKAGE=michr-text-post-editing
+make test-slow PACKAGE=text-post-edit-metrics
+make test-fast PACKAGE=text-post-edit-metrics
 ```
 
 ---
@@ -292,13 +292,13 @@ Never use `--no-verify` merely to bypass a failing check.
 Create packages under:
 
 ```text
-packages/<distribution-name>/
+python/packages/<distribution-name>/
 ```
 
 Recommended layout:
 
 ```text
-packages/example-package/
+python/packages/example-package/
 ├── pyproject.toml
 ├── README.md
 ├── src/
@@ -332,10 +332,10 @@ The root workspace declaration currently discovers:
 
 ```toml
 [tool.uv.workspace]
-members = ["packages/*", "programs/*"]
+members = ["python/packages/*", "python/programs/*"]
 ```
 
-Therefore, adding a valid member under `packages/` normally requires no explicit
+Therefore, adding a valid member under `python/packages/` normally requires no explicit
 workspace-list edit.
 
 ### Adding an internal dependency
@@ -365,13 +365,13 @@ members.
 Create programs under:
 
 ```text
-programs/<program-name>/
+python/programs/<program-name>/
 ```
 
 Recommended layout:
 
 ```text
-programs/example-program/
+python/programs/example-program/
 ├── pyproject.toml
 ├── README.md
 ├── src/
@@ -420,9 +420,9 @@ Add a dependency only to the member that directly imports it.
 
 Examples:
 
-- SacreBLEU and RapidFuzz belong to `michr-text-post-editing`.
+- SacreBLEU and RapidFuzz belong to `text-post-edit-metrics`.
 - `study-posting-ai-analysis` depends only on
-  `michr-text-post-editing`.
+  `text-post-edit-metrics`.
 - A future Oracle row-source package would own `oracledb`.
 - A reporting program would own pandas only if its reporting implementation
   requires pandas.
@@ -449,7 +449,7 @@ Documentation lives with the code it governs:
 | Workspace structure and common workflow | Root `README.md` |
 | Reusable package API | Package `README.md` |
 | Program CLI and configuration | Program `README.md` |
-| Study methodology and form policy | `packages/study-posting-ai-analysis/docs/` |
+| Study methodology and form policy | `python/packages/study-posting-ai-analysis/docs/` |
 | Shared agent rules | `.github/copilot-instructions.md` |
 | Member-specific agent rules | `.github/instructions/` |
 
@@ -493,7 +493,7 @@ members are added.
 
 | Member | Tests | Coverage gate |
 |---|---:|---:|
-| `michr-text-post-editing` | Metric, normalization, model, and differential tests | 95% |
+| `text-post-edit-metrics` | Metric, normalization, model, and differential tests | 95% |
 | `study-posting-ai-analysis` | Field policy, parsing, flattening, and integration tests | 95% |
 
 Use `make coverage` for current counts and measured coverage.

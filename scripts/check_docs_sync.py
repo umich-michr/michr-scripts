@@ -11,7 +11,7 @@ import shutil
 import subprocess
 import sys
 
-PACKAGE = "packages/study-posting-ai-analysis"
+PACKAGE = "python/packages/study-posting-ai-analysis"
 
 # Blocking: these modules determine published numbers.
 REQUIRED_PAIRS: dict[str, tuple[str, str]] = {

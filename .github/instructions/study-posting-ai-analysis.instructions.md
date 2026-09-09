@@ -1,5 +1,5 @@
 ---
-applyTo: "packages/study-posting-ai-analysis/**"
+applyTo: "python/packages/study-posting-ai-analysis/**"
 ---
 
 # study-posting-ai-analysis instructions
@@ -22,7 +22,7 @@ study-posting form rules.
 Technical text metrics are delegated to:
 
 ```python
-from michr_text_post_editing import analyze_post_edit
+from text_post_edit_metrics import analyze_post_edit
 ```
 
 The returned `PostEditingResult` is stored in
@@ -63,23 +63,23 @@ Those responsibilities belong to other packages or programs.
 The dependency direction is:
 
 ```text
-michr-text-post-editing
+text-post-edit-metrics
           ↑
 study-posting-ai-analysis
 ```
 
-This package may import `michr_text_post_editing`.
+This package may import `text_post_edit_metrics`.
 
-`michr-text-post-editing` must never import this package.
+`text-post-edit-metrics` must never import this package.
 
 Do not recreate metric wrappers or compatibility modules in this package.
 There must be no study-package metric implementation or compatibility-wrapper
-module. Import generic text metrics directly from `michr_text_post_editing`.
+module. Import generic text metrics directly from `text_post_edit_metrics`.
 
 Consumers that need generic text metrics import them directly:
 
 ```python
-from michr_text_post_editing import (
+from text_post_edit_metrics import (
     PostEditingResult,
     analyze_post_edit,
 )
@@ -325,7 +325,7 @@ Tests should cover:
 - integration with `PostEditingResult`.
 
 Do not duplicate low-level TER, character, soft-word, or differential tests.
-Those belong to `michr-text-post-editing`.
+Those belong to `text-post-edit-metrics`.
 
 Run:
 
@@ -340,7 +340,7 @@ make check
 The specification of record is:
 
 ```text
-packages/study-posting-ai-analysis/docs/analysis-specification.md
+python/packages/study-posting-ai-analysis/docs/analysis-specification.md
 ```
 
 Update it alongside changes to:
@@ -355,5 +355,5 @@ Update it alongside changes to:
 - flattened output.
 
 The technical metric implementation is documented primarily by
-`packages/michr-text-post-editing/README.md`, while the study specification
+`python/packages/text-post-edit-metrics/README.md`, while the study specification
 retains the formulas needed to interpret study reports.
