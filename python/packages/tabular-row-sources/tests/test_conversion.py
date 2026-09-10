@@ -674,6 +674,42 @@ def test_datetime_conversion_parses_naive_iso_text(value: str) -> None:
 
 
 @pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        (
+            "05/15/2026 11:29:54",
+            datetime.fromisoformat("2026-05-15T11:29:54"),
+        ),
+        (
+            "05/15/2026 11:29:54.702864",
+            datetime.fromisoformat("2026-05-15T11:29:54.702864"),
+        ),
+        (
+            " 05/15/2026 11:29:54.702864 ",
+            datetime.fromisoformat("2026-05-15T11:29:54.702864"),
+        ),
+    ],
+    ids=[
+        "whole-seconds",
+        "six-fractional-digits",
+        "padded",
+    ],
+)
+def test_datetime_conversion_parses_report_text(
+    value: str,
+    expected: datetime,
+) -> None:
+    result = convert_value(
+        value,
+        column=column(ColumnType.DATETIME),
+    )
+
+    assert result == expected
+    assert isinstance(result, datetime)
+    assert result.tzinfo is None
+
+
+@pytest.mark.parametrize(
     "value",
     [
         "2026-09-09T14:59:35Z",
@@ -704,13 +740,29 @@ def test_datetime_conversion_preserves_text_offset() -> None:
 
 @pytest.mark.parametrize(
     "value",
-    ["", "not-a-datetime", "2026-99-99T40:00:00"],
-    ids=["empty", "word", "invalid-fields"],
+    [
+        "",
+        "not-a-datetime",
+        "2026-99-99T40:00:00",
+        "13/15/2026 11:29:54",
+        "05/15/2026 25:29:54",
+        "05/15/2026 11:29:54.702864123",
+        "5/15/2026 11:29:54",
+    ],
+    ids=[
+        "empty",
+        "word",
+        "invalid-iso-fields",
+        "invalid-report-date",
+        "invalid-report-time",
+        "nine-fractional-digits",
+        "noncanonical-width",
+    ],
 )
 def test_datetime_conversion_rejects_invalid_text(value: str) -> None:
     with pytest.raises(
         ValueConversionError,
-        match="expected an ISO 8601 datetime",
+        match="expected an ISO 8601 datetime or",
     ):
         convert_value(
             value,
@@ -726,7 +778,7 @@ def test_datetime_conversion_rejects_invalid_text(value: str) -> None:
 def test_datetime_conversion_rejects_other_types(value: object) -> None:
     with pytest.raises(
         ValueConversionError,
-        match="expected a datetime or ISO 8601 datetime text",
+        match="expected a datetime or supported datetime text",
     ):
         convert_value(
             value,

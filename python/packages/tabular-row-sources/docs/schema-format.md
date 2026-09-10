@@ -145,34 +145,22 @@ Only explicitly configured markers should become `None`.
 
 ## 6. Date and datetime values
 
-Canonical `date` values use:
+CSV datetime values may use ISO 8601 or the audit-report export formats:
 
-```python
-datetime.date
+```text
+MM/DD/YYYY HH:MM:SS
+MM/DD/YYYY HH:MM:SS.ffffff
 ```
-
-Canonical `datetime` values use:
-
-```python
-datetime.datetime
-```
-
-A `datetime` is not accepted as a `date` merely because
-`datetime` subclasses `date`.
-
-CSV values should use ISO 8601 representations.
 
 Examples:
 
-```text
-2026-09-09
 2026-09-09T14:59:35
 2026-09-09T14:59:35-04:00
-```
+05/15/2026 11:29:54
+05/15/2026 11:29:54.702864
 
-Timezone-aware values remain aware.
-
-Naive values remain naive. The package must not silently assign a timezone.
+The report format requires exactly six fractional digits when a fraction ispresent. Values with greater precision are rejected rather than truncated.
+Timezone-aware values remain aware. Naive values remain naive. The package doesnot silently assign a timezone.
 
 ---
 
@@ -291,7 +279,7 @@ All concrete sources use the same conversion layer.
 | `float` | finite integer, float, `Decimal`, floating-point text |
 | `boolean` | Boolean, integer/Decimal `0` or `1`, text `true`, `false`, `0`, `1` |
 | `date` | `date` excluding `datetime`, ISO 8601 date text |
-| `datetime` | `datetime`, ISO 8601 datetime text, trailing `Z` or `z` |
+| `datetime` | `datetime`, ISO 8601 datetime text, trailing `Z` or `z`, or `MM/DD/YYYY HH:MM:SS[.ffffff]` |
 | `json_object` | dictionary, JSON text, UTF-8 JSON bytes |
 
 Conversion rejects ambiguous or lossy values.

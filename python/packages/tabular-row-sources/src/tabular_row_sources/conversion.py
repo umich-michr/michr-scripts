@@ -14,6 +14,7 @@ from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 import json
 import math
+import re
 
 from tabular_row_sources.errors import (
     SourceFormatError,
@@ -32,6 +33,16 @@ _BOOLEAN_TEXT_VALUES: dict[str, bool] = {
     "false": False,
     "0": False,
 }
+
+_REPORT_DATETIME_PATTERN = re.compile(
+    r"^(?P<month>\d{2})/"
+    r"(?P<day>\d{2})/"
+    r"(?P<year>\d{4}) "
+    r"(?P<hour>\d{2}):"
+    r"(?P<minute>\d{2}):"
+    r"(?P<second>\d{2})"
+    r"(?:\.(?P<fraction>\d{6}))?$"
+)
 
 
 def _value_context(
@@ -383,6 +394,32 @@ def _convert_date(
     )
 
 
+def _parse_report_datetime_text(text: str) -> datetime | None:
+    """Parse the audit report's lossless Oracle datetime text formats."""
+    matched = _REPORT_DATETIME_PATTERN.fullmatch(text)
+
+    if matched is None:
+        return None
+
+    fraction = matched.group("fraction")
+    iso_text = (
+        f"{matched.group('year')}-"
+        f"{matched.group('month')}-"
+        f"{matched.group('day')}T"
+        f"{matched.group('hour')}:"
+        f"{matched.group('minute')}:"
+        f"{matched.group('second')}"
+    )
+
+    if fraction is not None:
+        iso_text = f"{iso_text}.{fraction}"
+
+    try:
+        return datetime.fromisoformat(iso_text)
+    except ValueError:
+        return None
+
+
 def _convert_datetime(
     value: object,
     *,
@@ -398,24 +435,30 @@ def _convert_datetime(
 
         # Normalize the common UTC designator explicitly. This keeps behavior
         # clear even if runtime parsing rules change.
-        if text.endswith(("Z", "z")):
-            text = f"{text[:-1]}+00:00"
+        iso_text = f"{text[:-1]}+00:00" if text.endswith(("Z", "z")) else text
 
         try:
-            return datetime.fromisoformat(text)
-        except ValueError as error:
+            return datetime.fromisoformat(iso_text)
+        except ValueError:
+            report_datetime = _parse_report_datetime_text(text)
+
+            if report_datetime is not None:
+                return report_datetime
+
             raise _conversion_error(
                 column,
                 value,
                 row_number=row_number,
-                detail="expected an ISO 8601 datetime",
-            ) from error
+                detail=(
+                    "expected an ISO 8601 datetime or MM/DD/YYYY HH:MM:SS[.ffffff]"
+                ),
+            ) from None
 
     raise _conversion_error(
         column,
         value,
         row_number=row_number,
-        detail="expected a datetime or ISO 8601 datetime text",
+        detail="expected a datetime or supported datetime text",
     )
 
 
