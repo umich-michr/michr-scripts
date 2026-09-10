@@ -40,6 +40,7 @@ junit.xml
 # ---------------------------------------------------------------------------
 # Generated reports (regenerated on every run; never committed)
 # ---------------------------------------------------------------------------
+output/
 reports/
 python/packages/*/reports/
 python/programs/*/reports/

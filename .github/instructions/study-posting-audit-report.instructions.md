@@ -8,13 +8,29 @@ This runnable program composes:
 
 - `tabular-row-sources`;
 - `study-posting-ai-analysis`;
-- transitively, `text-post-edit-metrics`.
+- transitively, `text-post-edit-metrics`;
+- the shared configuration-resolution package when command-line configuration
+  is added.
 
-It owns source-column mapping, eligibility, record identity, error policy,
-output serialization, atomic output files, CLI behavior, configuration, and
-logging.
+It owns:
 
-It must not duplicate row-source conversion or study-analysis logic.
+- source selection and source-column mapping;
+- payload-state policy;
+- record identity and duplicate detection;
+- per-record error policy;
+- normalized report generation;
+- output serialization and atomic publication;
+- CLI behavior;
+- program-specific configuration;
+- database-driver selection and connection configuration;
+- application logging when introduced.
+
+It must not duplicate:
+
+- generic configuration precedence and prompting;
+- row-source schema conversion or streaming;
+- study-analysis policy;
+- generic post-edit metric calculations.
 
 Default successful outputs are:
 
@@ -24,11 +40,17 @@ Default successful outputs are:
 `field_metrics.record_id` joins to the configured source ID column in
 `records.csv`.
 
-Record IDs must be non-null and unique.
+Record IDs must be non-null and unique. Rows with three null analysis payloads
+remain in `records.csv` without field metrics. Rows with partial payload
+presence raise `AuditRowError`.
 
 Free text remains excluded by default.
 
 Use named CLI options. Do not log source JSON payloads, selected text, final
-text, credentials, or secret-bearing connection strings.
+text, credentials, passwords, or secret-bearing connection strings.
 
-Tests use synthetic rows and must not require a live database or credentials.
+SQL bind values must be passed separately to the database driver. Never
+construct SQL by interpolating configuration values.
+
+Tests use synthetic rows and fake database connections. They must not require a
+live database or credentials.
