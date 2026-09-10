@@ -372,4 +372,4 @@ WITH
          AND vestm.role = 'PI'
    LEFT JOIN attempt_author_appointments ca_author ON ca_author.study_posting_audit_id = spa.id
    LEFT JOIN attempt_pi_appointments    ca_pi     ON ca_pi.study_posting_audit_id    = spa.id
- order by spa.start_time, spa.user_name;
+ order by spa.start_time, spa.user_name

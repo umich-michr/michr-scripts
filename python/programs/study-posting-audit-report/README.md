@@ -1,43 +1,80 @@
 # study-posting-audit-report
 
-Generates a normalized two-file report from Study Posting Authoring audit rows.
+Generates a normalized report from Study Posting Authoring audit rows supplied
+by a CSV file or Oracle query.
 
 The program composes:
 
-- `tabular-row-sources` for schema-aware CSV and DB-API row streaming;
-- `study-posting-ai-analysis` for per-record study-posting analysis;
-- transitively, `text-post-edit-metrics` for generic text post-edit metrics.
+- `program-configuration` for CLI, environment, dotenv, defaults, and prompts;
+- `tabular-row-sources` for schema-aware lazy row streaming;
+- `study-posting-ai-analysis` for per-record study analysis;
+- transitively, `text-post-edit-metrics` for generic text metrics.
 
-The command-line client reads either CSV input or an Oracle query result. The
-public Python API also accepts any configured `RowSource`.
+## Quick start
+
+Show all commands:
+
+```bash
+uv run study-posting-audit-report --help
+```
+
+### CSV
+
+```bash
+uv run study-posting-audit-report csv \
+  --input path/to/audit.csv
+```
+
+### Oracle
+
+Prepare the local operational query:
+
+```bash
+cp \
+  python/programs/study-posting-audit-report/input/audit-rows.example.sql \
+  python/programs/study-posting-audit-report/input/audit-rows.sql
+```
+
+Then run:
+
+```bash
+export STUDY_POSTING_AUDIT_DB_PASSWORD='...'
+
+uv run study-posting-audit-report database \
+  --dsn "database.example:1521/service" \
+  --username reporting_user
+```
+
+The output directory must not already exist.
 
 ## Architecture
 
 ```text
-CSV file or DB-API query
-          ↓
-tabular-row-sources
-          ↓ canonical Row values
+CSV file or Oracle query
+            ↓
+    tabular-row-sources
+            ↓ canonical rows
 study-posting-audit-report
-          ↓
+            ↓
 study-posting-ai-analysis
-          ↓
-text-post-edit-metrics
+            ↓
+ text-post-edit-metrics
+            ↓
+ records.csv + field_metrics.csv
 ```
-
-Responsibilities remain separate:
 
 | Component | Responsibility |
 |---|---|
-| `tabular-row-sources` | Stream and canonically convert CSV or query rows |
-| `study-posting-ai-analysis` | Apply study-specific analysis to one audit record |
+| `program-configuration` | Generic precedence, dotenv loading, parsing, prompting, and secret redaction |
+| `tabular-row-sources` | Stream and canonically convert CSV or DB-API rows |
+| `study-posting-ai-analysis` | Apply study-specific policy to one record |
 | `text-post-edit-metrics` | Calculate generic directional text metrics |
-| This program | Select rows for analysis and publish the normalized report |
+| This program | Select rows for analysis and publish the report |
 
-The program does not duplicate source conversion, study policy, or text-metric
+The program does not duplicate source conversion, study policy, or metric
 algorithms.
 
-## Output
+## Normalized output
 
 A successful report contains:
 
@@ -55,16 +92,12 @@ Contains every successfully processed source record, including:
 - incomplete AI attempts;
 - completed AI attempts.
 
-Columns follow canonical schema order. Additional source columns are preserved
-when they are part of the supplied schema.
+Columns follow canonical schema order.
 
 ### `field_metrics.csv`
 
-Contains one row per analyzed study-posting field, using:
-
-```python
-study_posting_ai_analysis.FLATTENED_COLUMNS
-```
+Contains one row per analyzed study-posting field using
+`study_posting_ai_analysis.FLATTENED_COLUMNS`.
 
 Only completed AI attempts produce field metrics.
 
@@ -76,7 +109,7 @@ records.<configured record ID column>
 field_metrics.record_id
 ```
 
-Record IDs must be non-null and unique within a report run.
+Record IDs must be non-null and unique within a run.
 
 ## Analysis selection
 
@@ -87,65 +120,28 @@ ATTEMPT_TYPE = AI
 ATTEMPT_RESULT = COMPLETE
 ```
 
-The values are compared exactly and case-sensitively.
+Comparisons are exact and case-sensitive.
 
-Rows are handled in this order:
+Processing order:
 
-1. A non-AI row is preserved without analysis.
-2. An AI row whose result is not `COMPLETE` is preserved without analysis.
+1. Non-AI rows are preserved without analysis.
+2. AI rows whose result is not `COMPLETE` are preserved without analysis.
 3. A completed AI row must have:
-   - a non-null `END_TIME`;
+   - non-null `END_TIME`;
    - non-null `LLM_SUGGESTIONS`;
    - non-null `SELECTED_SUGGESTIONS`;
    - non-null `FINAL_SUBMISSION`.
-4. A consistent completed AI row is parsed and analyzed.
-5. A completed AI row missing required analysis data raises `AuditRowError`.
+4. A consistent completed AI row is analyzed.
+5. Missing required data on a completed AI row raises `AuditRowError`.
 
-Manual and incomplete rows are not required to have a consistent set of
-analysis payloads. This allows completed manual rows to retain
-`FINAL_SUBMISSION` without AI suggestion or selection payloads.
+Manual and incomplete rows do not require a complete set of analysis payloads.
 
-The source query should return all records intended for `records.csv`; it should
+The source query should return every row intended for `records.csv`; it should
 not filter to completed AI attempts merely to control analysis.
 
-## Default source-column mapping
+## Input schema and SQL template
 
-| Purpose | Default column |
-|---|---|
-| Record ID | `ID` |
-| Attempt completion time | `END_TIME` |
-| Attempt type | `ATTEMPT_TYPE` |
-| Attempt result | `ATTEMPT_RESULT` |
-| Suggestions | `LLM_SUGGESTIONS` |
-| Selections | `SELECTED_SUGGESTIONS` |
-| Final saved values | `FINAL_SUBMISSION` |
-
-All configured names must be nonblank and unique.
-
-A custom mapping can be supplied:
-
-```python
-from study_posting_audit_report import (
-    AuditColumnMapping,
-    AuditReportConfig,
-)
-
-config = AuditReportConfig(
-    columns=AuditColumnMapping(
-        record_id="AUDIT_ID",
-        end_time="FINISHED_AT",
-        attempt_type="TYPE",
-        attempt_result="RESULT",
-        llm_suggestions="SUGGESTED",
-        selected_suggestions="SELECTED",
-        final_submission="FINAL",
-    )
-)
-```
-
-## Input templates
-
-The program directory contains:
+Committed program inputs:
 
 ```text
 input/
@@ -154,79 +150,77 @@ input/
 └── audit-rows.example.sql
 ```
 
-### `audit-schema.json`
+### Schema
 
-Defines the canonical 39-column row shape shared by CSV and database input.
+`audit-schema.json` defines the canonical 39-column shape shared by CSV and
+database sources.
 
-Source columns may appear in any order, but their case-sensitive names must
-match the schema exactly. Canonical rows and `records.csv` use schema order.
+Source columns:
 
-### `audit-rows.example.sql`
+- may appear in any order;
+- must have the schema's exact case-sensitive names;
+- must not be missing, unexpected, blank, or duplicated.
 
-A sanitized example of the operational Oracle query.
+Canonical rows and `records.csv` use schema order.
 
-It must be copied locally to:
+Default processing-column names:
+
+| Purpose | Column |
+|---|---|
+| Record ID | `ID` |
+| Completion time | `END_TIME` |
+| Attempt type | `ATTEMPT_TYPE` |
+| Attempt result | `ATTEMPT_RESULT` |
+| Suggestions | `LLM_SUGGESTIONS` |
+| Selections | `SELECTED_SUGGESTIONS` |
+| Final saved values | `FINAL_SUBMISSION` |
+
+### SQL template
+
+`audit-rows.example.sql` is sanitized and does not run unchanged.
+
+Copy it to the ignored local path:
 
 ```text
 input/audit-rows.sql
 ```
 
-before database execution. The local file is ignored by Git because it may
-contain environment-specific database links and approved account exclusions.
+Then:
 
-The example SQL:
+- replace `YOUR_HR_DATABASE_LINK`;
+- replace account-exclusion placeholders under approved local policy;
+- verify all table and view names;
+- confirm the query returns no more than one row per audit ID;
+- keep its projection synchronized with `audit-schema.json`;
+- do not add credentials;
+- omit a trailing semicolon for execution through python-oracledb.
 
-- contains no credentials;
-- uses placeholders for the HR database link;
-- uses placeholders for locally excluded test, service, or system accounts;
-- excludes stack-trace text from the final projection;
-- retains stack-trace presence only to derive `ATTEMPT_RESULT`;
-- formats timestamps with six fractional digits.
+`STACK_TRACE` is not projected. Its presence may be used inside the query to
+derive `ATTEMPT_RESULT`.
 
-The default database CLI will use `input/audit-rows.sql` after that CLI is
-implemented.
+Timestamp text uses microsecond precision:
 
-## CSV command
-
-Run from the repository root:
-
-```bash
-uv run study-posting-audit-report csv \
-  --input path/to/audit.csv
+```text
+MM/DD/YYYY HH24:MI:SS.FF6
 ```
 
-The command uses these workspace defaults:
+## Configuration
 
-| Setting | Default |
-|---|---|
-| Schema | `python/programs/study-posting-audit-report/input/audit-schema.json` |
-| Output directory | `output/study-posting-ai-audit-analysis/report/` |
-| Dotenv file | `.env` |
-| Include selected/final metric text | `false` |
-| CSV encoding | `utf-8-sig` |
-| Delimiter | `,` |
-| Quote character | `"` |
-| Escape character | none |
-| Null markers | empty field and `\N` |
-
-The output directory must not already exist.
-
-### Configuration precedence
-
-CSV command settings use:
+Both commands use:
 
 ```text
 command line
 → process environment
-→ .env
+→ dotenv
 → default
 → interactive prompt
+→ missing-setting error
 ```
 
-The default `.env` file is optional. An explicitly requested `--env-file` must
+The workspace `.env` file is optional. An explicitly supplied `--env-file` must
 exist.
 
-Disable dotenv loading and prompting for a batch invocation:
+Disable dotenv and prompts in a batch job:
 
 ```bash
 uv run study-posting-audit-report csv \
@@ -235,7 +229,34 @@ uv run study-posting-audit-report csv \
   --no-prompt
 ```
 
-### CSV options
+Boolean text accepts:
+
+```text
+true, false, 1, 0, yes, no, on, off
+```
+
+### Shared settings
+
+| Setting | Environment variable | Default |
+|---|---|---|
+| Schema | `STUDY_POSTING_AUDIT_SCHEMA` | `input/audit-schema.json` |
+| Output | `STUDY_POSTING_AUDIT_OUTPUT` | `output/study-posting-ai-audit-analysis/report/` |
+| Include metric text | `STUDY_POSTING_AUDIT_INCLUDE_TEXT` | `false` |
+| Dotenv file | `STUDY_POSTING_AUDIT_ENV_FILE` | workspace `.env` |
+| Prompting | `STUDY_POSTING_AUDIT_PROMPT` | `true` |
+
+`--include-text` controls only the flattened `selected_text` and `final_text`
+columns in `field_metrics.csv`. It does not remove source payloads from
+`records.csv`.
+
+## CSV command
+
+```bash
+uv run study-posting-audit-report csv \
+  --input path/to/audit.csv
+```
+
+Options:
 
 ```text
 --input PATH
@@ -251,7 +272,18 @@ uv run study-posting-audit-report csv \
 --prompt / --no-prompt
 ```
 
-Repeat `--null-value` to define multiple null markers:
+CSV settings:
+
+| Setting | Environment variable | Default |
+|---|---|---|
+| Input | `STUDY_POSTING_AUDIT_CSV_INPUT` | Prompt if unresolved |
+| Encoding | `STUDY_POSTING_AUDIT_CSV_ENCODING` | `utf-8-sig` |
+| Delimiter | `STUDY_POSTING_AUDIT_CSV_DELIMITER` | `,` |
+| Quote character | `STUDY_POSTING_AUDIT_CSV_QUOTECHAR` | `"` |
+| Escape character | `STUDY_POSTING_AUDIT_CSV_ESCAPECHAR` | None |
+| Null markers | `STUDY_POSTING_AUDIT_CSV_NULL_VALUES` | empty field and `\N` |
+
+Repeat `--null-value` to replace the configured marker set:
 
 ```bash
 uv run study-posting-audit-report csv \
@@ -260,259 +292,13 @@ uv run study-posting-audit-report csv \
   --null-value '\N'
 ```
 
-Explicit CLI null markers replace environment, dotenv, and default markers.
-
-`--include-text` controls only the flattened `selected_text` and `final_text`
-columns in `field_metrics.csv`. It does not remove source payload columns from
-`records.csv`.
-
-### Environment variables
-
-| Setting | Environment variable |
-|---|---|
-| CSV input | `STUDY_POSTING_AUDIT_CSV_INPUT` |
-| Schema | `STUDY_POSTING_AUDIT_SCHEMA` |
-| Output directory | `STUDY_POSTING_AUDIT_OUTPUT` |
-| Include metric text | `STUDY_POSTING_AUDIT_INCLUDE_TEXT` |
-| CSV encoding | `STUDY_POSTING_AUDIT_CSV_ENCODING` |
-| Delimiter | `STUDY_POSTING_AUDIT_CSV_DELIMITER` |
-| Quote character | `STUDY_POSTING_AUDIT_CSV_QUOTECHAR` |
-| Escape character | `STUDY_POSTING_AUDIT_CSV_ESCAPECHAR` |
-| Null markers | `STUDY_POSTING_AUDIT_CSV_NULL_VALUES` |
-| Dotenv path | `STUDY_POSTING_AUDIT_ENV_FILE` |
-| Prompting | `STUDY_POSTING_AUDIT_PROMPT` |
-
 Environment and dotenv null markers use a JSON array:
 
 ```dotenv
 STUDY_POSTING_AUDIT_CSV_NULL_VALUES=["","\\N"]
 ```
 
-Boolean values accept:
-
-```text
-true, false, 1, 0, yes, no, on, off
-```
-
-### Exit behavior
-
-A successful command returns exit status `0` and prints the output paths and
-summary counts.
-
-Expected configuration, source, row-processing, analysis, and report-output
-failures return status `2` with a concise message on standard error. Expected
-failures do not print a traceback.
-
-## Pure processing API
-
-Rows can be processed without writing files:
-
-```python
-from study_posting_audit_report import (
-    AuditReportConfig,
-    process_audit_rows,
-    validate_source_schema,
-)
-
-config = AuditReportConfig()
-
-validate_source_schema(
-    source.schema,
-    config=config,
-)
-
-with source.open_rows() as rows:
-    for outcome in process_audit_rows(
-        rows,
-        config=config,
-    ):
-        consume_record(outcome.record)
-
-        for metric_row in outcome.metric_rows:
-            consume_metric(metric_row)
-```
-
-Skipped manual and incomplete rows have:
-
-```python
-outcome.analyzed is False
-outcome.metric_rows == ()
-```
-
-Successfully analyzed completed AI rows have:
-
-```python
-outcome.analyzed is True
-```
-
-and contain one metric row per analyzed study-posting field.
-
-## Generate a report
-
-```python
-from study_posting_audit_report import generate_csv_report
-
-report = generate_csv_report(
-    source,
-    output_directory="output/study-posting-ai-audit-analysis/report",
-)
-
-print(report.records_path)
-print(report.field_metrics_path)
-print(report.summary)
-```
-
-The output directory must not already exist.
-
-Both files are written into a temporary sibling directory. The completed
-directory is published only after source processing, analysis, serialization,
-flushing, and file closure all succeed.
-
-Existing output directories are never overwritten.
-
-## Free text
-
-Selected and final free text are excluded from field metrics by default.
-
-To include them explicitly:
-
-```python
-from study_posting_audit_report import (
-    AuditReportConfig,
-    generate_csv_report,
-)
-
-report = generate_csv_report(
-    source,
-    output_directory="output/study-posting-ai-audit-analysis/report",
-    config=AuditReportConfig(
-        include_text=True,
-    ),
-)
-```
-
-Enabling this option may place source free text in the generated report. Use it
-only under applicable privacy and data-handling requirements.
-
-## CSV output options
-
-Default output settings are:
-
-```python
-from study_posting_audit_report import CsvOutputOptions
-
-options = CsvOutputOptions(
-    encoding="utf-8",
-    null_value="\\N",
-    lineterminator="\n",
-)
-```
-
-A real string equal to the configured null marker is rejected to avoid
-ambiguous output.
-
-## Summary counts
-
-`AuditReportSummary` contains:
-
-| Field | Meaning |
-|---|---|
-| `source_rows` | Total source rows read |
-| `analyzable_rows` | Completed AI rows selected for analysis |
-| `analyzed_rows` | Selected rows successfully analyzed |
-| `skipped_rows` | Manual and incomplete rows preserved without analysis |
-| `failed_rows` | Selected rows retained as failures under a future non-fail-fast policy |
-| `metric_rows` | Field-level metric rows written |
-
-The current implementation is fail-fast. A successfully published report has:
-
-```text
-analyzable_rows = analyzed_rows
-failed_rows = 0
-source_rows = analyzed_rows + skipped_rows
-```
-
-## Failure behavior
-
-Expected failures include:
-
-- missing required schema columns;
-- invalid or duplicate record IDs;
-- a completed AI row without `END_TIME`;
-- a completed AI row missing an analysis payload;
-- malformed analysis payloads;
-- study-analysis policy violations;
-- source failures;
-- unsupported output values;
-- publication failures.
-
-On failure:
-
-- processing stops;
-- source resources are closed;
-- the staging directory is removed;
-- no output directory is published.
-
-Errors must not contain analysis payloads, free text, credentials, passwords, or
-secret-bearing connection strings.
-
-## Oracle connection adapter
-
-The program includes an Oracle connection adapter built on `python-oracledb`.
-
-The adapter:
-
-- uses python-oracledb thin mode;
-- does not call `init_oracle_client()`;
-- accepts an Easy Connect string or a locally resolvable TNS alias;
-- validates the DSN, username, and password;
-- creates connections lazily through a zero-argument factory;
-- leaves connection and cursor ownership to `DbApiQuerySource`.
-
-Example Python composition:
-
-```python
-from study_posting_audit_report.connections import OracleDriver
-from tabular_row_sources import (
-    DbApiQuerySource,
-    load_schema_json,
-    read_sql_file,
-)
-
-driver = OracleDriver()
-connect = driver.create_connect(
-    dsn=database_dsn,
-    username=database_username,
-    password=database_password,
-)
-
-source = DbApiQuerySource(
-    connect=connect,
-    sql=read_sql_file(sql_path),
-    schema=load_schema_json(schema_path),
-    parameters=sql_parameters,
-    fetch_size=500,
-)
-```
-
-SQL and bind parameters remain separate. `DbApiQuerySource` passes them
-separately to the database cursor and does not interpolate values into SQL.
-
-Connection creation belongs to this program. Generic query streaming and
-canonical row conversion remain in `tabular-row-sources`.
-
-The driver registry currently supports:
-
-```text
-oracle
-```
-
-The registry provides an extension point for future database adapters without
-changing report processing or row streaming.
-
 ## Database command
-
-Run an Oracle query and generate the normalized report:
 
 ```bash
 uv run study-posting-audit-report database \
@@ -520,62 +306,7 @@ uv run study-posting-audit-report database \
   --username reporting_user
 ```
 
-The command uses these defaults:
-
-| Setting | Default |
-|---|---|
-| Driver | `oracle` |
-| SQL file | `python/programs/study-posting-audit-report/input/audit-rows.sql` |
-| Schema | `python/programs/study-posting-audit-report/input/audit-schema.json` |
-| Output directory | `output/study-posting-ai-audit-analysis/report/` |
-| Dotenv file | `.env` |
-| Fetch size | `500` |
-| SQL parameters | Empty mapping |
-| Include selected/final metric text | `false` |
-
-The local operational SQL file is ignored by Git. Create it by copying and
-adapting the sanitized example:
-
-```bash
-cp \
-  python/programs/study-posting-audit-report/input/audit-rows.example.sql \
-  python/programs/study-posting-audit-report/input/audit-rows.sql
-```
-
-Review the copied query before use:
-
-- replace the database-link placeholder;
-- replace account-exclusion placeholders according to approved local policy;
-- confirm the final projection matches `audit-schema.json`;
-- confirm the query returns at most one row per audit record ID;
-- do not add credentials to the SQL file.
-
-### Oracle connection
-
-The initial database command uses `python-oracledb` in thin mode.
-
-The DSN may be:
-
-- an Easy Connect string; or
-- a TNS alias resolvable by the local Oracle configuration.
-
-The command does not call `init_oracle_client()`.
-
-The initial authentication mode is username and password. There is deliberately
-no `--password` command-line option because command-line values can be exposed
-through shell history or process inspection.
-
-Resolve the password through:
-
-```text
-STUDY_POSTING_AUDIT_DB_PASSWORD
-```
-
-in the process environment or `.env`. If it remains unresolved and prompting
-is enabled in an interactive terminal, the command requests it through a
-non-echoing secret prompt.
-
-### Database options
+Options:
 
 ```text
 --driver NAME
@@ -592,7 +323,24 @@ non-echoing secret prompt.
 --prompt / --no-prompt
 ```
 
-The currently registered database driver is:
+Database settings:
+
+| Setting | Environment variable | Default |
+|---|---|---|
+| Driver | `STUDY_POSTING_AUDIT_DB_DRIVER` | `oracle` |
+| DSN | `STUDY_POSTING_AUDIT_DB_DSN` | Prompt if unresolved |
+| Username | `STUDY_POSTING_AUDIT_DB_USERNAME` | Prompt if unresolved |
+| Password | `STUDY_POSTING_AUDIT_DB_PASSWORD` | Secret prompt if unresolved |
+| Fetch size | `STUDY_POSTING_AUDIT_DB_FETCH_SIZE` | `500` |
+| SQL file | `STUDY_POSTING_AUDIT_SQL_FILE` | local `input/audit-rows.sql` |
+| SQL parameters | `STUDY_POSTING_AUDIT_SQL_PARAMS` | Empty object |
+
+There is deliberately no `--password` option. Supply the password through the
+process environment, `.env`, or a non-echoing interactive prompt.
+
+### Oracle behavior
+
+The registered driver is:
 
 ```text
 oracle
@@ -600,28 +348,18 @@ oracle
 
 Driver names are matched case-insensitively.
 
-### Database environment variables
+The adapter:
 
-| Setting | Environment variable |
-|---|---|
-| Driver | `STUDY_POSTING_AUDIT_DB_DRIVER` |
-| DSN | `STUDY_POSTING_AUDIT_DB_DSN` |
-| Username | `STUDY_POSTING_AUDIT_DB_USERNAME` |
-| Password | `STUDY_POSTING_AUDIT_DB_PASSWORD` |
-| Fetch size | `STUDY_POSTING_AUDIT_DB_FETCH_SIZE` |
-| SQL file | `STUDY_POSTING_AUDIT_SQL_FILE` |
-| SQL parameters | `STUDY_POSTING_AUDIT_SQL_PARAMS` |
-| Schema | `STUDY_POSTING_AUDIT_SCHEMA` |
-| Output directory | `STUDY_POSTING_AUDIT_OUTPUT` |
-| Include metric text | `STUDY_POSTING_AUDIT_INCLUDE_TEXT` |
-| Dotenv path | `STUDY_POSTING_AUDIT_ENV_FILE` |
-| Prompting | `STUDY_POSTING_AUDIT_PROMPT` |
+- uses `python-oracledb` thin mode;
+- does not call `init_oracle_client()`;
+- accepts an Easy Connect string or locally resolvable TNS alias;
+- opens the connection lazily;
+- delegates cursor, connection, batching, and conversion lifecycle to
+  `DbApiQuerySource`.
 
-### Parameterized SQL
+### SQL parameters
 
-SQL bind parameters remain separate from SQL text.
-
-Provide a JSON object:
+Supply a JSON object:
 
 ```bash
 uv run study-posting-audit-report database \
@@ -630,13 +368,13 @@ uv run study-posting-audit-report database \
   --sql-params-json '{"start_time":"2026-01-01","limit":100}'
 ```
 
-Environment and dotenv configuration use the same JSON-object representation:
+Environment and dotenv use the same representation:
 
 ```dotenv
 STUDY_POSTING_AUDIT_SQL_PARAMS={"start_time":"2026-01-01","limit":100}
 ```
 
-Apply string-valued command-line overrides with repeated options:
+Apply string-valued overrides:
 
 ```bash
 uv run study-posting-audit-report database \
@@ -647,39 +385,111 @@ uv run study-posting-audit-report database \
   --sql-param end_time=2026-02-01
 ```
 
-Resolution for SQL parameters is:
+Resolution:
 
 ```text
-environment or dotenv JSON object
+environment or dotenv JSON
 → replaced by --sql-params-json when supplied
-→ updated by repeated --sql-param NAME=VALUE options
+→ updated by repeated --sql-param NAME=VALUE
 ```
 
-JSON values retain their JSON types. Values supplied through `--sql-param` are
-strings. The first `=` separates the parameter name from its value, so a value
-may itself contain `=`.
+JSON values retain JSON types. Repeated `--sql-param` values are strings. The
+first `=` separates a parameter name from its value.
 
-The final mapping is passed separately to the DB-API cursor. The program never
-interpolates bind values into SQL text.
+The final mapping is passed separately to the DB-API cursor. SQL bind values are
+never interpolated into SQL text.
 
-### Database execution flow
+## Python API
+
+The output API accepts any configured `RowSource`:
+
+```python
+from study_posting_audit_report import generate_csv_report
+
+report = generate_csv_report(
+    source,
+    output_directory="output/report",
+)
+```
+
+Pure row processing is also available:
+
+```python
+from study_posting_audit_report import (
+    AuditReportConfig,
+    process_audit_rows,
+    validate_source_schema,
+)
+
+config = AuditReportConfig()
+
+validate_source_schema(
+    source.schema,
+    config=config,
+)
+
+with source.open_rows() as rows:
+    for outcome in process_audit_rows(rows, config=config):
+        consume_record(outcome.record)
+
+        for metric_row in outcome.metric_rows:
+            consume_metric(metric_row)
+```
+
+## Summary and exit behavior
+
+`AuditReportSummary` contains:
+
+| Field | Meaning |
+|---|---|
+| `source_rows` | Total source rows read |
+| `analyzable_rows` | Completed AI rows selected for analysis |
+| `analyzed_rows` | Selected rows successfully analyzed |
+| `skipped_rows` | Manual and incomplete rows preserved without analysis |
+| `failed_rows` | Reserved for a future non-fail-fast policy |
+| `metric_rows` | Field-level metric rows written |
+
+The current implementation is fail-fast. For a published report:
 
 ```text
-database command
-      ↓
-layered configuration
-      ↓
-Oracle driver registry and deferred connection factory
-      ↓
-DbApiQuerySource
-      ↓
-study-posting audit processing
-      ↓
-records.csv + field_metrics.csv
+analyzable_rows = analyzed_rows
+failed_rows = 0
+source_rows = analyzed_rows + skipped_rows
 ```
 
-Connections and cursors are opened lazily and closed by `DbApiQuerySource` after
-normal completion, early termination, or failure.
+A successful command returns status `0` and prints output paths and counts.
+
+Expected configuration, source, analysis, row, and output failures return status
+`2` with a concise message on standard error and no traceback.
+
+On failure:
+
+- processing stops;
+- source resources close;
+- the staging directory is removed;
+- no output directory is published.
+
+## Privacy and security
+
+Both output files may contain sensitive institutional data.
+
+In particular, `records.csv` preserves source columns and may contain:
+
+- AI suggestions;
+- selected suggestions;
+- final submissions;
+- model metadata;
+- feedback text.
+
+Therefore:
+
+- do not commit source exports or generated reports;
+- keep `--include-text` disabled unless flattened text is required;
+- do not log payloads or free text;
+- do not expose passwords through CLI arguments;
+- do not log secret-bearing connection strings;
+- pass SQL bind values separately;
+- run only in approved environments under applicable U-M controls.
 
 ## Development
 
@@ -691,7 +501,7 @@ make coverage PACKAGE=study-posting-audit-report
 make check
 ```
 
-See the [root README](../../../README.md) for workspace guidance.
+See the [root README](../../../README.md) for workspace-wide guidance.
 
 ## License
 
