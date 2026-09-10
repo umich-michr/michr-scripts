@@ -18,7 +18,12 @@
   "python.terminal.activateEnvInCurrentTerminal": true,
 
   // src-layout support for editor tooling.
-  "python.analysis.extraPaths": ["${workspaceFolder}/python/packages/study-posting-ai-analysis/src"],
+  "python.analysis.extraPaths": [
+    "${workspaceFolder}/python/packages/study-posting-ai-analysis/src",
+    "${workspaceFolder}/python/packages/tabular-row-sources/src",
+    "${workspaceFolder}/python/packages/text-post-edit-metrics/src",
+    "${workspaceFolder}/python/programs/study-posting-audit-report/src"
+  ],
 
   // ---------------------------------------------------------------------
   // Pylance: strict analysis so the agent sees type errors as it writes

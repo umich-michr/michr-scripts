@@ -80,16 +80,22 @@ For the compensation Boolean:
 - the suggested value represents the AI recommendation;
 - the final value represents what the user ultimately saved.
 
-### Upstream dataset inclusion rule
+### Upstream dataset selection and source mapping
 
-The planned audit-reporting program includes rows where:
+A reporting source may select completed AI attempts upstream, for example:
 
 ```text
 ATTEMPT_TYPE = 'AI'
 ATTEMPT_RESULT = 'COMPLETE'
 ```
 
-It maps source columns to library inputs:
+That filter is not required or enforced by either `study-posting-ai-analysis` or `study-posting-audit-report`. The reportingprogram determines row handling from the presence of its three analysis payloads:
+
+- all three payloads present: analyze the row;
+- all three payloads null: skip analysis while preserving the source record;
+- partial payload presence: reject the inconsistent row.
+
+The reporting program maps source columns to library inputs:
 
 | Source column | Library input |
 |---|---|
@@ -97,8 +103,7 @@ It maps source columns to library inputs:
 | `SELECTED_SUGGESTIONS` | Selected object |
 | `FINAL_SUBMISSION` | Final object |
 
-This eligibility rule and source mapping are not enforced by
-`study-posting-ai-analysis`.
+Upstream filtering, payload-state policy, and source mapping are not enforced by `study-posting-ai-analysis`.
 
 The library performs no:
 

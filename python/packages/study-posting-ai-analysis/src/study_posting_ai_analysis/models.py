@@ -14,7 +14,7 @@ and field definitions.
 from dataclasses import dataclass
 from enum import StrEnum
 
-from text_post_edit_metrics.models import PostEditingResult
+from text_post_edit_metrics import PostEditingResult
 
 # ---------------------------------------------------------------------------
 # Type aliases

@@ -42,8 +42,10 @@ from study_posting_ai_analysis.validation import (
     require_string,
     require_string_list,
 )
-from text_post_edit_metrics import PostEditingResult
-from text_post_edit_metrics.metrics import analyze_post_edit
+from text_post_edit_metrics import (
+    PostEditingResult,
+    analyze_post_edit,
+)
 
 
 def find_first_picked_suggestion(

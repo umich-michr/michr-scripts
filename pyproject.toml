@@ -94,8 +94,12 @@ ignore = ["D203", "D213", "ISC001", "TRY003", "EM101", "EM102"]
 convention = "numpy"
 
 [tool.ruff.lint.isort]
-# Every workspace member is first-party. Add new members here.
-known-first-party = ["text_post_edit_metrics", "study_posting_ai_analysis"]
+known-first-party = [
+    "study_posting_ai_analysis",
+    "study_posting_audit_report",
+    "tabular_row_sources",
+    "text_post_edit_metrics",
+]
 force-sort-within-sections = true
 
 [tool.ruff.lint.pylint]

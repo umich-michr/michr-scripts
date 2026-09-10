@@ -359,6 +359,8 @@ uv lock
 uv sync --all-packages
 make check
 ```
+10. Add the member's `src` directory to
+    `.vscode/settings.json` under `python.analysis.extraPaths`.
 
 The root workspace discovers members under:
 

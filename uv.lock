@@ -10,6 +10,8 @@ resolution-markers = [
 members = [
     "michr-scripts",
     "study-posting-ai-analysis",
+    "study-posting-audit-report",
+    "tabular-row-sources",
     "text-post-edit-metrics",
 ]
 
@@ -1228,6 +1230,26 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [{ name = "text-post-edit-metrics", editable = "python/packages/text-post-edit-metrics" }]
+
+[[package]]
+name = "study-posting-audit-report"
+version = "0.1.0"
+source = { editable = "python/programs/study-posting-audit-report" }
+dependencies = [
+    { name = "study-posting-ai-analysis" },
+    { name = "tabular-row-sources" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "study-posting-ai-analysis", editable = "python/packages/study-posting-ai-analysis" },
+    { name = "tabular-row-sources", editable = "python/packages/tabular-row-sources" },
+]
+
+[[package]]
+name = "tabular-row-sources"
+version = "0.1.0"
+source = { editable = "python/packages/tabular-row-sources" }
 
 [[package]]
 name = "tabulate"
