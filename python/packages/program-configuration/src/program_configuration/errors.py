@@ -1,6 +1,7 @@
 """Exceptions raised by reusable program-configuration resolution."""
 
 from collections.abc import Iterable
+from pathlib import Path
 
 
 class ConfigurationError(ValueError):
@@ -71,3 +72,16 @@ class UnknownExplicitSettingError(ConfigurationError):
         super().__init__(
             f"Explicit configuration contains unknown settings: {formatted}"
         )
+
+
+class DotenvFileError(ConfigurationError):
+    """A dotenv file path or file operation is invalid."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        path: Path | None = None,
+    ) -> None:
+        self.path = path
+        super().__init__(message)

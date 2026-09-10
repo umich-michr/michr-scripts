@@ -17,11 +17,11 @@ explicit value
 → unresolved
 ```
 
-The first implementation is pure: callers supply mappings. It does not read
-files, inspect `os.environ`, parse command lines, or prompt.
+The core resolver is pure: callers supply mappings. An explicit dotenv loader
+is available for consumers that need file-based local configuration.
 
-Later adapters may add dotenv-file loading and terminal prompting without
-changing the core precedence contract.
+The package does not inspect or mutate `os.environ`, parse command lines, or
+prompt implicitly.
 
 The package does not own:
 
@@ -77,6 +77,43 @@ configuration = resolve_configuration(
 assert configuration["schema_path"] == Path("local-schema.json")
 assert configuration["include_text"] is True
 ```
+
+## Dotenv files
+
+Load a dotenv file explicitly:
+
+```python
+from program_configuration import load_dotenv_file
+
+dotenv = load_dotenv_file(
+    ".env",
+    required=False,
+)
+```
+
+A missing optional file returns an empty mapping. A missing required file raises
+`DotenvFileError`.
+
+Loading does not mutate `os.environ`, and variable interpolation is disabled.
+The consuming program remains responsible for supplying the real process
+environment separately:
+
+```python
+import os
+
+configuration = resolve_configuration(
+    settings,
+    environment=os.environ,
+    dotenv=dotenv,
+)
+```
+
+This preserves the precedence:
+
+```text
+explicit → process environment → dotenv → default
+```
+
 
 ## Missing values
 
@@ -155,11 +192,13 @@ Parsers validate untrusted values and raise `ValueError` when conversion fails.
 
 The next increment will add:
 
-- dotenv-file loading without mutating `os.environ`;
 - injected prompt providers;
 - secret prompts through `getpass`;
 - noninteractive behavior;
 - resolution of otherwise missing settings through prompts.
+
+Prompting will occur only after explicit values, the process environment,
+dotenv values, and defaults have been considered.
 
 ## Development
 

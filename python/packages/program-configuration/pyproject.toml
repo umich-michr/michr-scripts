@@ -20,7 +20,9 @@ license = "MIT"
 authors = [{ name = "University of Michigan" }]
 keywords = ["configuration", "environment", "dotenv", "cli", "programs"]
 
-dependencies = []
+dependencies = [
+    "python-dotenv>=1.2,<2.0",
+]
 
 # ===========================================================================
 # Build

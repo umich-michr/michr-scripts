@@ -34,6 +34,8 @@ Rules:
 - reject duplicate environment-variable names;
 - validate all mappings at runtime;
 - use injected prompt behavior when prompting is introduced;
-- do not hide filesystem access in the pure core resolver.
+- keep dotenv-file I/O explicit and separate from the pure core resolver;
+- disable implicit dotenv interpolation;
+- never mutate `os.environ`.
 
 Use synthetic values in tests. Never include real credentials, DSNs, tokens, orinstitutional configuration.

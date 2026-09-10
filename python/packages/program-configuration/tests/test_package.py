@@ -7,6 +7,7 @@ from program_configuration import (
     MISSING,
     ConfigurationError,
     ConfigurationValueError,
+    DotenvFileError,
     MissingConfigurationError,
     ResolvedConfiguration,
     ResolvedValue,
@@ -14,6 +15,7 @@ from program_configuration import (
     SettingSpec,
     UnknownExplicitSettingError,
     ValueSource,
+    load_dotenv_file,
     parse_boolean,
     parse_integer,
     parse_json_object,
@@ -52,6 +54,7 @@ def test_public_api_exports_errors() -> None:
     assert package.ConfigurationValueError is ConfigurationValueError
     assert package.MissingConfigurationError is MissingConfigurationError
     assert package.UnknownExplicitSettingError is UnknownExplicitSettingError
+    assert package.DotenvFileError is DotenvFileError
 
 
 def test_public_api_exports_parsers() -> None:
@@ -61,6 +64,10 @@ def test_public_api_exports_parsers() -> None:
     assert package.parse_positive_integer is parse_positive_integer
     assert package.parse_path is parse_path
     assert package.parse_json_object is parse_json_object
+
+
+def test_public_api_exports_dotenv_loader() -> None:
+    assert package.load_dotenv_file is load_dotenv_file
 
 
 def test_public_api_exports_resolver() -> None:

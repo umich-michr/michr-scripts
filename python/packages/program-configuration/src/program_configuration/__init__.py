@@ -1,12 +1,15 @@
 """Reusable layered, typed, and secret-aware program configuration.
 
 The core resolver is pure: callers supply explicit, process-environment, and
-dotenv mappings. Filesystem dotenv loading and prompting are separate concerns.
+dotenv mappings. Dotenv files are loaded explicitly without mutating the
+process environment. Prompting remains a separate concern.
 """
 
+from program_configuration.dotenv import load_dotenv_file
 from program_configuration.errors import (
     ConfigurationError,
     ConfigurationValueError,
+    DotenvFileError,
     MissingConfigurationError,
     SettingDefinitionError,
     UnknownExplicitSettingError,
@@ -35,6 +38,7 @@ __all__ = [
     "MISSING",
     "ConfigurationError",
     "ConfigurationValueError",
+    "DotenvFileError",
     "MissingConfigurationError",
     "ResolvedConfiguration",
     "ResolvedValue",
@@ -44,6 +48,7 @@ __all__ = [
     "UnknownExplicitSettingError",
     "ValueSource",
     "__version__",
+    "load_dotenv_file",
     "parse_boolean",
     "parse_integer",
     "parse_json_object",
