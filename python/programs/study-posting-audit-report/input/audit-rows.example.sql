@@ -78,8 +78,9 @@ WITH
        ON j.emplid = hpd.emplid
      LEFT JOIN dept_current dc     ON dc.deptid   = j.appt_deptid
      LEFT JOIN jobcode_current jcc ON jcc.jobcode = j.jobcode
-     -- Person filter REMOVED so all authors/PIs are covered.
-     -- Excluding the same test/system accounts you excluded before:
+     -- Replace these placeholders with locally approved test, service, or
+     -- system accounts that must be excluded from operational reporting.
+     -- Add or remove entries according to the applicable reporting policy.
      WHERE hpd.campus_id NOT IN (
          'EXCLUDED_CAMPUS_ID_1',
          'EXCLUDED_CAMPUS_ID_2'

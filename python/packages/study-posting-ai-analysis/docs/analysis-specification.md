@@ -92,7 +92,8 @@ ATTEMPT_TYPE = 'AI'
 ATTEMPT_RESULT = 'COMPLETE'
 ```
 
-A selected row must also have a non-null completion time and all three analysispayloads. Manual and incomplete rows are preserved without field analysis.
+A selected row must also have a non-null completion time and all three analysis payloads. Manual and incomplete rows are preserved without field analysis.
+
 The reporting program maps source columns to library inputs:
 
 | Source column | Library input |
@@ -101,7 +102,29 @@ The reporting program maps source columns to library inputs:
 | `SELECTED_SUGGESTIONS` | Selected object |
 | `FINAL_SUBMISSION` | Final object |
 
-Source selection, attempt classification, conditional payload requirements, andsource-column mapping are not enforced by study-posting-ai-analysis.
+Source selection, attempt classification, conditional payload requirements, and source-column mapping are not enforced by study-posting-ai-analysis.
+
+The library performs no:
+
+- database access;
+- SQL execution;
+- report-row selection;
+- CSV or filesystem I/O;
+- DataFrame construction;
+- logging;
+- command-line processing;
+- batch iteration;
+- report publication.
+
+A consuming program is responsible for:
+
+- obtaining source records;
+- selecting records for analysis;
+- mapping source fields to the three library inputs;
+- assigning record identifiers;
+- handling per-record failures;
+- aggregating results;
+- writing output.
 
 ---
 

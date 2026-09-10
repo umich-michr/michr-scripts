@@ -22,9 +22,9 @@ class ProcessedAuditRow:
         Validated source record identifier.
     record
         Fresh copy of the complete canonical source row.
-    analyzed
+     analyzed
         Whether the row was a completed AI attempt and was successfully
-    analyzed.
+        analyzed.
     metric_rows
         Flattened field-metric rows. Empty for manual and incomplete attempts.
     """

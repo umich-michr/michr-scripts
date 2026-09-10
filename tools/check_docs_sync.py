@@ -139,7 +139,7 @@ REQUIRED_DOCUMENTS: dict[str, tuple[DocumentationRequirement, ...]] = {
     f"{REPORT_PROGRAM}/src/study_posting_audit_report/processing.py": (
         (
             REPORT_README,
-            "the program README documents row processing and payload-state policy",
+            "the program README documents row processing and analysis-selection policy",
         ),
     ),
 }
