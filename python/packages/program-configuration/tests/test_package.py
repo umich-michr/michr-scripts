@@ -9,10 +9,13 @@ from program_configuration import (
     ConfigurationValueError,
     DotenvFileError,
     MissingConfigurationError,
+    PromptError,
+    PromptProvider,
     ResolvedConfiguration,
     ResolvedValue,
     SettingDefinitionError,
     SettingSpec,
+    TerminalPromptProvider,
     UnknownExplicitSettingError,
     ValueSource,
     load_dotenv_file,
@@ -55,6 +58,12 @@ def test_public_api_exports_errors() -> None:
     assert package.MissingConfigurationError is MissingConfigurationError
     assert package.UnknownExplicitSettingError is UnknownExplicitSettingError
     assert package.DotenvFileError is DotenvFileError
+    assert package.PromptError is PromptError
+
+
+def test_public_api_exports_prompting() -> None:
+    assert package.PromptProvider is PromptProvider
+    assert package.TerminalPromptProvider is TerminalPromptProvider
 
 
 def test_public_api_exports_parsers() -> None:
@@ -80,3 +89,4 @@ def test_program_exceptions_share_one_base_class() -> None:
     assert issubclass(MissingConfigurationError, ConfigurationError)
     assert issubclass(UnknownExplicitSettingError, ConfigurationError)
     assert issubclass(ConfigurationError, ValueError)
+    assert issubclass(PromptError, ConfigurationError)

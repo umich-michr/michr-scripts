@@ -85,3 +85,7 @@ class DotenvFileError(ConfigurationError):
     ) -> None:
         self.path = path
         super().__init__(message)
+
+
+class PromptError(ConfigurationError):
+    """An interactive configuration prompt cannot be completed."""

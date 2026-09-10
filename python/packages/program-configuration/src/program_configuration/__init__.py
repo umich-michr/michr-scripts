@@ -1,8 +1,8 @@
 """Reusable layered, typed, and secret-aware program configuration.
 
-The core resolver is pure: callers supply explicit, process-environment, and
-dotenv mappings. Dotenv files are loaded explicitly without mutating the
-process environment. Prompting remains a separate concern.
+The core resolver accepts explicit, process-environment, and dotenv mappings.
+Dotenv files are loaded explicitly without mutating the process environment.
+Interactive prompting is injectable and can be disabled by consumers.
 """
 
 from program_configuration.dotenv import load_dotenv_file
@@ -11,6 +11,7 @@ from program_configuration.errors import (
     ConfigurationValueError,
     DotenvFileError,
     MissingConfigurationError,
+    PromptError,
     SettingDefinitionError,
     UnknownExplicitSettingError,
 )
@@ -30,6 +31,10 @@ from program_configuration.parsing import (
     parse_path,
     parse_positive_integer,
 )
+from program_configuration.prompting import (
+    PromptProvider,
+    TerminalPromptProvider,
+)
 from program_configuration.resolution import resolve_configuration
 
 __version__ = "0.1.0"
@@ -40,11 +45,14 @@ __all__ = [
     "ConfigurationValueError",
     "DotenvFileError",
     "MissingConfigurationError",
+    "PromptError",
+    "PromptProvider",
     "ResolvedConfiguration",
     "ResolvedValue",
     "SettingDefinitionError",
     "SettingParser",
     "SettingSpec",
+    "TerminalPromptProvider",
     "UnknownExplicitSettingError",
     "ValueSource",
     "__version__",

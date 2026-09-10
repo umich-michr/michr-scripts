@@ -161,6 +161,12 @@ REQUIRED_DOCUMENTS: dict[str, tuple[DocumentationRequirement, ...]] = {
             "the package README documents dotenv loading behavior",
         ),
     ),
+    f"{CONFIG_PACKAGE}/src/program_configuration/prompting.py": (
+        (
+            CONFIG_README,
+            "the package README documents prompting behavior",
+        ),
+    ),
 }
 
 # Advisory pairings: these changes often require documentation, but not every

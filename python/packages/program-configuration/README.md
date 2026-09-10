@@ -14,6 +14,7 @@ explicit value
 → process environment
 → dotenv mapping
 → default
+→ prompt
 → unresolved
 ```
 
@@ -188,17 +189,79 @@ The package exports reusable parsers for:
 
 Parsers validate untrusted values and raise `ValueError` when conversion fails.
 
-## Planned next increment
+## Prompting
 
-The next increment will add:
+Prompting is explicit and injectable. A setting must declare prompt text:
 
-- injected prompt providers;
-- secret prompts through `getpass`;
-- noninteractive behavior;
-- resolution of otherwise missing settings through prompts.
+```python
+SettingSpec(
+    name="username",
+    environment_variable="EXAMPLE_USERNAME",
+    parser=parse_nonblank_string,
+    prompt="Database username",
+)
+```
 
-Prompting will occur only after explicit values, the process environment,
-dotenv values, and defaults have been considered.
+Supply a provider when resolving:
+
+```python
+from program_configuration import TerminalPromptProvider
+
+configuration = resolve_configuration(
+    settings,
+    environment=os.environ,
+    dotenv=dotenv,
+    prompt_provider=TerminalPromptProvider(),
+)
+```
+
+Prompting occurs only when:
+
+- explicit, environment, dotenv, and default sources did not resolve the
+  setting;
+- the setting declares prompt text;
+- prompting is enabled;
+- the provider reports that it is interactive.
+
+Disable prompting for batch jobs:
+
+```python
+configuration = resolve_configuration(
+    settings,
+    environment=os.environ,
+    dotenv=dotenv,
+    prompt_provider=TerminalPromptProvider(),
+    prompt_enabled=False,
+)
+```
+
+Unresolved values are then reported together through
+`MissingConfigurationError`.
+
+Secret settings use the provider's secret reader. The terminal provider uses
+`getpass.getpass()` and does not echo the entered value.
+
+Prompt behavior is injectable so unit tests and nonterminal applications do not
+need to patch `input()` or contact a real terminal.
+
+## Full precedence
+
+The complete resolution order is:
+
+```text
+explicit
+→ environment
+→ dotenv
+→ default
+→ prompt
+→ missing error
+```
+
+Invalid values do not fall through to a lower-precedence source. They raise
+`ConfigurationValueError` with the setting name and source.
+
+Secret parser failures are redacted and do not retain a secret-bearing parser
+exception as their cause or context.
 
 ## Development
 

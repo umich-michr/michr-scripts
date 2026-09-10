@@ -9,6 +9,8 @@ import pytest
 from program_configuration import (
     ConfigurationValueError,
     MissingConfigurationError,
+    PromptError,
+    PromptProvider,
     SettingDefinitionError,
     SettingSpec,
     UnknownExplicitSettingError,
@@ -329,31 +331,44 @@ def test_configuration_layers_must_be_mappings(
         )
 
 
-@pytest.mark.parametrize(
-    ("argument_name", "keyword"),
-    [
-        ("Explicit configuration", "explicit"),
-        ("Environment configuration", "environment"),
-        ("Dotenv configuration", "dotenv"),
-    ],
-    ids=["explicit", "environment", "dotenv"],
-)
-def test_configuration_layer_keys_must_be_strings(
-    argument_name: str,
-    keyword: str,
-) -> None:
-    invalid_mapping = cast(
+def invalid_configuration_mapping() -> Mapping[str, object]:
+    """Return a mapping with an invalid non-string key."""
+    return cast(
         "Mapping[str, object]",
         {1: "value"},
     )
 
+
+def test_explicit_configuration_keys_must_be_strings() -> None:
     with pytest.raises(
         SettingDefinitionError,
-        match=rf"{argument_name} keys must be strings",
+        match="Explicit configuration keys must be strings",
     ):
         resolve_configuration(
             (),
-            **{keyword: invalid_mapping},
+            explicit=invalid_configuration_mapping(),
+        )
+
+
+def test_environment_configuration_keys_must_be_strings() -> None:
+    with pytest.raises(
+        SettingDefinitionError,
+        match="Environment configuration keys must be strings",
+    ):
+        resolve_configuration(
+            (),
+            environment=invalid_configuration_mapping(),
+        )
+
+
+def test_dotenv_configuration_keys_must_be_strings() -> None:
+    with pytest.raises(
+        SettingDefinitionError,
+        match="Dotenv configuration keys must be strings",
+    ):
+        resolve_configuration(
+            (),
+            dotenv=invalid_configuration_mapping(),
         )
 
 
@@ -487,3 +502,410 @@ def test_no_specs_produces_empty_configuration() -> None:
 
     assert len(configuration) == 0
     assert configuration.as_dict() == {}
+
+
+class FakePromptProvider:
+    """Configurable prompt provider for resolver tests."""
+
+    def __init__(
+        self,
+        values: list[str],
+        *,
+        interactive: object = True,
+        read_error: BaseException | None = None,
+        interactive_error: Exception | None = None,
+    ) -> None:
+        self._values = list(values)
+        self._interactive = interactive
+        self._read_error = read_error
+        self._interactive_error = interactive_error
+        self.interactive_checks = 0
+        self.read_calls: list[tuple[str, bool]] = []
+
+    @property
+    def is_interactive(self) -> bool:
+        """Return configured interactivity."""
+        self.interactive_checks += 1
+
+        if self._interactive_error is not None:
+            raise self._interactive_error
+
+        return cast("bool", self._interactive)
+
+    def read(
+        self,
+        prompt: str,
+        *,
+        secret: bool,
+    ) -> str:
+        """Return the next configured prompt value."""
+        self.read_calls.append((prompt, secret))
+
+        if self._read_error is not None:
+            raise self._read_error
+
+        if not self._values:
+            raise RuntimeError("No configured prompt value remains")
+
+        return self._values.pop(0)
+
+
+def prompted_spec(
+    *,
+    secret: bool = False,
+    blank_is_missing: bool = True,
+) -> SettingSpec:
+    """Return one required prompted setting."""
+    return SettingSpec(
+        name="value",
+        environment_variable="EXAMPLE_VALUE",
+        parser=parse_nonblank_string if blank_is_missing else lambda value: value,
+        prompt="Configured value",
+        secret=secret,
+        blank_is_missing=blank_is_missing,
+    )
+
+
+def test_unresolved_setting_is_prompted() -> None:
+    provider = FakePromptProvider(["prompted-value"])
+
+    configuration = resolve_configuration(
+        (prompted_spec(),),
+        prompt_provider=provider,
+    )
+
+    assert configuration["value"] == "prompted-value"
+    assert configuration.source_for("value") is ValueSource.PROMPT
+    assert provider.interactive_checks == 1
+    assert provider.read_calls == [("Configured value", False)]
+
+
+def test_secret_setting_requests_secret_prompt() -> None:
+    provider = FakePromptProvider(["sensitive-value"])
+
+    configuration = resolve_configuration(
+        (prompted_spec(secret=True),),
+        prompt_provider=provider,
+    )
+
+    assert configuration["value"] == "sensitive-value"
+    assert provider.read_calls == [("Configured value", True)]
+    assert "sensitive-value" not in repr(configuration)
+
+
+def test_explicit_value_prevents_prompting() -> None:
+    provider = FakePromptProvider(["unused"])
+
+    configuration = resolve_configuration(
+        (prompted_spec(),),
+        explicit={"value": "explicit-value"},
+        prompt_provider=provider,
+    )
+
+    assert configuration["value"] == "explicit-value"
+    assert configuration.source_for("value") is ValueSource.EXPLICIT
+    assert provider.interactive_checks == 0
+    assert provider.read_calls == []
+
+
+def test_environment_value_prevents_prompting() -> None:
+    provider = FakePromptProvider(["unused"])
+
+    configuration = resolve_configuration(
+        (prompted_spec(),),
+        environment={"EXAMPLE_VALUE": "environment-value"},
+        prompt_provider=provider,
+    )
+
+    assert configuration["value"] == "environment-value"
+    assert configuration.source_for("value") is ValueSource.ENVIRONMENT
+    assert provider.interactive_checks == 0
+    assert provider.read_calls == []
+
+
+def test_dotenv_value_prevents_prompting() -> None:
+    provider = FakePromptProvider(["unused"])
+
+    configuration = resolve_configuration(
+        (prompted_spec(),),
+        dotenv={"EXAMPLE_VALUE": "dotenv-value"},
+        prompt_provider=provider,
+    )
+
+    assert configuration["value"] == "dotenv-value"
+    assert configuration.source_for("value") is ValueSource.DOTENV
+    assert provider.interactive_checks == 0
+    assert provider.read_calls == []
+
+
+def test_default_prevents_prompting() -> None:
+    spec = SettingSpec(
+        name="value",
+        parser=parse_nonblank_string,
+        default="default-value",
+        prompt="Configured value",
+    )
+    provider = FakePromptProvider(["unused"])
+
+    configuration = resolve_configuration(
+        (spec,),
+        prompt_provider=provider,
+    )
+
+    assert configuration["value"] == "default-value"
+    assert configuration.source_for("value") is ValueSource.DEFAULT
+    assert provider.interactive_checks == 0
+    assert provider.read_calls == []
+
+
+def test_unresolved_setting_without_prompt_does_not_inspect_provider() -> None:
+    spec = SettingSpec(
+        name="value",
+        parser=parse_nonblank_string,
+    )
+    provider = FakePromptProvider(["unused"])
+
+    with pytest.raises(MissingConfigurationError):
+        resolve_configuration(
+            (spec,),
+            prompt_provider=provider,
+        )
+
+    assert provider.interactive_checks == 0
+    assert provider.read_calls == []
+
+
+def test_prompting_can_be_disabled() -> None:
+    provider = FakePromptProvider(["unused"])
+
+    with pytest.raises(MissingConfigurationError):
+        resolve_configuration(
+            (prompted_spec(),),
+            prompt_provider=provider,
+            prompt_enabled=False,
+        )
+
+    assert provider.interactive_checks == 0
+    assert provider.read_calls == []
+
+
+def test_noninteractive_provider_does_not_read() -> None:
+    provider = FakePromptProvider(
+        ["unused"],
+        interactive=False,
+    )
+
+    with pytest.raises(MissingConfigurationError):
+        resolve_configuration(
+            (prompted_spec(),),
+            prompt_provider=provider,
+        )
+
+    assert provider.interactive_checks == 1
+    assert provider.read_calls == []
+
+
+def test_blank_prompt_response_remains_missing() -> None:
+    provider = FakePromptProvider(["   "])
+
+    with pytest.raises(
+        MissingConfigurationError,
+        match="- value",
+    ):
+        resolve_configuration(
+            (prompted_spec(),),
+            prompt_provider=provider,
+        )
+
+    assert provider.read_calls == [("Configured value", False)]
+
+
+def test_blank_prompt_response_can_be_meaningful() -> None:
+    provider = FakePromptProvider([""])
+    spec = prompted_spec(blank_is_missing=False)
+
+    configuration = resolve_configuration(
+        (spec,),
+        prompt_provider=provider,
+    )
+
+    assert configuration["value"] == ""
+    assert configuration.source_for("value") is ValueSource.PROMPT
+
+
+def test_invalid_prompted_value_reports_prompt_source() -> None:
+    spec = SettingSpec(
+        name="fetch_size",
+        parser=parse_positive_integer,
+        prompt="Fetch size",
+    )
+    provider = FakePromptProvider(["0"])
+
+    with pytest.raises(
+        ConfigurationValueError,
+        match="from prompt is invalid",
+    ) as captured:
+        resolve_configuration(
+            (spec,),
+            prompt_provider=provider,
+        )
+
+    assert captured.value.source_name == "prompt"
+
+
+def test_secret_prompt_parser_error_is_redacted() -> None:
+    sensitive_value = "synthetic-sensitive-value"
+
+    def reject(value: object) -> object:
+        raise ValueError(f"rejected {value!r}")
+
+    spec = SettingSpec(
+        name="password",
+        parser=reject,
+        prompt="Password",
+        secret=True,
+    )
+    provider = FakePromptProvider([sensitive_value])
+
+    with pytest.raises(ConfigurationValueError) as captured:
+        resolve_configuration(
+            (spec,),
+            prompt_provider=provider,
+        )
+
+    assert sensitive_value not in str(captured.value)
+    assert captured.value.__cause__ is None
+    assert captured.value.__context__ is None
+
+
+def test_prompt_error_from_provider_is_preserved() -> None:
+    error = PromptError("prompt failed")
+    provider = FakePromptProvider(
+        [],
+        read_error=error,
+    )
+
+    with pytest.raises(PromptError) as captured:
+        resolve_configuration(
+            (prompted_spec(),),
+            prompt_provider=provider,
+        )
+
+    assert captured.value is error
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        EOFError(),
+        KeyboardInterrupt(),
+        OSError("terminal failed"),
+    ],
+    ids=["end-of-file", "keyboard-interrupt", "operating-system"],
+)
+def test_raw_prompt_reader_errors_are_wrapped(
+    error: BaseException,
+) -> None:
+    provider = FakePromptProvider(
+        [],
+        read_error=error,
+    )
+
+    with pytest.raises(
+        PromptError,
+        match="Could not read configuration prompt for setting 'value'",
+    ) as captured:
+        resolve_configuration(
+            (prompted_spec(),),
+            prompt_provider=provider,
+        )
+
+    assert captured.value.__cause__ is error
+
+
+def test_interactivity_error_is_wrapped() -> None:
+    provider = FakePromptProvider(
+        [],
+        interactive_error=OSError("terminal failed"),
+    )
+
+    with pytest.raises(
+        PromptError,
+        match="Could not determine whether prompting is interactive",
+    ) as captured:
+        resolve_configuration(
+            (prompted_spec(),),
+            prompt_provider=provider,
+        )
+
+    assert isinstance(captured.value.__cause__, OSError)
+
+
+def test_interactivity_must_be_boolean() -> None:
+    provider = FakePromptProvider(
+        [],
+        interactive="yes",
+    )
+
+    with pytest.raises(
+        PromptError,
+        match=r"PromptProvider\.is_interactive must return a Boolean",
+    ):
+        resolve_configuration(
+            (prompted_spec(),),
+            prompt_provider=provider,
+        )
+
+
+def test_prompt_enabled_must_be_boolean() -> None:
+    with pytest.raises(
+        SettingDefinitionError,
+        match="prompt_enabled must be a Boolean",
+    ):
+        resolve_configuration(
+            (),
+            prompt_enabled=cast("bool", 1),
+        )
+
+
+def test_prompt_provider_must_satisfy_protocol() -> None:
+    with pytest.raises(
+        SettingDefinitionError,
+        match="prompt_provider must implement PromptProvider",
+    ):
+        resolve_configuration(
+            (),
+            prompt_provider=cast("PromptProvider", object()),
+        )
+
+
+def test_multiple_prompted_values_preserve_declaration_order() -> None:
+    specs = (
+        SettingSpec(
+            name="first",
+            parser=parse_nonblank_string,
+            prompt="First",
+        ),
+        SettingSpec(
+            name="second",
+            parser=parse_nonblank_string,
+            prompt="Second",
+        ),
+    )
+    provider = FakePromptProvider(["one", "two"])
+
+    configuration = resolve_configuration(
+        specs,
+        prompt_provider=provider,
+    )
+
+    assert tuple(configuration) == ("first", "second")
+    assert configuration.as_dict() == {
+        "first": "one",
+        "second": "two",
+    }
+    assert provider.interactive_checks == 1
+    assert provider.read_calls == [
+        ("First", False),
+        ("Second", False),
+    ]

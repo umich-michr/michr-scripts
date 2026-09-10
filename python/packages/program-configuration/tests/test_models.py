@@ -24,6 +24,7 @@ def test_value_source_values_are_stable() -> None:
     assert ValueSource.ENVIRONMENT.value == "environment"
     assert ValueSource.DOTENV.value == "dotenv"
     assert ValueSource.DEFAULT.value == "default"
+    assert ValueSource.PROMPT.value == "prompt"
 
 
 def test_setting_spec_preserves_configuration() -> None:
@@ -32,10 +33,12 @@ def test_setting_spec_preserves_configuration() -> None:
         parser=parse_nonblank_string,
         environment_variable="EXAMPLE_INPUT",
         default="input.csv",
+        prompt="Input path",
         secret=True,
         blank_is_missing=False,
     )
 
+    assert spec.prompt == "Input path"
     assert spec.name == "input_path"
     assert spec.parser is parse_nonblank_string
     assert spec.environment_variable == "EXAMPLE_INPUT"
@@ -108,6 +111,35 @@ def test_environment_variable_must_be_string_or_none() -> None:
             name="input_path",
             parser=parse_nonblank_string,
             environment_variable=cast("str | None", 42),
+        )
+
+
+@pytest.mark.parametrize(
+    "prompt",
+    ["", "   ", "\n\t"],
+    ids=["empty", "spaces", "control-whitespace"],
+)
+def test_setting_prompt_must_be_nonblank(prompt: str) -> None:
+    with pytest.raises(
+        SettingDefinitionError,
+        match="Prompt for setting 'input_path' must be a nonblank string",
+    ):
+        SettingSpec(
+            name="input_path",
+            parser=parse_nonblank_string,
+            prompt=prompt,
+        )
+
+
+def test_setting_prompt_must_be_string_or_none() -> None:
+    with pytest.raises(
+        SettingDefinitionError,
+        match="Prompt for setting 'input_path' must be a nonblank string",
+    ):
+        SettingSpec(
+            name="input_path",
+            parser=parse_nonblank_string,
+            prompt=cast("str | None", 42),
         )
 
 

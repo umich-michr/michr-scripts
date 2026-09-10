@@ -28,6 +28,7 @@ class ValueSource(StrEnum):
     ENVIRONMENT = "environment"
     DOTENV = "dotenv"
     DEFAULT = "default"
+    PROMPT = "prompt"
 
 
 def _require_nonblank_string(
@@ -90,12 +91,16 @@ class SettingSpec:
     blank_is_missing
         Whether a blank string should be treated as absent and allow fallback
         to a lower-precedence source.
+    prompt
+        Optional nonblank text used to request a missing value. A setting is
+        not prompted when this is ``None``.
     """
 
     name: str
     parser: SettingParser
     environment_variable: str | None = None
     default: object = MISSING
+    prompt: str | None = None
     secret: bool = False
     blank_is_missing: bool = True
 
@@ -108,6 +113,11 @@ class SettingSpec:
         _require_optional_nonblank_string(
             self.environment_variable,
             field_name=f"Environment variable for setting {self.name!r}",
+        )
+
+        _require_optional_nonblank_string(
+            self.prompt,
+            field_name=f"Prompt for setting {self.name!r}",
         )
 
         if not callable(self.parser):

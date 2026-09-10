@@ -1,4 +1,4 @@
-"""Pure layered resolution of declarative program settings."""
+"""Layered resolution of declarative program settings."""
 
 from collections.abc import Iterable, Mapping
 from typing import cast
@@ -6,6 +6,7 @@ from typing import cast
 from program_configuration.errors import (
     ConfigurationValueError,
     MissingConfigurationError,
+    PromptError,
     SettingDefinitionError,
     UnknownExplicitSettingError,
 )
@@ -16,6 +17,7 @@ from program_configuration.models import (
     SettingSpec,
     ValueSource,
 )
+from program_configuration.prompting import PromptProvider
 
 
 def _copy_string_mapping(
@@ -95,7 +97,7 @@ def _candidate(
     environment: Mapping[str, object],
     dotenv: Mapping[str, object],
 ) -> tuple[object, ValueSource] | None:
-    """Return the highest-precedence nonmissing raw value."""
+    """Return the highest-precedence nonmissing non-prompt value."""
     if spec.name in explicit:
         value = explicit[spec.name]
 
@@ -149,12 +151,83 @@ def _parse_candidate(
             secret=spec.secret,
         )
 
-    # Raise outside the exception handler so a secret-bearing parser exception
-    # is not retained as __cause__ or __context__.
     raise ConfigurationValueError(
         setting_name=spec.name,
         source_name=source.value,
         detail="secret value was rejected by its parser",
+    )
+
+
+def _require_prompt_enabled(value: object) -> bool:
+    """Return an exact Boolean prompt-enabled flag."""
+    if type(value) is not bool:
+        raise SettingDefinitionError("prompt_enabled must be a Boolean")
+
+    return value
+
+
+def _require_prompt_provider(
+    value: object,
+) -> PromptProvider | None:
+    """Return a structurally valid prompt provider or ``None``."""
+    if value is None:
+        return None
+
+    if not isinstance(value, PromptProvider):
+        raise SettingDefinitionError("prompt_provider must implement PromptProvider")
+
+    return value
+
+
+def _prompt_provider_is_interactive(
+    provider: PromptProvider,
+) -> bool:
+    """Return an exact interactive-capability value."""
+    try:
+        result = provider.is_interactive
+    except PromptError:
+        raise
+    except (AttributeError, OSError) as error:
+        raise PromptError(
+            "Could not determine whether prompting is interactive"
+        ) from error
+
+    if type(result) is not bool:
+        raise PromptError("PromptProvider.is_interactive must return a Boolean")
+
+    return result
+
+
+def _prompt_candidate(
+    spec: SettingSpec,
+    *,
+    provider: PromptProvider | None,
+    prompt_enabled: bool,
+    interactive: bool,
+) -> ResolvedValue | None:
+    """Prompt for one unresolved setting when permitted."""
+    if not prompt_enabled or provider is None or not interactive or spec.prompt is None:
+        return None
+
+    try:
+        raw_value = provider.read(
+            spec.prompt,
+            secret=spec.secret,
+        )
+    except PromptError:
+        raise
+    except (EOFError, KeyboardInterrupt, OSError) as error:
+        raise PromptError(
+            f"Could not read configuration prompt for setting {spec.name!r}"
+        ) from error
+
+    if _is_missing(raw_value, spec=spec):
+        return None
+
+    return _parse_candidate(
+        spec,
+        raw_value=raw_value,
+        source=ValueSource.PROMPT,
     )
 
 
@@ -164,17 +237,21 @@ def resolve_configuration(
     explicit: Mapping[str, object] | None = None,
     environment: Mapping[str, object] | None = None,
     dotenv: Mapping[str, object] | None = None,
+    prompt_provider: PromptProvider | None = None,
+    prompt_enabled: bool = True,
 ) -> ResolvedConfiguration:
     """Resolve settings using deterministic layered precedence.
 
     Precedence is:
 
     ```text
-    explicit → environment → dotenv → default → unresolved
+    explicit → environment → dotenv → default → prompt → unresolved
     ```
 
+    Prompting occurs only for settings that remain unresolved, declare prompt
+    text, have an interactive provider, and are resolved with prompting enabled.
+
     Missing required settings are reported together in declaration order.
-    Values are parsed only after their highest-precedence source is selected.
     """
     validated_specs = _validate_specs(specs)
     explicit_values = _copy_string_mapping(
@@ -189,6 +266,8 @@ def resolve_configuration(
         {} if dotenv is None else dotenv,
         mapping_name="Dotenv configuration",
     )
+    prompting_enabled = _require_prompt_enabled(prompt_enabled)
+    provider = _require_prompt_provider(prompt_provider)
 
     declared_names = {spec.name for spec in validated_specs}
     unknown_names = sorted(set(explicit_values) - declared_names)
@@ -196,6 +275,7 @@ def resolve_configuration(
     if unknown_names:
         raise UnknownExplicitSettingError(unknown_names)
 
+    interactive: bool | None = None
     entries: list[ResolvedValue] = []
     missing_names: list[str] = []
 
@@ -207,18 +287,36 @@ def resolve_configuration(
             dotenv=dotenv_values,
         )
 
-        if candidate is None:
-            missing_names.append(spec.name)
+        if candidate is not None:
+            raw_value, source = candidate
+            entries.append(
+                _parse_candidate(
+                    spec,
+                    raw_value=raw_value,
+                    source=source,
+                )
+            )
             continue
 
-        raw_value, source = candidate
-        entries.append(
-            _parse_candidate(
-                spec,
-                raw_value=raw_value,
-                source=source,
-            )
+        if prompting_enabled and provider is not None and spec.prompt is not None:
+            if interactive is None:
+                interactive = _prompt_provider_is_interactive(provider)
+
+            prompt_is_interactive = interactive
+        else:
+            prompt_is_interactive = False
+
+        prompted = _prompt_candidate(
+            spec,
+            provider=provider,
+            prompt_enabled=prompting_enabled,
+            interactive=prompt_is_interactive,
         )
+
+        if prompted is None:
+            missing_names.append(spec.name)
+        else:
+            entries.append(prompted)
 
     if missing_names:
         raise MissingConfigurationError(missing_names)
