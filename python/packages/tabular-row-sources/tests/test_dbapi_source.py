@@ -271,6 +271,25 @@ def test_query_source_streams_and_converts_rows_in_order() -> None:
     assert connect.calls == 1
 
 
+def test_reordered_result_columns_are_accepted_and_canonicalized() -> None:
+    cursor = FakeCursor(
+        description=description_for("TITLE", "ID"),
+        batches=[
+            [("First", "1"), ("Second", "2")],
+            [],
+        ],
+    )
+    source, _, _ = make_source(cursor)
+
+    rows = collect_rows(source)
+
+    assert rows == [
+        {"ID": 1, "TITLE": "First"},
+        {"ID": 2, "TITLE": "Second"},
+    ]
+    assert all(tuple(row) == simple_schema().column_names for row in rows)
+
+
 def test_query_source_converts_database_native_values() -> None:
     timestamp = datetime.fromisoformat("2026-09-09T14:59:35-04:00")
     cursor = FakeCursor(
@@ -809,19 +828,18 @@ def test_duplicate_result_column_names_are_rejected() -> None:
 @pytest.mark.parametrize(
     "description",
     [
-        description_for("TITLE", "ID"),
         description_for("ID"),
         description_for("ID", "TITLE", "EXTRA"),
         description_for("id", "TITLE"),
     ],
-    ids=["reordered", "missing", "extra", "wrong-case"],
+    ids=["missing", "extra", "wrong-case"],
 )
-def test_result_columns_must_match_schema_order(
+def test_result_column_names_must_match_schema(
     description: object,
 ) -> None:
     with pytest.raises(
         SourceFormatError,
-        match="result columns do not match schema order",
+        match="result columns do not match schema names",
     ):
         metadata_failure(description)
 

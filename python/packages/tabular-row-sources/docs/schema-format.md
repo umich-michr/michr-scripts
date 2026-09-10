@@ -5,8 +5,8 @@
 
 A row schema defines:
 
-- exact column names;
-- exact column order;
+- exact case-sensitive column names;
+- canonical output column order;
 - canonical Python value types;
 - nullability.
 
@@ -93,20 +93,23 @@ value to the canonical Python type before yielding the row.
 
 ## 4. Column matching
 
-The initial source implementations use strict matching.
+Source implementations use strict name matching.
 
 A source must provide:
 
 - every schema column;
 - no unexpected columns;
 - no duplicate columns;
-- the exact case-sensitive names;
-- the exact schema order.
+- the exact case-sensitive names.
 
-Strict matching prevents a changed query or CSV export from silently shifting
-values into the wrong output columns.
+Source columns may appear in a different order. Each source associates values
+with the actual source column names and then emits canonical row dictionaries in
+schema order.
 
-A relaxed projection mode is not currently supported.
+This prevents changed queries or CSV exports from silently shifting values into
+the wrong columns while allowing harmless source-column reordering.
+
+A projection mode that ignores missing or unexpected columns is not supported.
 
 ---
 
@@ -331,15 +334,14 @@ Infinity
 
 ### Row conversion
 
-`convert_row()` requires exact source-column agreement with the schema:
+`convert_row()` requires exact source-column-name agreement with the schema:
 
 - same names;
 - same case;
-- same order;
 - no missing columns;
 - no extra columns.
 
-It returns a fresh dictionary whose keys follow schema order and whose values use
-canonical Python types.
+Input order may differ. The function returns a fresh dictionary whose keys
+follow schema order and whose values use canonical Python types.
 
 Optional row numbers may be supplied for error reporting.

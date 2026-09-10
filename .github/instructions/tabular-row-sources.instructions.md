@@ -20,7 +20,8 @@ Rows are `dict[str, object]`.
 
 Every source must:
 
-- preserve column order;
+- accept source columns in any order;
+- emit row dictionaries in canonical schema order;
 - require nonblank, unique string column names;
 - yield fresh row dictionaries;
 - stream rather than load unbounded input;
@@ -64,14 +65,14 @@ Every concrete source requires a `RowSchema`.
 The schema controls:
 
 - exact case-sensitive column names;
-- exact column order;
+- canonical output column order;
 - canonical Python value types;
 - nullability.
 
 Schema JSON parsing and loading belong to this package.
 
-Strict column matching is the default. Do not silently ignore, reorder, add, or
-drop source columns.
+Strict name matching is the default. Accept source columns in any order, then
+reorder them to schema order. Do not silently ignore, add, or drop columns.
 
 CSV and database sources must use the same conversion layer so the same schema
 produces compatible canonical values.

@@ -232,13 +232,18 @@ def _validate_result_columns(
     *,
     schema: RowSchema,
 ) -> None:
-    """Require exact result-column agreement with the schema."""
+    """Require exact result-column names while allowing source reordering."""
     expected = schema.column_names
+    actual_name_set = set(actual)
+    expected_name_set = set(expected)
 
-    if actual != expected:
+    missing = [name for name in expected if name not in actual_name_set]
+    unexpected = [name for name in actual if name not in expected_name_set]
+
+    if missing or unexpected:
         raise SourceFormatError(
-            "DB-API result columns do not match schema order: "
-            f"expected {expected!r}, received {actual!r}"
+            "DB-API result columns do not match schema names: "
+            f"missing {missing!r}; unexpected {unexpected!r}"
         )
 
 
@@ -278,6 +283,7 @@ def _require_result_row(
 def _iter_query_rows(
     cursor: _CursorProtocol,
     *,
+    column_names: tuple[str, ...],
     schema: RowSchema,
     fetch_size: int,
 ) -> Iterator[Row]:
@@ -316,7 +322,7 @@ def _iter_query_rows(
 
             source_row: dict[object, object] = dict(
                 zip(
-                    schema.column_names,
+                    column_names,
                     values,
                     strict=True,
                 )
@@ -447,6 +453,7 @@ class DbApiQuerySource:
 
             yield _iter_query_rows(
                 cursor,
+                column_names=column_names,
                 schema=self._schema,
                 fetch_size=self._fetch_size,
             )

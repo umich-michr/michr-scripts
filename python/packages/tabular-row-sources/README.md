@@ -56,7 +56,7 @@ Every source must:
 
 - use a supplied `RowSchema`;
 - preserve schema column order;
-- require exact schema-column matching;
+- require exact schema-column names while allowing source reordering;
 - yield a fresh dictionary for every row;
 - convert values to canonical Python types;
 - enforce nullability;
@@ -104,8 +104,9 @@ Column names are:
 - unique;
 - ordered.
 
-Sources must provide exactly the schema columns in schema order. Missing,
-unexpected, reordered, blank, and duplicate columns are rejected.
+Sources must provide exactly the schema's case-sensitive column names. Missing,
+unexpected, blank, and duplicate columns are rejected. Source order may differ;
+yielded row dictionaries always follow schema order.
 
 A relaxed projection mode is not supported.
 
@@ -192,7 +193,8 @@ from tabular_row_sources import (
 
 `convert_row()`:
 
-- requires exact column names and order;
+- requires exact case-sensitive column names;
+- accepts source columns in any order;
 - validates every value;
 - enforces nullability;
 - returns a fresh dictionary in schema order;
@@ -214,7 +216,8 @@ The conversion layer rejects ambiguous or lossy conversions. For example:
 `CsvRowSource`:
 
 - requires a header row;
-- requires exact header agreement with the schema;
+- requires exact header-name agreement with the schema;
+- accepts header columns in any order and emits schema-ordered rows;
 - validates blank and duplicate headers;
 - reads logical CSV records lazily;
 - converts values through the shared conversion layer;
@@ -327,8 +330,8 @@ This package owns:
 - canonical value conversion;
 - exact column and row-shape validation;
 - lazy CSV reading;
-- future lazy DB-API query reading;
-- future optional database adapters;
+- lazy DB-API query reading;
+- reusable database connection-factory integration;
 - source resource lifecycle;
 - source exceptions.
 
@@ -359,10 +362,9 @@ Available:
 - generic lazy DB-API query source;
 - package exception hierarchy.
 
-Planned:
-
-1. SQL-file loading helper;
-2. optional Oracle connection adapter.
+The package intentionally does not provide database-driver configuration.
+Driver-specific connection setup belongs to consuming programs or reusable
+driver adapters.
 
 The default test suite does not require network access, credentials, a live
 database, or Oracle client software.

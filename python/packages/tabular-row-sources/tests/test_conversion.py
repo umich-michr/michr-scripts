@@ -843,6 +843,20 @@ def test_json_object_conversion_rejects_non_string_key() -> None:
 # ---------------------------------------------------------------------------
 # Row conversion
 # ---------------------------------------------------------------------------
+def simple_schema() -> RowSchema:
+    """Return a two-column schema for row-conversion tests."""
+    return RowSchema(
+        columns=(
+            column(
+                ColumnType.INTEGER,
+                name="ID",
+            ),
+            column(
+                ColumnType.STRING,
+                name="TITLE",
+            ),
+        )
+    )
 
 
 def representative_schema() -> RowSchema:
@@ -933,30 +947,24 @@ def test_convert_row_returns_fresh_dictionary() -> None:
     assert result is not source
 
 
-def test_convert_row_rejects_wrong_column_order() -> None:
-    source: dict[object, object] = {
+def test_convert_row_accepts_reordered_source_columns() -> None:
+    schema = simple_schema()
+    source_row: dict[object, object] = {
         "TITLE": "Example",
-        "ID": 1,
+        "ID": "1",
     }
-    schema = RowSchema(
-        columns=(
-            column(ColumnType.INTEGER, name="ID"),
-            column(ColumnType.STRING, name="TITLE"),
-        )
-    )
-    expected = (
-        "Source row columns do not match schema order: "
-        "expected ('ID', 'TITLE'), received ('TITLE', 'ID')"
+
+    result = convert_row(
+        source_row,
+        schema=schema,
+        row_number=3,
     )
 
-    with pytest.raises(
-        SourceFormatError,
-        match=re.escape(expected),
-    ):
-        convert_row(
-            source,
-            schema=schema,
-        )
+    assert result == {
+        "ID": 1,
+        "TITLE": "Example",
+    }
+    assert tuple(result) == schema.column_names
 
 
 def test_convert_row_rejects_missing_column() -> None:
@@ -970,7 +978,7 @@ def test_convert_row_rejects_missing_column() -> None:
 
     with pytest.raises(
         SourceFormatError,
-        match="columns do not match schema order",
+        match="columns do not match schema names",
     ):
         convert_row(
             source,
@@ -993,7 +1001,7 @@ def test_convert_row_rejects_unexpected_column() -> None:
 
     with pytest.raises(
         SourceFormatError,
-        match="columns do not match schema order",
+        match="columns do not match schema names",
     ):
         convert_row(
             source,
@@ -1050,7 +1058,7 @@ def test_convert_row_shape_error_contains_row_number() -> None:
 
     with pytest.raises(
         SourceFormatError,
-        match="Source row 8 columns do not match schema order",
+        match="Source row 8 columns do not match schema names",
     ):
         convert_row(
             source,

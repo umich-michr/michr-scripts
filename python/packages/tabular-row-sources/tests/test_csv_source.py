@@ -613,23 +613,41 @@ def test_duplicate_header_names_are_rejected(tmp_path: Path) -> None:
         collect_rows(source)
 
 
-@pytest.mark.parametrize(
-    "header",
-    [
-        "TITLE,ID",
-        "ID",
-        "ID,TITLE,EXTRA",
-        "id,TITLE",
-    ],
-    ids=["reordered", "missing", "extra", "wrong-case"],
-)
-def test_header_must_match_exact_schema_order(
+def test_reordered_header_is_accepted_and_output_uses_schema_order(
     tmp_path: Path,
-    header: str,
 ) -> None:
     path = write_csv(
         tmp_path,
-        f"{header}\n1,Example\n",
+        "TITLE,ID\nExample,1\n",
+    )
+    source = CsvRowSource(
+        path=path,
+        schema=simple_schema(),
+    )
+
+    rows = collect_rows(source)
+
+    assert rows == [{"ID": 1, "TITLE": "Example"}]
+    assert tuple(rows[0]) == simple_schema().column_names
+
+
+@pytest.mark.parametrize(
+    ("header", "record"),
+    [
+        ("ID", "1"),
+        ("ID,TITLE,EXTRA", "1,Example,unexpected"),
+        ("id,TITLE", "1,Example"),
+    ],
+    ids=["missing", "extra", "wrong-case"],
+)
+def test_header_names_must_match_schema(
+    tmp_path: Path,
+    header: str,
+    record: str,
+) -> None:
+    path = write_csv(
+        tmp_path,
+        f"{header}\n{record}\n",
     )
     source = CsvRowSource(
         path=path,
@@ -638,7 +656,7 @@ def test_header_must_match_exact_schema_order(
 
     with pytest.raises(
         SourceFormatError,
-        match="CSV header does not match schema order",
+        match="CSV header columns do not match schema names",
     ):
         collect_rows(source)
 

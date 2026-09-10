@@ -591,7 +591,8 @@ def convert_row(
 ) -> Row:
     """Validate and convert one mapping-shaped source row.
 
-    Source columns must exactly equal the schema columns in both name and order.
+    Source columns must have exactly the schema's case-sensitive names. Source
+    order may differ; the returned row always follows schema order.
 
     Parameters
     ----------
@@ -619,11 +620,16 @@ def convert_row(
         row_number=row_number,
     )
     expected_names = schema.column_names
+    actual_name_set = set(actual_names)
+    expected_name_set = set(expected_names)
 
-    if actual_names != expected_names:
+    missing = [name for name in expected_names if name not in actual_name_set]
+    unexpected = [name for name in actual_names if name not in expected_name_set]
+
+    if missing or unexpected:
         raise SourceFormatError(
-            f"{_row_context(row_number)} columns do not match schema order: "
-            f"expected {expected_names!r}, received {actual_names!r}"
+            f"{_row_context(row_number)} columns do not match schema names: "
+            f"missing {missing!r}; unexpected {unexpected!r}"
         )
 
     result: Row = {}

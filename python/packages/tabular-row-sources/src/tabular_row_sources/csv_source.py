@@ -15,7 +15,7 @@ from contextlib import AbstractContextManager, contextmanager
 import csv
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TextIO
+from typing import TextIO, cast
 
 from tabular_row_sources.conversion import convert_row
 from tabular_row_sources.errors import (
@@ -151,9 +151,10 @@ def _require_null_values(
     if not isinstance(value, frozenset):
         raise SourceConfigurationError("CSV null_values must be a frozenset of strings")
 
+    untyped_markers = cast("frozenset[object]", value)
     markers: set[str] = set()
 
-    for marker in value:
+    for marker in untyped_markers:
         if not isinstance(marker, str):
             raise SourceConfigurationError("CSV null_values must contain strings only")
 
@@ -174,7 +175,7 @@ def _validate_header(
     *,
     schema: RowSchema,
 ) -> None:
-    """Validate a CSV header against the exact schema."""
+    """Validate CSV header names against the schema."""
     if not header:
         raise SourceFormatError("CSV file does not contain a header row")
 
@@ -194,13 +195,17 @@ def _validate_header(
             f"CSV header contains duplicate column names: {duplicates}"
         )
 
-    actual = tuple(header)
-    expected = schema.column_names
+    expected_names = schema.column_names
+    actual_name_set = set(header)
+    expected_name_set = set(expected_names)
 
-    if actual != expected:
+    missing = [name for name in expected_names if name not in actual_name_set]
+    unexpected = [name for name in header if name not in expected_name_set]
+
+    if missing or unexpected:
         raise SourceFormatError(
-            "CSV header does not match schema order: "
-            f"expected {expected!r}, received {actual!r}"
+            "CSV header columns do not match schema names: "
+            f"missing {missing!r}; unexpected {unexpected!r}"
         )
 
 
@@ -239,12 +244,13 @@ def _iter_csv_rows(
     reader: Iterator[list[str]],
     *,
     path: Path,
+    header: tuple[str, ...],
     schema: RowSchema,
     null_values: frozenset[str],
 ) -> Iterator[Row]:
     """Lazily read, validate, and convert CSV data records."""
     record_number = 1
-    expected_count = len(schema)
+    expected_count = len(header)
 
     while True:
         try:
@@ -278,7 +284,7 @@ def _iter_csv_rows(
 
         source_row: dict[object, object] = dict(
             zip(
-                schema.column_names,
+                header,
                 source_values,
                 strict=True,
             )
@@ -413,6 +419,7 @@ class CsvRowSource:
             yield _iter_csv_rows(
                 reader,
                 path=self._path,
+                header=tuple(header),
                 schema=self._schema,
                 null_values=self._null_values,
             )
