@@ -179,6 +179,12 @@ REQUIRED_DOCUMENTS: dict[str, tuple[DocumentationRequirement, ...]] = {
             "the program README documents Oracle connection behavior",
         ),
     ),
+    f"{REPORT_PROGRAM}/src/study_posting_audit_report/database_config.py": (
+        (
+            REPORT_README,
+            "the program README documents database configuration",
+        ),
+    ),
 }
 
 # Advisory pairings: these changes often require documentation, but not every

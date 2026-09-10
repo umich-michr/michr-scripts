@@ -8,9 +8,8 @@ The program composes:
 - `study-posting-ai-analysis` for per-record study-posting analysis;
 - transitively, `text-post-edit-metrics` for generic text post-edit metrics.
 
-The current command-line client reads CSV input. Oracle database input is the
-next planned source mode. The public Python API also accepts any configured
-`RowSource`.
+The command-line client reads either CSV input or an Oracle query result. The
+public Python API also accepts any configured `RowSource`.
 
 ## Architecture
 
@@ -511,38 +510,176 @@ oracle
 The registry provides an extension point for future database adapters without
 changing report processing or row streaming.
 
-## Planned database command
+## Database command
 
-The next CLI increment will expose:
+Run an Oracle query and generate the normalized report:
 
-```text
-study-posting-audit-report database ...
+```bash
+uv run study-posting-audit-report database \
+  --dsn "database.example:1521/service" \
+  --username reporting_user
 ```
 
-It will use the implemented Oracle adapter, `DbApiQuerySource`, the canonical
-audit schema, and the local `input/audit-rows.sql` query.
+The command uses these defaults:
 
-The command will resolve:
+| Setting | Default |
+|---|---|
+| Driver | `oracle` |
+| SQL file | `python/programs/study-posting-audit-report/input/audit-rows.sql` |
+| Schema | `python/programs/study-posting-audit-report/input/audit-schema.json` |
+| Output directory | `output/study-posting-ai-audit-analysis/report/` |
+| Dotenv file | `.env` |
+| Fetch size | `500` |
+| SQL parameters | Empty mapping |
+| Include selected/final metric text | `false` |
 
-- database driver;
-- DSN;
-- username;
-- password;
-- SQL-file path;
-- schema path;
-- output directory;
-- fetch size;
-- optional SQL bind parameters;
-- text-inclusion and prompting flags.
+The local operational SQL file is ignored by Git. Create it by copying and
+adapting the sanitized example:
 
-The initial authentication mode is username and password. A literal password
-command-line option will not be provided. The password will be resolved from:
+```bash
+cp \
+  python/programs/study-posting-audit-report/input/audit-rows.example.sql \
+  python/programs/study-posting-audit-report/input/audit-rows.sql
+```
+
+Review the copied query before use:
+
+- replace the database-link placeholder;
+- replace account-exclusion placeholders according to approved local policy;
+- confirm the final projection matches `audit-schema.json`;
+- confirm the query returns at most one row per audit record ID;
+- do not add credentials to the SQL file.
+
+### Oracle connection
+
+The initial database command uses `python-oracledb` in thin mode.
+
+The DSN may be:
+
+- an Easy Connect string; or
+- a TNS alias resolvable by the local Oracle configuration.
+
+The command does not call `init_oracle_client()`.
+
+The initial authentication mode is username and password. There is deliberately
+no `--password` command-line option because command-line values can be exposed
+through shell history or process inspection.
+
+Resolve the password through:
 
 ```text
 STUDY_POSTING_AUDIT_DB_PASSWORD
 ```
 
-or requested through a non-echoing interactive prompt.
+in the process environment or `.env`. If it remains unresolved and prompting
+is enabled in an interactive terminal, the command requests it through a
+non-echoing secret prompt.
+
+### Database options
+
+```text
+--driver NAME
+--dsn VALUE
+--username VALUE
+--sql-file PATH
+--schema PATH
+--output PATH
+--fetch-size INTEGER
+--sql-params-json JSON
+--sql-param NAME=VALUE
+--include-text / --no-include-text
+--env-file PATH / --no-env-file
+--prompt / --no-prompt
+```
+
+The currently registered database driver is:
+
+```text
+oracle
+```
+
+Driver names are matched case-insensitively.
+
+### Database environment variables
+
+| Setting | Environment variable |
+|---|---|
+| Driver | `STUDY_POSTING_AUDIT_DB_DRIVER` |
+| DSN | `STUDY_POSTING_AUDIT_DB_DSN` |
+| Username | `STUDY_POSTING_AUDIT_DB_USERNAME` |
+| Password | `STUDY_POSTING_AUDIT_DB_PASSWORD` |
+| Fetch size | `STUDY_POSTING_AUDIT_DB_FETCH_SIZE` |
+| SQL file | `STUDY_POSTING_AUDIT_SQL_FILE` |
+| SQL parameters | `STUDY_POSTING_AUDIT_SQL_PARAMS` |
+| Schema | `STUDY_POSTING_AUDIT_SCHEMA` |
+| Output directory | `STUDY_POSTING_AUDIT_OUTPUT` |
+| Include metric text | `STUDY_POSTING_AUDIT_INCLUDE_TEXT` |
+| Dotenv path | `STUDY_POSTING_AUDIT_ENV_FILE` |
+| Prompting | `STUDY_POSTING_AUDIT_PROMPT` |
+
+### Parameterized SQL
+
+SQL bind parameters remain separate from SQL text.
+
+Provide a JSON object:
+
+```bash
+uv run study-posting-audit-report database \
+  --dsn "database.example:1521/service" \
+  --username reporting_user \
+  --sql-params-json '{"start_time":"2026-01-01","limit":100}'
+```
+
+Environment and dotenv configuration use the same JSON-object representation:
+
+```dotenv
+STUDY_POSTING_AUDIT_SQL_PARAMS={"start_time":"2026-01-01","limit":100}
+```
+
+Apply string-valued command-line overrides with repeated options:
+
+```bash
+uv run study-posting-audit-report database \
+  --dsn "database.example:1521/service" \
+  --username reporting_user \
+  --sql-params-json '{"status":"BASE","limit":100}' \
+  --sql-param status=COMPLETE \
+  --sql-param end_time=2026-02-01
+```
+
+Resolution for SQL parameters is:
+
+```text
+environment or dotenv JSON object
+→ replaced by --sql-params-json when supplied
+→ updated by repeated --sql-param NAME=VALUE options
+```
+
+JSON values retain their JSON types. Values supplied through `--sql-param` are
+strings. The first `=` separates the parameter name from its value, so a value
+may itself contain `=`.
+
+The final mapping is passed separately to the DB-API cursor. The program never
+interpolates bind values into SQL text.
+
+### Database execution flow
+
+```text
+database command
+      ↓
+layered configuration
+      ↓
+Oracle driver registry and deferred connection factory
+      ↓
+DbApiQuerySource
+      ↓
+study-posting audit processing
+      ↓
+records.csv + field_metrics.csv
+```
+
+Connections and cursors are opened lazily and closed by `DbApiQuerySource` after
+normal completion, early termination, or failure.
 
 ## Development
 

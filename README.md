@@ -46,8 +46,8 @@ Current runnable-program project:
 |---|---|
 | [`study-posting-audit-report`](python/programs/study-posting-audit-report/) | Produce normalized audit records and completed-AI field metrics from a configured row source |
 
-Its command-line entry point is planned; its current public Python API accepts a
-configured `RowSource`.
+Its command-line entry point supports CSV and Oracle database sources. Its
+public Python API also accepts a configured `RowSource`.
 
 ### Dependency direction
 

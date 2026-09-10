@@ -4,7 +4,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 import json
 from pathlib import Path
-from typing import cast
+from typing import Protocol, cast
 
 from program_configuration import (
     PromptProvider,
@@ -34,6 +34,25 @@ _CSV_ESCAPECHAR = "STUDY_POSTING_AUDIT_CSV_ESCAPECHAR"
 _CSV_NULL_VALUES = "STUDY_POSTING_AUDIT_CSV_NULL_VALUES"
 
 _DEFAULT_NULL_VALUES = ("", "\\N")
+
+
+class CommandConfigurationArguments(Protocol):
+    """Common unresolved arguments used before command-specific resolution."""
+
+    @property
+    def env_file(self) -> object:
+        """Return the unresolved dotenv-file argument."""
+        ...
+
+    @property
+    def no_env_file(self) -> bool:
+        """Return whether dotenv loading is disabled."""
+        ...
+
+    @property
+    def prompt_enabled(self) -> object:
+        """Return the unresolved prompting flag."""
+        ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -128,11 +147,11 @@ def _environment_value(
 
 
 def load_command_dotenv(
-    arguments: CsvCommandArguments,
+    arguments: CommandConfigurationArguments,
     *,
     environment: Mapping[str, object],
 ) -> dict[str, object]:
-    """Load the CSV command's selected dotenv file.
+    """Load the selected command dotenv file.
 
     The dotenv path is resolved before the main configuration because a dotenv
     file cannot select itself.
@@ -178,8 +197,8 @@ def load_command_dotenv(
     )
 
 
-def _resolve_prompt_enabled(
-    arguments: CsvCommandArguments,
+def resolve_prompt_enabled(
+    arguments: CommandConfigurationArguments,
     *,
     environment: Mapping[str, object],
     dotenv: Mapping[str, object],
@@ -329,7 +348,7 @@ def resolve_csv_command_config(
     prompt_provider: PromptProvider | None,
 ) -> CsvCommandConfig:
     """Resolve and type the CSV command configuration."""
-    prompting_enabled = _resolve_prompt_enabled(
+    prompting_enabled = resolve_prompt_enabled(
         arguments,
         environment=environment,
         dotenv=dotenv,
