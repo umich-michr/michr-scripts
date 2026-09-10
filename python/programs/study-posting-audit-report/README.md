@@ -457,30 +457,92 @@ On failure:
 Errors must not contain analysis payloads, free text, credentials, passwords, or
 secret-bearing connection strings.
 
+## Oracle connection adapter
+
+The program includes an Oracle connection adapter built on `python-oracledb`.
+
+The adapter:
+
+- uses python-oracledb thin mode;
+- does not call `init_oracle_client()`;
+- accepts an Easy Connect string or a locally resolvable TNS alias;
+- validates the DSN, username, and password;
+- creates connections lazily through a zero-argument factory;
+- leaves connection and cursor ownership to `DbApiQuerySource`.
+
+Example Python composition:
+
+```python
+from study_posting_audit_report.connections import OracleDriver
+from tabular_row_sources import (
+    DbApiQuerySource,
+    load_schema_json,
+    read_sql_file,
+)
+
+driver = OracleDriver()
+connect = driver.create_connect(
+    dsn=database_dsn,
+    username=database_username,
+    password=database_password,
+)
+
+source = DbApiQuerySource(
+    connect=connect,
+    sql=read_sql_file(sql_path),
+    schema=load_schema_json(schema_path),
+    parameters=sql_parameters,
+    fetch_size=500,
+)
+```
+
+SQL and bind parameters remain separate. `DbApiQuerySource` passes them
+separately to the database cursor and does not interpolate values into SQL.
+
+Connection creation belongs to this program. Generic query streaming and
+canonical row conversion remain in `tabular-row-sources`.
+
+The driver registry currently supports:
+
+```text
+oracle
+```
+
+The registry provides an extension point for future database adapters without
+changing report processing or row streaming.
+
 ## Planned database command
 
-Oracle database input is the next planned CLI increment:
+The next CLI increment will expose:
 
 ```text
 study-posting-audit-report database ...
 ```
 
-It will use the existing generic `DbApiQuerySource` and the local
-`input/audit-rows.sql` query.
+It will use the implemented Oracle adapter, `DbApiQuerySource`, the canonical
+audit schema, and the local `input/audit-rows.sql` query.
 
-The database command will add:
+The command will resolve:
 
-- Oracle thin-mode connection creation;
-- username/password configuration;
-- Easy Connect or locally resolvable TNS aliases;
-- parameterized SQL values passed separately from SQL text;
-- driver selection designed for future extension.
+- database driver;
+- DSN;
+- username;
+- password;
+- SQL-file path;
+- schema path;
+- output directory;
+- fetch size;
+- optional SQL bind parameters;
+- text-inclusion and prompting flags.
 
-Oracle connection policy will remain in this program. Generic row streaming
-will remain in `tabular-row-sources`.
+The initial authentication mode is username and password. A literal password
+command-line option will not be provided. The password will be resolved from:
 
+```text
+STUDY_POSTING_AUDIT_DB_PASSWORD
+```
 
-That CLI and configuration package are not yet implemented.
+or requested through a non-echoing interactive prompt.
 
 ## Development
 

@@ -19,6 +19,7 @@ authors = [{ name = "University of Michigan" }]
 keywords = ["study-posting", "audit-report", "llm-evaluation", "csv-report"]
 
 dependencies = [
+    "oracledb>=26.0.0",
     "program-configuration>=0.1.0",
     "study-posting-ai-analysis>=0.1.0",
     "tabular-row-sources>=0.1.0",

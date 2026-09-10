@@ -67,3 +67,13 @@ construct SQL by interpolating configuration values.
 
 Tests use synthetic rows and fake database connections. They must not require a
 live database or credentials.
+
+Oracle connection creation belongs in the report program. The generic
+`tabular-row-sources` package receives only a zero-argument connection factory.
+
+Use python-oracledb thin mode. Do not call `init_oracle_client()` unless a later
+documented requirement explicitly introduces thick mode.
+
+Do not include passwords in command-line options, representations, errors, or
+logs. Oracle tests must use injected or monkeypatched connectors and must not
+contact a live database.

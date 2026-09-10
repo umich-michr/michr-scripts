@@ -173,6 +173,12 @@ REQUIRED_DOCUMENTS: dict[str, tuple[DocumentationRequirement, ...]] = {
             "the program README documents command-line behavior",
         ),
     ),
+    f"{REPORT_PROGRAM}/src/study_posting_audit_report/connections/oracle.py": (
+        (
+            REPORT_README,
+            "the program README documents Oracle connection behavior",
+        ),
+    ),
 }
 
 # Advisory pairings: these changes often require documentation, but not every
@@ -248,6 +254,12 @@ ADVISORY_DOCUMENTS: dict[str, tuple[DocumentationRequirement, ...]] = {
         (
             REPORT_README,
             "the program README documents configuration inputs and defaults",
+        ),
+    ),
+    f"{REPORT_PROGRAM}/src/study_posting_audit_report/connections/registry.py": (
+        (
+            REPORT_README,
+            "the program README documents available database drivers",
         ),
     ),
     "Makefile": (("README.md", "the root README documents development commands"),),
