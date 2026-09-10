@@ -1,15 +1,17 @@
 """Pure transformation of canonical audit rows into field-level metrics.
 
-This module owns payload-state classification, source-column mapping, record-ID
+This module owns analysis selection, source-column mapping, record-ID
 validation, duplicate detection, and composition with
 ``study-posting-ai-analysis``.
+
+Every valid source row is preserved. Completed AI attempts are analyzed. Manual
+and incomplete attempts are preserved without field metrics.
 
 It performs no database access, file I/O, logging, aggregation, or output
 writing.
 """
 
 from collections.abc import Iterable, Iterator, Mapping
-from enum import Enum
 from typing import cast
 
 from study_posting_ai_analysis import (
@@ -22,12 +24,8 @@ from study_posting_audit_report.errors import AuditRowError, RecordId
 from study_posting_audit_report.models import ProcessedAuditRow
 from tabular_row_sources import Row, RowSchema
 
-
-class PayloadState(Enum):
-    """Valid presence states for one row's three analysis payloads."""
-
-    ANALYZABLE = "analyzable"
-    SKIPPED = "skipped"
+_ANALYZED_ATTEMPT_TYPE = "AI"
+_ANALYZED_ATTEMPT_RESULT = "COMPLETE"
 
 
 def validate_source_schema(
@@ -38,7 +36,7 @@ def validate_source_schema(
     """Require every configured audit column in the source schema.
 
     Extra source columns are permitted and preserved in ``records.csv``.
-    Required analysis columns may appear anywhere in the source schema.
+    Required columns may appear anywhere in the source schema.
 
     Parameters
     ----------
@@ -73,8 +71,6 @@ def _require_source_row(
             row_number=row_number,
         )
 
-    # Runtime validation establishes the outer mapping shape. The cast changes
-    # source element types from Unknown to object so keys can be narrowed.
     untyped_mapping = cast("Mapping[object, object]", value)
     row: dict[str, object] = {}
 
@@ -175,54 +171,74 @@ def extract_record_id(
     )
 
 
-def classify_payload_state(
+def _should_analyze_row(
     row: Mapping[str, object],
     *,
     config: AuditReportConfig,
     row_number: int,
     record_id: RecordId,
-) -> PayloadState:
-    """Classify the presence of one row's three analysis payloads.
+) -> bool:
+    """Return whether one source row must be analyzed.
 
-    All three null payloads produce ``PayloadState.SKIPPED``. All three
-    non-null payloads produce ``PayloadState.ANALYZABLE``. A mixture of null
-    and non-null payloads is an inconsistent source row.
-
-    Raises
-    ------
-    AuditRowError
-        If a configured payload column is absent or payload presence is
-        partial.
+    Manual attempts and incomplete AI attempts are skipped without inspecting
+    their analysis payloads. A completed AI attempt must have a non-null end
+    time and all three non-null analysis payloads.
     """
-    payloads = {
-        column_name: _required_value(
+    attempt_type = _required_value(
+        row,
+        column_name=config.columns.attempt_type,
+        row_number=row_number,
+        record_id=record_id,
+    )
+
+    if attempt_type != _ANALYZED_ATTEMPT_TYPE:
+        return False
+
+    attempt_result = _required_value(
+        row,
+        column_name=config.columns.attempt_result,
+        row_number=row_number,
+        record_id=record_id,
+    )
+
+    if attempt_result != _ANALYZED_ATTEMPT_RESULT:
+        return False
+
+    end_time = _required_value(
+        row,
+        column_name=config.columns.end_time,
+        row_number=row_number,
+        record_id=record_id,
+    )
+
+    if end_time is None:
+        raise AuditRowError(
+            f"completed AI row requires non-null column {config.columns.end_time!r}",
+            row_number=row_number,
+            record_id=record_id,
+        )
+
+    null_payload_columns = [
+        column_name
+        for column_name in config.columns.payload_columns
+        if _required_value(
             row,
             column_name=column_name,
             row_number=row_number,
             record_id=record_id,
         )
-        for column_name in config.columns.payload_columns
-    }
-    null_columns = [
-        column_name for column_name, value in payloads.items() if value is None
+        is None
     ]
 
-    if len(null_columns) == len(payloads):
-        return PayloadState.SKIPPED
+    if null_payload_columns:
+        raise AuditRowError(
+            "completed AI row requires all analysis payloads; "
+            f"null columns: {null_payload_columns}",
+            row_number=row_number,
+            record_id=record_id,
+        )
 
-    if not null_columns:
-        return PayloadState.ANALYZABLE
-
-    present_columns = [
-        column_name for column_name, value in payloads.items() if value is not None
-    ]
-
-    raise AuditRowError(
-        "analysis payloads must be either all null or all present; "
-        f"null columns: {null_columns}; present columns: {present_columns}",
-        row_number=row_number,
-        record_id=record_id,
-    )
+    return True
 
 
 def analyze_audit_row(
@@ -232,7 +248,7 @@ def analyze_audit_row(
     row_number: int,
     record_id: RecordId,
 ) -> tuple[dict[str, object], ...]:
-    """Analyze one row whose three payloads are present.
+    """Analyze one selected completed AI row.
 
     Parameters
     ----------
@@ -253,8 +269,8 @@ def analyze_audit_row(
     Raises
     ------
     AuditRowError
-        If required analysis payloads are absent, malformed, or violate
-        study-posting policy.
+        If required payloads are absent, malformed, or violate study-posting
+        policy.
     """
     suggested_value = _required_value(
         row,
@@ -313,10 +329,9 @@ def process_audit_rows(
 ) -> Iterator[ProcessedAuditRow]:
     """Process canonical source rows lazily.
 
-    Every source row produces one ``ProcessedAuditRow``. Rows with three null
-    payloads retain their source record but contain no metric rows. Rows with
-    three present payloads contain one metric row per analyzed study-posting
-    field. Partial payload presence is rejected.
+    Every source row produces one ``ProcessedAuditRow``. Manual and incomplete
+    attempts retain their source records but contain no metric rows. Completed
+    AI attempts contain one metric row per analyzed study-posting field.
 
     Record identifiers must be unique across the input stream.
 
@@ -335,8 +350,8 @@ def process_audit_rows(
     Raises
     ------
     AuditRowError
-        If a row is malformed, a record ID is invalid or duplicated, payload
-        presence is partial, or an analyzable row cannot be analyzed.
+        If a row is malformed, a record ID is invalid or duplicated, or a
+        completed AI row is inconsistent or cannot be analyzed.
     """
     seen_record_ids: set[RecordId] = set()
 
@@ -360,13 +375,12 @@ def process_audit_rows(
 
         seen_record_ids.add(record_id)
 
-        payload_state = classify_payload_state(
+        analyzed = _should_analyze_row(
             row,
             config=config,
             row_number=row_number,
             record_id=record_id,
         )
-        analyzed = payload_state is PayloadState.ANALYZABLE
 
         metric_rows = (
             analyze_audit_row(

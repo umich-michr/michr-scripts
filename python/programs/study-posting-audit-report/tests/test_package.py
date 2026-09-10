@@ -19,16 +19,15 @@ from study_posting_audit_report import (
     AuditRowError,
     AuditSourceError,
     CsvOutputOptions,
-    PayloadState,
     ProcessedAuditRow,
     analyze_audit_row,
-    classify_payload_state,
     extract_record_id,
     generate_csv_report,
     process_audit_rows,
     serialize_csv_value,
     validate_source_schema,
 )
+from tabular_row_sources import load_schema_json
 
 
 def test_package_is_not_an_implicit_namespace() -> None:
@@ -50,6 +49,9 @@ def test_default_column_mapping_matches_audit_export() -> None:
 
     assert mapping.required_columns == (
         "ID",
+        "END_TIME",
+        "ATTEMPT_TYPE",
+        "ATTEMPT_RESULT",
         "LLM_SUGGESTIONS",
         "SELECTED_SUGGESTIONS",
         "FINAL_SUBMISSION",
@@ -59,6 +61,22 @@ def test_default_column_mapping_matches_audit_export() -> None:
         "SELECTED_SUGGESTIONS",
         "FINAL_SUBMISSION",
     )
+
+
+def test_default_input_schema_matches_report_contract() -> None:
+    package_file = package.__file__
+
+    assert package_file is not None
+
+    program_directory = Path(package_file).parents[2]
+    schema_path = program_directory / "input" / "audit-schema.json"
+
+    schema = load_schema_json(schema_path)
+    required = AuditReportConfig().columns.required_columns
+
+    assert len(schema.columns) == 39
+    assert "STACK_TRACE" not in schema.column_names
+    assert all(name in schema.column_names for name in required)
 
 
 def test_default_report_config_excludes_free_text() -> None:
@@ -71,6 +89,9 @@ def test_default_report_config_excludes_free_text() -> None:
     "field_name",
     [
         "record_id",
+        "end_time",
+        "attempt_type",
+        "attempt_result",
         "llm_suggestions",
         "selected_suggestions",
         "final_submission",
@@ -79,6 +100,9 @@ def test_default_report_config_excludes_free_text() -> None:
 def test_column_mapping_rejects_blank_names(field_name: str) -> None:
     arguments = {
         "record_id": "ID",
+        "end_time": "END_TIME",
+        "attempt_type": "ATTEMPT_TYPE",
+        "attempt_result": "ATTEMPT_RESULT",
         "llm_suggestions": "LLM_SUGGESTIONS",
         "selected_suggestions": "SELECTED_SUGGESTIONS",
         "final_submission": "FINAL_SUBMISSION",
@@ -92,15 +116,88 @@ def test_column_mapping_rejects_blank_names(field_name: str) -> None:
         AuditColumnMapping(**arguments)
 
 
-def test_column_mapping_rejects_duplicate_names() -> None:
+@pytest.mark.parametrize(
+    ("field_name", "value"),
+    [
+        ("record_id", None),
+        ("end_time", 1),
+        ("attempt_type", object()),
+        ("attempt_result", False),
+        ("llm_suggestions", []),
+        ("selected_suggestions", {}),
+        ("final_submission", 1.5),
+    ],
+    ids=[
+        "record-id-none",
+        "end-time-integer",
+        "attempt-type-object",
+        "attempt-result-boolean",
+        "suggestions-list",
+        "selections-dictionary",
+        "final-float",
+    ],
+)
+def test_column_mapping_rejects_non_string_names(
+    field_name: str,
+    value: object,
+) -> None:
+    arguments: dict[str, object] = {
+        "record_id": "ID",
+        "end_time": "END_TIME",
+        "attempt_type": "ATTEMPT_TYPE",
+        "attempt_result": "ATTEMPT_RESULT",
+        "llm_suggestions": "LLM_SUGGESTIONS",
+        "selected_suggestions": "SELECTED_SUGGESTIONS",
+        "final_submission": "FINAL_SUBMISSION",
+    }
+    arguments[field_name] = value
+
+    with pytest.raises(
+        AuditReportConfigurationError,
+        match=f"{field_name} must be a nonblank string",
+    ):
+        AuditColumnMapping(**arguments)  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize(
+    ("field_name", "duplicate_value"),
+    [
+        ("end_time", "ID"),
+        ("attempt_type", "ID"),
+        ("attempt_result", "ID"),
+        ("llm_suggestions", "ID"),
+        ("selected_suggestions", "ID"),
+        ("final_submission", "ID"),
+    ],
+    ids=[
+        "end-time",
+        "attempt-type",
+        "attempt-result",
+        "suggestions",
+        "selections",
+        "final",
+    ],
+)
+def test_column_mapping_rejects_duplicate_names(
+    field_name: str,
+    duplicate_value: str,
+) -> None:
+    arguments = {
+        "record_id": "ID",
+        "end_time": "END_TIME",
+        "attempt_type": "ATTEMPT_TYPE",
+        "attempt_result": "ATTEMPT_RESULT",
+        "llm_suggestions": "LLM_SUGGESTIONS",
+        "selected_suggestions": "SELECTED_SUGGESTIONS",
+        "final_submission": "FINAL_SUBMISSION",
+    }
+    arguments[field_name] = duplicate_value
+
     with pytest.raises(
         AuditReportConfigurationError,
         match="must use unique source-column names",
     ):
-        AuditColumnMapping(
-            record_id="ID",
-            llm_suggestions="ID",
-        )
+        AuditColumnMapping(**arguments)
 
 
 def test_report_config_rejects_non_boolean_include_text() -> None:
@@ -111,6 +208,19 @@ def test_report_config_rejects_non_boolean_include_text() -> None:
         AuditReportConfig(
             include_text=1,  # type: ignore[arg-type]
         )
+
+
+def test_report_config_rejects_invalid_column_mapping() -> None:
+    invalid_columns = cast(
+        "AuditColumnMapping",
+        object(),
+    )
+
+    with pytest.raises(
+        AuditReportConfigurationError,
+        match="columns must be an AuditColumnMapping",
+    ):
+        AuditReportConfig(columns=invalid_columns)
 
 
 def test_report_summary_preserves_counts() -> None:
@@ -141,32 +251,20 @@ def test_program_exceptions_share_one_base_class() -> None:
     assert issubclass(AuditSourceError, AuditReportError)
 
 
-def test_report_config_rejects_invalid_column_mapping() -> None:
-    invalid_columns = cast(
-        "AuditColumnMapping",
-        object(),
-    )
-
-    with pytest.raises(
-        AuditReportConfigurationError,
-        match="columns must be an AuditColumnMapping",
-    ):
-        AuditReportConfig(columns=invalid_columns)
-
-
-def test_payload_state_values_are_stable() -> None:
-    assert PayloadState.ANALYZABLE.value == "analyzable"
-    assert PayloadState.SKIPPED.value == "skipped"
-
-
 def test_public_api_exports_processing_contract() -> None:
-    assert package.PayloadState is PayloadState
     assert package.ProcessedAuditRow is ProcessedAuditRow
     assert package.analyze_audit_row is analyze_audit_row
-    assert package.classify_payload_state is classify_payload_state
     assert package.extract_record_id is extract_record_id
     assert package.process_audit_rows is process_audit_rows
     assert package.validate_source_schema is validate_source_schema
+
+
+def test_removed_payload_state_api_is_not_exported() -> None:
+    assert "PayloadState" not in package.__all__
+    assert "classify_payload_state" not in package.__all__
+
+    assert not hasattr(package, "PayloadState")
+    assert not hasattr(package, "classify_payload_state")
 
 
 def test_removed_eligibility_api_is_not_exported() -> None:

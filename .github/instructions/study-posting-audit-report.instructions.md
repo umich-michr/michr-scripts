@@ -15,7 +15,7 @@ This runnable program composes:
 It owns:
 
 - source selection and source-column mapping;
-- payload-state policy;
+- completed-AI analysis-selection policy;
 - record identity and duplicate detection;
 - per-record error policy;
 - normalized report generation;
@@ -40,9 +40,10 @@ Default successful outputs are:
 `field_metrics.record_id` joins to the configured source ID column in
 `records.csv`.
 
-Record IDs must be non-null and unique. Rows with three null analysis payloads
-remain in `records.csv` without field metrics. Rows with partial payload
-presence raise `AuditRowError`.
+Record IDs must be non-null and unique. Manual and incomplete attempts remain in
+`records.csv` without field metrics. Completed AI attempts require a non-null
+end time and all three analysis payloads; inconsistent completed AI rows raise
+`AuditRowError`.
 
 Free text remains excluded by default.
 

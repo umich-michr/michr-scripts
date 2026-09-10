@@ -80,21 +80,19 @@ For the compensation Boolean:
 - the suggested value represents the AI recommendation;
 - the final value represents what the user ultimately saved.
 
-### Upstream dataset selection and source mapping
+### Upstream report selection and source mapping
 
-A reporting source may select completed AI attempts upstream, for example:
+A reporting source may return manual, incomplete AI, and completed AI attempts.
+The reporting program preserves all successfully processed source rows.
+
+`study-posting-audit-report` selects a row for study analysis when:
 
 ```text
 ATTEMPT_TYPE = 'AI'
 ATTEMPT_RESULT = 'COMPLETE'
 ```
 
-That filter is not required or enforced by either `study-posting-ai-analysis` or `study-posting-audit-report`. The reportingprogram determines row handling from the presence of its three analysis payloads:
-
-- all three payloads present: analyze the row;
-- all three payloads null: skip analysis while preserving the source record;
-- partial payload presence: reject the inconsistent row.
-
+A selected row must also have a non-null completion time and all three analysispayloads. Manual and incomplete rows are preserved without field analysis.
 The reporting program maps source columns to library inputs:
 
 | Source column | Library input |
@@ -103,29 +101,7 @@ The reporting program maps source columns to library inputs:
 | `SELECTED_SUGGESTIONS` | Selected object |
 | `FINAL_SUBMISSION` | Final object |
 
-Upstream filtering, payload-state policy, and source mapping are not enforced by `study-posting-ai-analysis`.
-
-The library performs no:
-
-- database access;
-- SQL execution;
-- record eligibility filtering;
-- CSV or filesystem I/O;
-- DataFrame construction;
-- logging;
-- command-line processing;
-- batch iteration;
-- report publication.
-
-A consuming program is responsible for:
-
-- obtaining records;
-- selecting eligible records;
-- mapping source fields to the three inputs;
-- assigning record identifiers;
-- handling per-record failures;
-- aggregating results;
-- writing output.
+Source selection, attempt classification, conditional payload requirements, andsource-column mapping are not enforced by study-posting-ai-analysis.
 
 ---
 

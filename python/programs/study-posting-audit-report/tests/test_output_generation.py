@@ -3,7 +3,7 @@
 from collections.abc import Generator, Iterator
 from contextlib import AbstractContextManager, contextmanager
 import csv
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
 from typing import cast
@@ -108,6 +108,11 @@ def audit_schema() -> RowSchema:
                 data_type=ColumnType.INTEGER,
             ),
             ColumnSpec(
+                name="END_TIME",
+                data_type=ColumnType.DATETIME,
+                nullable=True,
+            ),
+            ColumnSpec(
                 name="ATTEMPT_TYPE",
                 data_type=ColumnType.STRING,
             ),
@@ -149,60 +154,19 @@ def audit_schema() -> RowSchema:
     )
 
 
-def audit_schema_without_attempt_columns() -> RowSchema:
-    """Return a valid source schema without attempt provenance columns."""
-    return RowSchema(
-        columns=(
-            ColumnSpec(
-                name="ID",
-                data_type=ColumnType.INTEGER,
-            ),
-            ColumnSpec(
-                name="STUDY_NUM",
-                data_type=ColumnType.STRING,
-                nullable=True,
-            ),
-            ColumnSpec(
-                name="CREATED_DATE",
-                data_type=ColumnType.DATE,
-                nullable=True,
-            ),
-            ColumnSpec(
-                name="LATENCY_MS",
-                data_type=ColumnType.DECIMAL,
-                nullable=True,
-            ),
-            ColumnSpec(
-                name="LLM_SUGGESTIONS",
-                data_type=ColumnType.JSON_OBJECT,
-                nullable=True,
-            ),
-            ColumnSpec(
-                name="SELECTED_SUGGESTIONS",
-                data_type=ColumnType.JSON_OBJECT,
-                nullable=True,
-            ),
-            ColumnSpec(
-                name="FINAL_SUBMISSION",
-                data_type=ColumnType.JSON_OBJECT,
-                nullable=True,
-            ),
-        )
-    )
-
-
-def analyzable_row(
+def completed_ai_row(
     *,
     record_id: int = 1001,
 ) -> Row:
-    """Return one valid source row with all analysis payloads present."""
+    """Return one valid completed AI source row."""
     suggested, selected, final = valid_analysis_objects()
 
     return {
         "ID": record_id,
+        "END_TIME": datetime.fromisoformat("2026-09-09T15:04:35.123456"),
         "ATTEMPT_TYPE": "AI",
         "ATTEMPT_RESULT": "COMPLETE",
-        "STUDY_NUM": "HUM00000001",
+        "STUDY_NUM": "SYNTHETIC-0001",
         "CREATED_DATE": date(2026, 9, 9),
         "LATENCY_MS": Decimal("125.50"),
         "LLM_SUGGESTIONS": suggested,
@@ -211,30 +175,44 @@ def analyzable_row(
     }
 
 
-def skipped_row(
+def manual_row(
     *,
     record_id: int = 1002,
 ) -> Row:
-    """Return one source row with all analysis payloads null."""
+    """Return one completed manual row preserved without analysis."""
+    _, _, final = valid_analysis_objects()
+
     return {
         "ID": record_id,
+        "END_TIME": datetime.fromisoformat("2026-09-09T15:04:35"),
         "ATTEMPT_TYPE": "MANUAL",
         "ATTEMPT_RESULT": "COMPLETE",
-        "STUDY_NUM": "HUM00000002",
+        "STUDY_NUM": "SYNTHETIC-0002",
+        "CREATED_DATE": None,
+        "LATENCY_MS": None,
+        "LLM_SUGGESTIONS": None,
+        "SELECTED_SUGGESTIONS": None,
+        "FINAL_SUBMISSION": final,
+    }
+
+
+def incomplete_ai_row(
+    *,
+    record_id: int = 1003,
+    attempt_result: str = "USER_DROPPED",
+) -> Row:
+    """Return one incomplete AI row preserved without analysis."""
+    return {
+        "ID": record_id,
+        "END_TIME": None,
+        "ATTEMPT_TYPE": "AI",
+        "ATTEMPT_RESULT": attempt_result,
+        "STUDY_NUM": "SYNTHETIC-0003",
         "CREATED_DATE": None,
         "LATENCY_MS": None,
         "LLM_SUGGESTIONS": None,
         "SELECTED_SUGGESTIONS": None,
         "FINAL_SUBMISSION": None,
-    }
-
-
-def without_attempt_columns(row: Row) -> Row:
-    """Return a fresh row without attempt provenance columns."""
-    return {
-        column_name: value
-        for column_name, value in row.items()
-        if column_name not in {"ATTEMPT_TYPE", "ATTEMPT_RESULT"}
     }
 
 
@@ -317,8 +295,9 @@ def test_generate_report_writes_two_files_and_summary(
     source = InMemoryRowSource(
         schema=audit_schema(),
         rows=[
-            skipped_row(record_id=1001),
-            analyzable_row(record_id=1002),
+            manual_row(record_id=1001),
+            incomplete_ai_row(record_id=1002),
+            completed_ai_row(record_id=1003),
         ],
     )
     output_directory = tmp_path / "report"
@@ -336,10 +315,10 @@ def test_generate_report_writes_two_files_and_summary(
     assert report.records_path.is_file()
     assert report.field_metrics_path.is_file()
 
-    assert report.summary.source_rows == 2
+    assert report.summary.source_rows == 3
     assert report.summary.analyzable_rows == 1
     assert report.summary.analyzed_rows == 1
-    assert report.summary.skipped_rows == 1
+    assert report.summary.skipped_rows == 2
     assert report.summary.failed_rows == 0
     assert report.summary.metric_rows == 12
 
@@ -354,8 +333,9 @@ def test_records_csv_preserves_schema_columns_and_every_source_row(
     source = InMemoryRowSource(
         schema=audit_schema(),
         rows=[
-            skipped_row(record_id=1001),
-            analyzable_row(record_id=1002),
+            manual_row(record_id=1001),
+            incomplete_ai_row(record_id=1002),
+            completed_ai_row(record_id=1003),
         ],
     )
 
@@ -367,71 +347,57 @@ def test_records_csv_preserves_schema_columns_and_every_source_row(
     header, rows = read_csv_rows(report.records_path)
 
     assert tuple(header) == audit_schema().column_names
-    assert len(rows) == 2
+    assert len(rows) == 3
 
     assert rows[0]["ID"] == "1001"
     assert rows[0]["ATTEMPT_TYPE"] == "MANUAL"
+    assert rows[0]["ATTEMPT_RESULT"] == "COMPLETE"
+    assert rows[0]["END_TIME"] == "2026-09-09T15:04:35"
     assert rows[0]["CREATED_DATE"] == "\\N"
     assert rows[0]["LATENCY_MS"] == "\\N"
     assert rows[0]["LLM_SUGGESTIONS"] == "\\N"
+    assert rows[0]["FINAL_SUBMISSION"].startswith("{")
 
     assert rows[1]["ID"] == "1002"
     assert rows[1]["ATTEMPT_TYPE"] == "AI"
-    assert rows[1]["CREATED_DATE"] == "2026-09-09"
-    assert rows[1]["LATENCY_MS"] == "125.50"
+    assert rows[1]["ATTEMPT_RESULT"] == "USER_DROPPED"
+    assert rows[1]["END_TIME"] == "\\N"
+    assert rows[1]["LLM_SUGGESTIONS"] == "\\N"
+    assert rows[1]["SELECTED_SUGGESTIONS"] == "\\N"
+    assert rows[1]["FINAL_SUBMISSION"] == "\\N"
 
-    suggestions = rows[1]["LLM_SUGGESTIONS"]
+    assert rows[2]["ID"] == "1003"
+    assert rows[2]["ATTEMPT_TYPE"] == "AI"
+    assert rows[2]["ATTEMPT_RESULT"] == "COMPLETE"
+    assert rows[2]["END_TIME"] == "2026-09-09T15:04:35.123456"
+    assert rows[2]["CREATED_DATE"] == "2026-09-09"
+    assert rows[2]["LATENCY_MS"] == "125.50"
+
+    suggestions = rows[2]["LLM_SUGGESTIONS"]
 
     assert suggestions.startswith("{")
     assert '"title":["Title suggestion"]' in suggestions
 
 
-def test_report_does_not_require_attempt_columns(
+def test_only_completed_ai_rows_produce_field_metrics(
     tmp_path: Path,
 ) -> None:
-    source = InMemoryRowSource(
-        schema=audit_schema_without_attempt_columns(),
-        rows=[
-            without_attempt_columns(skipped_row(record_id=1001)),
-            without_attempt_columns(analyzable_row(record_id=1002)),
-        ],
-    )
+    manual = manual_row(record_id=1001)
+    manual["LLM_SUGGESTIONS"] = "not-json"
+    manual["SELECTED_SUGGESTIONS"] = "also-not-json"
 
-    report = generate_csv_report(
-        source,
-        output_directory=tmp_path / "report",
-    )
+    incomplete = incomplete_ai_row(record_id=1002)
+    incomplete["LLM_SUGGESTIONS"] = "not-json"
+    incomplete["SELECTED_SUGGESTIONS"] = "also-not-json"
 
-    header, records = read_csv_rows(report.records_path)
-
-    assert tuple(header) == audit_schema_without_attempt_columns().column_names
-    assert "ATTEMPT_TYPE" not in header
-    assert "ATTEMPT_RESULT" not in header
-    assert len(records) == 2
-
-    assert report.summary.source_rows == 2
-    assert report.summary.analyzable_rows == 1
-    assert report.summary.analyzed_rows == 1
-    assert report.summary.skipped_rows == 1
-    assert report.summary.metric_rows == 12
-
-
-def test_attempt_values_do_not_control_analysis(
-    tmp_path: Path,
-) -> None:
-    present_payload_row = analyzable_row(record_id=1001)
-    present_payload_row["ATTEMPT_TYPE"] = "MANUAL"
-    present_payload_row["ATTEMPT_RESULT"] = "FAILED"
-
-    null_payload_row = skipped_row(record_id=1002)
-    null_payload_row["ATTEMPT_TYPE"] = "AI"
-    null_payload_row["ATTEMPT_RESULT"] = "COMPLETE"
+    completed = completed_ai_row(record_id=1003)
 
     source = InMemoryRowSource(
         schema=audit_schema(),
         rows=[
-            present_payload_row,
-            null_payload_row,
+            manual,
+            incomplete,
+            completed,
         ],
     )
 
@@ -440,14 +406,17 @@ def test_attempt_values_do_not_control_analysis(
         output_directory=tmp_path / "report",
     )
 
+    _, record_rows = read_csv_rows(report.records_path)
     _, metric_rows = read_csv_rows(report.field_metrics_path)
 
-    assert report.summary.source_rows == 2
+    assert len(record_rows) == 3
+    assert report.summary.source_rows == 3
     assert report.summary.analyzable_rows == 1
     assert report.summary.analyzed_rows == 1
-    assert report.summary.skipped_rows == 1
+    assert report.summary.skipped_rows == 2
+    assert report.summary.failed_rows == 0
     assert report.summary.metric_rows == 12
-    assert {row["record_id"] for row in metric_rows} == {"1001"}
+    assert {row["record_id"] for row in metric_rows} == {"1003"}
 
 
 def test_field_metrics_csv_uses_canonical_columns(
@@ -455,7 +424,7 @@ def test_field_metrics_csv_uses_canonical_columns(
 ) -> None:
     source = InMemoryRowSource(
         schema=audit_schema(),
-        rows=[analyzable_row()],
+        rows=[completed_ai_row()],
     )
 
     report = generate_csv_report(
@@ -489,7 +458,7 @@ def test_field_metrics_exclude_free_text_by_default(
 ) -> None:
     source = InMemoryRowSource(
         schema=audit_schema(),
-        rows=[analyzable_row()],
+        rows=[completed_ai_row()],
     )
 
     report = generate_csv_report(
@@ -508,7 +477,7 @@ def test_field_metrics_include_text_when_enabled(
 ) -> None:
     source = InMemoryRowSource(
         schema=audit_schema(),
-        rows=[analyzable_row()],
+        rows=[completed_ai_row()],
     )
 
     report = generate_csv_report(
@@ -558,7 +527,7 @@ def test_custom_output_options_apply_to_both_files(
 ) -> None:
     source = InMemoryRowSource(
         schema=audit_schema(),
-        rows=[skipped_row()],
+        rows=[manual_row()],
     )
     output_directory = tmp_path / "report"
 
@@ -771,8 +740,8 @@ def test_duplicate_record_id_publishes_nothing(
     source = InMemoryRowSource(
         schema=audit_schema(),
         rows=[
-            skipped_row(record_id=1001),
-            analyzable_row(record_id=1001),
+            manual_row(record_id=1001),
+            completed_ai_row(record_id=1001),
         ],
     )
     output_directory = tmp_path / "report"
@@ -791,11 +760,11 @@ def test_duplicate_record_id_publishes_nothing(
     assert staging_directories(tmp_path, "report") == []
 
 
-def test_partial_payload_presence_publishes_nothing(
+def test_completed_ai_row_with_missing_payload_publishes_nothing(
     tmp_path: Path,
 ) -> None:
-    row = skipped_row()
-    row["LLM_SUGGESTIONS"] = valid_analysis_objects()[0]
+    row = completed_ai_row()
+    row["SELECTED_SUGGESTIONS"] = None
 
     source = InMemoryRowSource(
         schema=audit_schema(),
@@ -805,7 +774,33 @@ def test_partial_payload_presence_publishes_nothing(
 
     with pytest.raises(
         AuditRowError,
-        match="analysis payloads must be either all null or all present",
+        match="completed AI row requires all analysis payloads",
+    ):
+        generate_csv_report(
+            source,
+            output_directory=output_directory,
+        )
+
+    assert source.closed is True
+    assert not output_directory.exists()
+    assert staging_directories(tmp_path, "report") == []
+
+
+def test_completed_ai_row_without_end_time_publishes_nothing(
+    tmp_path: Path,
+) -> None:
+    row = completed_ai_row()
+    row["END_TIME"] = None
+
+    source = InMemoryRowSource(
+        schema=audit_schema(),
+        rows=[row],
+    )
+    output_directory = tmp_path / "report"
+
+    with pytest.raises(
+        AuditRowError,
+        match="completed AI row requires non-null column 'END_TIME'",
     ):
         generate_csv_report(
             source,
@@ -820,7 +815,7 @@ def test_partial_payload_presence_publishes_nothing(
 def test_analysis_failure_publishes_nothing(
     tmp_path: Path,
 ) -> None:
-    row = analyzable_row()
+    row = completed_ai_row()
     final = row["FINAL_SUBMISSION"]
 
     assert isinstance(final, dict)
@@ -852,7 +847,7 @@ def test_row_source_failure_is_wrapped_and_publishes_nothing(
 ) -> None:
     source = InMemoryRowSource(
         schema=audit_schema(),
-        rows=[skipped_row()],
+        rows=[manual_row()],
         failure=SourceExecutionError("source failed"),
     )
     output_directory = tmp_path / "report"
@@ -875,7 +870,7 @@ def test_row_source_failure_is_wrapped_and_publishes_nothing(
 def test_reserved_null_marker_string_publishes_nothing(
     tmp_path: Path,
 ) -> None:
-    row = skipped_row()
+    row = manual_row()
     row["STUDY_NUM"] = "\\N"
 
     source = InMemoryRowSource(
@@ -911,7 +906,7 @@ def test_unsupported_output_value_publishes_nothing(
             ),
         )
     )
-    row = skipped_row()
+    row = manual_row()
     row["UNSUPPORTED"] = cast("str", ["not", "serializable"])
 
     source = InMemoryRowSource(

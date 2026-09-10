@@ -23,10 +23,10 @@ class ProcessedAuditRow:
     record
         Fresh copy of the complete canonical source row.
     analyzed
-        Whether all three analysis payloads were present and successfully
-        analyzed.
+        Whether the row was a completed AI attempt and was successfully
+    analyzed.
     metric_rows
-        Flattened field-metric rows. Empty when all three payloads were null.
+        Flattened field-metric rows. Empty for manual and incomplete attempts.
     """
 
     source_row_number: int
@@ -45,11 +45,11 @@ class AuditReportSummary:
     source_rows
         Total source rows read.
     analyzable_rows
-        Rows where all three analysis payloads were present.
+        Completed AI rows selected for analysis.
     analyzed_rows
         Analyzable rows successfully analyzed.
     skipped_rows
-        Rows where all three analysis payloads were null.
+        Manual and incomplete rows preserved without analysis.
     failed_rows
         Analyzable rows that failed under a non-fail-fast policy. This remains
         zero while the program uses fail-fast processing.

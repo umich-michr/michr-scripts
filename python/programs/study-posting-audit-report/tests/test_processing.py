@@ -1,6 +1,7 @@
-"""Tests for pure audit-row payload classification and analysis processing."""
+"""Tests for pure audit-row selection and analysis processing."""
 
 from collections.abc import Iterable, Iterator
+from datetime import datetime
 from typing import cast
 
 import pytest
@@ -9,10 +10,8 @@ from study_posting_audit_report import (
     AuditColumnMapping,
     AuditReportConfig,
     AuditRowError,
-    PayloadState,
     ProcessedAuditRow,
     analyze_audit_row,
-    classify_payload_state,
     extract_record_id,
     process_audit_rows,
     validate_source_schema,
@@ -106,6 +105,19 @@ def source_schema(
             data_type=ColumnType.INTEGER,
         ),
         ColumnSpec(
+            name="END_TIME",
+            data_type=ColumnType.DATETIME,
+            nullable=True,
+        ),
+        ColumnSpec(
+            name="ATTEMPT_TYPE",
+            data_type=ColumnType.STRING,
+        ),
+        ColumnSpec(
+            name="ATTEMPT_RESULT",
+            data_type=ColumnType.STRING,
+        ),
+        ColumnSpec(
             name="LLM_SUGGESTIONS",
             data_type=ColumnType.JSON_OBJECT,
             nullable=True,
@@ -134,33 +146,59 @@ def source_schema(
     return RowSchema(columns=tuple(columns))
 
 
-def analyzable_source_row(
+def completed_ai_source_row(
     *,
     record_id: object = 1001,
 ) -> Row:
-    """Return one valid source row with all analysis payloads present."""
+    """Return one valid completed AI source row."""
     suggested, selected, final = valid_analysis_objects()
 
     return {
         "ID": record_id,
+        "END_TIME": datetime.fromisoformat("2026-05-18T09:07:38"),
+        "ATTEMPT_TYPE": "AI",
+        "ATTEMPT_RESULT": "COMPLETE",
         "LLM_SUGGESTIONS": suggested,
         "SELECTED_SUGGESTIONS": selected,
         "FINAL_SUBMISSION": final,
-        "STUDY_NUM": "HUM00000001",
+        "STUDY_NUM": "SYNTHETIC-0001",
     }
 
 
-def skipped_source_row(
+def manual_source_row(
     *,
     record_id: object = 1002,
 ) -> Row:
-    """Return one source row with all analysis payloads null."""
+    """Return one completed manual row with only a final payload."""
+    _, _, final = valid_analysis_objects()
+
     return {
         "ID": record_id,
+        "END_TIME": datetime.fromisoformat("2026-05-18T10:00:00"),
+        "ATTEMPT_TYPE": "MANUAL",
+        "ATTEMPT_RESULT": "COMPLETE",
+        "LLM_SUGGESTIONS": None,
+        "SELECTED_SUGGESTIONS": None,
+        "FINAL_SUBMISSION": final,
+        "STUDY_NUM": "SYNTHETIC-0002",
+    }
+
+
+def incomplete_ai_source_row(
+    *,
+    record_id: object = 1003,
+    attempt_result: object = "USER_DROPPED",
+) -> Row:
+    """Return one incomplete AI row with absent analysis values."""
+    return {
+        "ID": record_id,
+        "END_TIME": None,
+        "ATTEMPT_TYPE": "AI",
+        "ATTEMPT_RESULT": attempt_result,
         "LLM_SUGGESTIONS": None,
         "SELECTED_SUGGESTIONS": None,
         "FINAL_SUBMISSION": None,
-        "STUDY_NUM": "HUM00000002",
+        "STUDY_NUM": "SYNTHETIC-0003",
     }
 
 
@@ -198,18 +236,6 @@ def test_source_schema_accepts_required_columns_in_any_position() -> None:
     )
 
 
-def test_source_schema_does_not_require_attempt_columns() -> None:
-    schema = source_schema()
-
-    assert "ATTEMPT_TYPE" not in schema.column_names
-    assert "ATTEMPT_RESULT" not in schema.column_names
-
-    validate_source_schema(
-        schema,
-        config=AuditReportConfig(),
-    )
-
-
 def test_source_schema_rejects_missing_required_columns() -> None:
     schema = RowSchema(
         columns=(
@@ -231,6 +257,9 @@ def test_source_schema_rejects_missing_required_columns() -> None:
 
     message = str(captured.value)
 
+    assert "END_TIME" in message
+    assert "ATTEMPT_TYPE" in message
+    assert "ATTEMPT_RESULT" in message
     assert "LLM_SUGGESTIONS" in message
     assert "SELECTED_SUGGESTIONS" in message
     assert "FINAL_SUBMISSION" in message
@@ -240,6 +269,9 @@ def test_source_schema_uses_custom_column_mapping() -> None:
     config = AuditReportConfig(
         columns=AuditColumnMapping(
             record_id="AUDIT_ID",
+            end_time="FINISHED_AT",
+            attempt_type="TYPE",
+            attempt_result="RESULT",
             llm_suggestions="SUGGESTED",
             selected_suggestions="SELECTED",
             final_submission="FINAL",
@@ -248,9 +280,28 @@ def test_source_schema_uses_custom_column_mapping() -> None:
     schema = RowSchema(
         columns=(
             ColumnSpec("AUDIT_ID", ColumnType.INTEGER),
-            ColumnSpec("SUGGESTED", ColumnType.JSON_OBJECT),
-            ColumnSpec("SELECTED", ColumnType.JSON_OBJECT),
-            ColumnSpec("FINAL", ColumnType.JSON_OBJECT),
+            ColumnSpec(
+                "FINISHED_AT",
+                ColumnType.DATETIME,
+                nullable=True,
+            ),
+            ColumnSpec("TYPE", ColumnType.STRING),
+            ColumnSpec("RESULT", ColumnType.STRING),
+            ColumnSpec(
+                "SUGGESTED",
+                ColumnType.JSON_OBJECT,
+                nullable=True,
+            ),
+            ColumnSpec(
+                "SELECTED",
+                ColumnType.JSON_OBJECT,
+                nullable=True,
+            ),
+            ColumnSpec(
+                "FINAL",
+                ColumnType.JSON_OBJECT,
+                nullable=True,
+            ),
         )
     )
 
@@ -376,175 +427,13 @@ def test_extract_record_id_rejects_unsupported_type(
 
 
 # ---------------------------------------------------------------------------
-# Payload-state classification
-# ---------------------------------------------------------------------------
-
-
-def test_three_present_payloads_are_analyzable() -> None:
-    state = classify_payload_state(
-        analyzable_source_row(),
-        config=AuditReportConfig(),
-        row_number=1,
-        record_id=1001,
-    )
-
-    assert state is PayloadState.ANALYZABLE
-
-
-def test_three_null_payloads_are_skipped() -> None:
-    state = classify_payload_state(
-        skipped_source_row(),
-        config=AuditReportConfig(),
-        row_number=1,
-        record_id=1002,
-    )
-
-    assert state is PayloadState.SKIPPED
-
-
-@pytest.mark.parametrize(
-    "present_columns",
-    [
-        {"LLM_SUGGESTIONS"},
-        {"SELECTED_SUGGESTIONS"},
-        {"FINAL_SUBMISSION"},
-        {"LLM_SUGGESTIONS", "SELECTED_SUGGESTIONS"},
-        {"LLM_SUGGESTIONS", "FINAL_SUBMISSION"},
-        {"SELECTED_SUGGESTIONS", "FINAL_SUBMISSION"},
-    ],
-    ids=[
-        "suggested-only",
-        "selected-only",
-        "final-only",
-        "suggested-and-selected",
-        "suggested-and-final",
-        "selected-and-final",
-    ],
-)
-def test_partial_payload_presence_is_rejected(
-    present_columns: set[str],
-) -> None:
-    suggested, selected, final = valid_analysis_objects()
-    values: dict[str, object] = {
-        "LLM_SUGGESTIONS": suggested,
-        "SELECTED_SUGGESTIONS": selected,
-        "FINAL_SUBMISSION": final,
-    }
-    row: Row = {
-        "ID": 1001,
-        **{
-            column: value if column in present_columns else None
-            for column, value in values.items()
-        },
-    }
-
-    with pytest.raises(
-        AuditRowError,
-        match="analysis payloads must be either all null or all present",
-    ) as captured:
-        classify_payload_state(
-            row,
-            config=AuditReportConfig(),
-            row_number=4,
-            record_id=1001,
-        )
-
-    assert captured.value.row_number == 4
-    assert captured.value.record_id == 1001
-
-
-def test_partial_payload_error_identifies_presence_without_payload_values() -> None:
-    confidential_value = "CONFIDENTIAL-PAYLOAD-CONTENT"
-    row: Row = {
-        "ID": 1001,
-        "LLM_SUGGESTIONS": confidential_value,
-        "SELECTED_SUGGESTIONS": None,
-        "FINAL_SUBMISSION": None,
-    }
-
-    with pytest.raises(AuditRowError) as captured:
-        classify_payload_state(
-            row,
-            config=AuditReportConfig(),
-            row_number=8,
-            record_id=1001,
-        )
-
-    message = str(captured.value)
-
-    assert "LLM_SUGGESTIONS" in message
-    assert "SELECTED_SUGGESTIONS" in message
-    assert "FINAL_SUBMISSION" in message
-    assert confidential_value not in message
-
-
-@pytest.mark.parametrize(
-    "missing_column",
-    [
-        "LLM_SUGGESTIONS",
-        "SELECTED_SUGGESTIONS",
-        "FINAL_SUBMISSION",
-    ],
-)
-def test_payload_classification_rejects_missing_column(
-    missing_column: str,
-) -> None:
-    row = analyzable_source_row()
-    del row[missing_column]
-
-    with pytest.raises(
-        AuditRowError,
-        match=f"source row is missing required column '{missing_column}'",
-    ) as captured:
-        classify_payload_state(
-            row,
-            config=AuditReportConfig(),
-            row_number=5,
-            record_id=1001,
-        )
-
-    assert captured.value.row_number == 5
-    assert captured.value.record_id == 1001
-
-
-def test_attempt_values_do_not_influence_analyzable_state() -> None:
-    row = analyzable_source_row()
-    row["ATTEMPT_TYPE"] = "MANUAL"
-    row["ATTEMPT_RESULT"] = "FAILED"
-
-    state = classify_payload_state(
-        row,
-        config=AuditReportConfig(),
-        row_number=1,
-        record_id=1001,
-    )
-
-    assert state is PayloadState.ANALYZABLE
-
-
-def test_attempt_values_do_not_influence_skipped_state() -> None:
-    row = skipped_source_row()
-    row["ATTEMPT_TYPE"] = "AI"
-    row["ATTEMPT_RESULT"] = "COMPLETE"
-
-    state = classify_payload_state(
-        row,
-        config=AuditReportConfig(),
-        row_number=1,
-        record_id=1002,
-    )
-
-    assert state is PayloadState.SKIPPED
-
-
-# ---------------------------------------------------------------------------
-# Audit-row analysis
+# Completed AI-row analysis
 # ---------------------------------------------------------------------------
 
 
 def test_analyze_audit_row_produces_one_metric_row_per_field() -> None:
     metric_rows = analyze_audit_row(
-        analyzable_source_row(),
+        completed_ai_source_row(),
         config=AuditReportConfig(),
         row_number=1,
         record_id=1001,
@@ -569,7 +458,7 @@ def test_analyze_audit_row_produces_one_metric_row_per_field() -> None:
 
 def test_analyze_audit_row_carries_record_id_to_every_metric() -> None:
     metric_rows = analyze_audit_row(
-        analyzable_source_row(),
+        completed_ai_source_row(),
         config=AuditReportConfig(),
         row_number=1,
         record_id="audit-1001",
@@ -580,7 +469,7 @@ def test_analyze_audit_row_carries_record_id_to_every_metric() -> None:
 
 def test_analyze_audit_row_excludes_text_by_default() -> None:
     metric_rows = analyze_audit_row(
-        analyzable_source_row(),
+        completed_ai_source_row(),
         config=AuditReportConfig(),
         row_number=1,
         record_id=1001,
@@ -593,7 +482,7 @@ def test_analyze_audit_row_excludes_text_by_default() -> None:
 
 def test_analyze_audit_row_includes_text_when_enabled() -> None:
     metric_rows = analyze_audit_row(
-        analyzable_source_row(),
+        completed_ai_source_row(),
         config=AuditReportConfig(include_text=True),
         row_number=1,
         record_id=1001,
@@ -615,7 +504,7 @@ def test_analyze_audit_row_includes_text_when_enabled() -> None:
 def test_analyze_audit_row_rejects_missing_payload_column(
     missing_column: str,
 ) -> None:
-    row = analyzable_source_row()
+    row = completed_ai_source_row()
     del row[missing_column]
 
     with pytest.raises(
@@ -653,7 +542,7 @@ def test_analyze_audit_row_wraps_payload_errors(
     column_name: str,
     invalid_value: object,
 ) -> None:
-    row = analyzable_source_row()
+    row = completed_ai_source_row()
     row[column_name] = invalid_value
 
     with pytest.raises(
@@ -673,7 +562,7 @@ def test_analyze_audit_row_wraps_payload_errors(
 
 
 def test_analyze_audit_row_wraps_study_policy_error() -> None:
-    row = analyzable_source_row()
+    row = completed_ai_source_row()
     final = row["FINAL_SUBMISSION"]
 
     assert isinstance(final, dict)
@@ -695,112 +584,14 @@ def test_analyze_audit_row_wraps_study_policy_error() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Stream processing
+# Analysis selection and stream processing
 # ---------------------------------------------------------------------------
 
 
-def test_process_audit_rows_preserves_every_source_record() -> None:
-    rows = [
-        skipped_source_row(record_id=1),
-        analyzable_source_row(record_id=2),
-    ]
-
-    outcomes = list(
-        process_audit_rows(
-            rows,
-            config=AuditReportConfig(),
-        )
-    )
-
-    assert len(outcomes) == 2
-
-    assert outcomes[0].record_id == 1
-    assert outcomes[0].analyzed is False
-    assert outcomes[0].metric_rows == ()
-
-    assert outcomes[1].record_id == 2
-    assert outcomes[1].analyzed is True
-    assert len(outcomes[1].metric_rows) == 12
-
-
-def test_process_audit_rows_assigns_one_based_source_numbers() -> None:
-    outcomes = list(
-        process_audit_rows(
-            [
-                skipped_source_row(record_id=1),
-                analyzable_source_row(record_id=2),
-            ],
-            config=AuditReportConfig(),
-        )
-    )
-
-    assert outcomes[0].source_row_number == 1
-    assert outcomes[1].source_row_number == 2
-
-
-def test_processed_record_is_a_fresh_dictionary() -> None:
-    original = skipped_source_row()
-
+def test_completed_ai_row_is_analyzed() -> None:
     outcome = next(
         process_audit_rows(
-            [original],
-            config=AuditReportConfig(),
-        )
-    )
-
-    assert outcome.record == original
-    assert outcome.record is not original
-
-
-def test_processing_rejects_partial_payload_presence() -> None:
-    row = skipped_source_row()
-    row["LLM_SUGGESTIONS"] = "not-json"
-
-    with pytest.raises(
-        AuditRowError,
-        match="analysis payloads must be either all null or all present",
-    ) as captured:
-        next(
-            process_audit_rows(
-                [row],
-                config=AuditReportConfig(),
-            )
-        )
-
-    assert captured.value.row_number == 1
-    assert captured.value.record_id == 1002
-
-
-def test_processing_analyzes_three_present_payloads_regardless_of_shape() -> None:
-    row = analyzable_source_row()
-    row["LLM_SUGGESTIONS"] = "not-json"
-    row["SELECTED_SUGGESTIONS"] = object()
-    row["FINAL_SUBMISSION"] = 42
-
-    with pytest.raises(
-        AuditRowError,
-        match="analysis failed",
-    ) as captured:
-        next(
-            process_audit_rows(
-                [row],
-                config=AuditReportConfig(),
-            )
-        )
-
-    assert captured.value.row_number == 1
-    assert captured.value.record_id == 1001
-    assert captured.value.__cause__ is not None
-
-
-def test_processing_ignores_attempt_values_for_present_payloads() -> None:
-    row = analyzable_source_row()
-    row["ATTEMPT_TYPE"] = "MANUAL"
-    row["ATTEMPT_RESULT"] = "FAILED"
-
-    outcome = next(
-        process_audit_rows(
-            [row],
+            [completed_ai_source_row()],
             config=AuditReportConfig(),
         )
     )
@@ -809,10 +600,65 @@ def test_processing_ignores_attempt_values_for_present_payloads() -> None:
     assert len(outcome.metric_rows) == 12
 
 
-def test_processing_ignores_attempt_values_for_null_payloads() -> None:
-    row = skipped_source_row()
-    row["ATTEMPT_TYPE"] = "AI"
-    row["ATTEMPT_RESULT"] = "COMPLETE"
+def test_completed_manual_row_is_preserved_without_analysis() -> None:
+    row = manual_source_row()
+
+    outcome = next(
+        process_audit_rows(
+            [row],
+            config=AuditReportConfig(),
+        )
+    )
+
+    assert outcome.record == row
+    assert outcome.record is not row
+    assert outcome.analyzed is False
+    assert outcome.metric_rows == ()
+
+
+@pytest.mark.parametrize(
+    "attempt_result",
+    [
+        "USER_DROPPED",
+        "AI_ERROR",
+        "AI_ERROR_WITHOUT_STACK_TRACE",
+        "FAILED",
+        None,
+    ],
+    ids=[
+        "user-dropped",
+        "ai-error",
+        "error-without-stack",
+        "failed",
+        "null-result",
+    ],
+)
+def test_incomplete_ai_row_is_preserved_without_analysis(
+    attempt_result: object,
+) -> None:
+    row = incomplete_ai_source_row(
+        attempt_result=attempt_result,
+    )
+    row["LLM_SUGGESTIONS"] = "malformed-but-not-inspected"
+
+    outcome = next(
+        process_audit_rows(
+            [row],
+            config=AuditReportConfig(),
+        )
+    )
+
+    assert outcome.record == row
+    assert outcome.analyzed is False
+    assert outcome.metric_rows == ()
+
+
+def test_non_ai_row_does_not_inspect_result_or_payloads() -> None:
+    row = manual_source_row()
+    row["ATTEMPT_RESULT"] = object()
+    row["LLM_SUGGESTIONS"] = object()
+    row["SELECTED_SUGGESTIONS"] = object()
+    row["FINAL_SUBMISSION"] = object()
 
     outcome = next(
         process_audit_rows(
@@ -825,10 +671,163 @@ def test_processing_ignores_attempt_values_for_null_payloads() -> None:
     assert outcome.metric_rows == ()
 
 
+def test_completed_ai_row_requires_end_time() -> None:
+    row = completed_ai_source_row()
+    row["END_TIME"] = None
+
+    with pytest.raises(
+        AuditRowError,
+        match="completed AI row requires non-null column 'END_TIME'",
+    ) as captured:
+        next(
+            process_audit_rows(
+                [row],
+                config=AuditReportConfig(),
+            )
+        )
+
+    assert captured.value.row_number == 1
+    assert captured.value.record_id == 1001
+
+
+@pytest.mark.parametrize(
+    "null_columns",
+    [
+        {"LLM_SUGGESTIONS"},
+        {"SELECTED_SUGGESTIONS"},
+        {"FINAL_SUBMISSION"},
+        {
+            "LLM_SUGGESTIONS",
+            "SELECTED_SUGGESTIONS",
+            "FINAL_SUBMISSION",
+        },
+    ],
+    ids=[
+        "suggested",
+        "selected",
+        "final",
+        "all",
+    ],
+)
+def test_completed_ai_row_requires_every_payload(
+    null_columns: set[str],
+) -> None:
+    row = completed_ai_source_row()
+
+    for column_name in null_columns:
+        row[column_name] = None
+
+    with pytest.raises(
+        AuditRowError,
+        match="completed AI row requires all analysis payloads",
+    ) as captured:
+        next(
+            process_audit_rows(
+                [row],
+                config=AuditReportConfig(),
+            )
+        )
+
+    message = str(captured.value)
+
+    assert captured.value.row_number == 1
+    assert captured.value.record_id == 1001
+
+    for column_name in null_columns:
+        assert column_name in message
+
+
+def test_completed_ai_payload_error_does_not_include_payload_values() -> None:
+    confidential_value = "CONFIDENTIAL-PAYLOAD-CONTENT"
+    row = completed_ai_source_row()
+    row["LLM_SUGGESTIONS"] = confidential_value
+    row["SELECTED_SUGGESTIONS"] = None
+
+    with pytest.raises(AuditRowError) as captured:
+        next(
+            process_audit_rows(
+                [row],
+                config=AuditReportConfig(),
+            )
+        )
+
+    assert "SELECTED_SUGGESTIONS" in str(captured.value)
+    assert confidential_value not in str(captured.value)
+
+
+@pytest.mark.parametrize(
+    "missing_column",
+    [
+        "END_TIME",
+        "ATTEMPT_TYPE",
+        "ATTEMPT_RESULT",
+        "LLM_SUGGESTIONS",
+        "SELECTED_SUGGESTIONS",
+        "FINAL_SUBMISSION",
+    ],
+)
+def test_completed_ai_row_rejects_missing_processing_column(
+    missing_column: str,
+) -> None:
+    row = completed_ai_source_row()
+    del row[missing_column]
+
+    with pytest.raises(
+        AuditRowError,
+        match=f"source row is missing required column '{missing_column}'",
+    ):
+        next(
+            process_audit_rows(
+                [row],
+                config=AuditReportConfig(),
+            )
+        )
+
+
+def test_process_audit_rows_preserves_every_selected_and_skipped_record() -> None:
+    rows = [
+        manual_source_row(record_id=1),
+        incomplete_ai_source_row(record_id=2),
+        completed_ai_source_row(record_id=3),
+    ]
+
+    outcomes = list(
+        process_audit_rows(
+            rows,
+            config=AuditReportConfig(),
+        )
+    )
+
+    assert [outcome.record_id for outcome in outcomes] == [1, 2, 3]
+    assert [outcome.analyzed for outcome in outcomes] == [
+        False,
+        False,
+        True,
+    ]
+    assert outcomes[0].metric_rows == ()
+    assert outcomes[1].metric_rows == ()
+    assert len(outcomes[2].metric_rows) == 12
+
+
+def test_process_audit_rows_assigns_one_based_source_numbers() -> None:
+    outcomes = list(
+        process_audit_rows(
+            [
+                manual_source_row(record_id=1),
+                completed_ai_source_row(record_id=2),
+            ],
+            config=AuditReportConfig(),
+        )
+    )
+
+    assert outcomes[0].source_row_number == 1
+    assert outcomes[1].source_row_number == 2
+
+
 def test_processing_rejects_duplicate_integer_ids() -> None:
     rows = [
-        skipped_source_row(record_id=7),
-        analyzable_source_row(record_id=7),
+        manual_source_row(record_id=7),
+        completed_ai_source_row(record_id=7),
     ]
 
     with pytest.raises(
@@ -848,8 +847,8 @@ def test_processing_rejects_duplicate_integer_ids() -> None:
 
 def test_processing_rejects_duplicate_string_ids() -> None:
     rows = [
-        skipped_source_row(record_id="audit-7"),
-        analyzable_source_row(record_id="audit-7"),
+        manual_source_row(record_id="audit-7"),
+        completed_ai_source_row(record_id="audit-7"),
     ]
 
     with pytest.raises(
@@ -868,8 +867,8 @@ def test_integer_and_string_ids_are_distinct() -> None:
     outcomes = list(
         process_audit_rows(
             [
-                skipped_source_row(record_id=7),
-                skipped_source_row(record_id="7"),
+                manual_source_row(record_id=7),
+                manual_source_row(record_id="7"),
             ],
             config=AuditReportConfig(),
         )
@@ -922,9 +921,9 @@ def test_processing_is_lazy() -> None:
 
     def rows() -> Iterator[Row]:
         events.append("first")
-        yield skipped_source_row(record_id=1)
+        yield manual_source_row(record_id=1)
         events.append("second")
-        yield analyzable_source_row(record_id=2)
+        yield completed_ai_source_row(record_id=2)
 
     outcomes = process_audit_rows(
         rows(),
@@ -947,7 +946,7 @@ def test_processing_is_lazy() -> None:
 def test_metric_rows_are_fresh_dictionaries() -> None:
     outcome = next(
         process_audit_rows(
-            [analyzable_source_row()],
+            [completed_ai_source_row()],
             config=AuditReportConfig(),
         )
     )

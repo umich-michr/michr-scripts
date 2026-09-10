@@ -1,0 +1,67 @@
+{
+  "columns": [
+    {"name": "ID", "type": "integer", "nullable": false},
+    {"name": "START_TIME", "type": "datetime", "nullable": false},
+    {"name": "END_TIME", "type": "datetime", "nullable": true},
+    {"name": "ATTEMPT_TYPE", "type": "string", "nullable": false},
+    {"name": "ATTEMPT_RESULT", "type": "string", "nullable": false},
+    {"name": "USER_TYPE", "type": "string", "nullable": false},
+    {"name": "STUDY_NUM", "type": "string", "nullable": false},
+    {"name": "CREATED_DATE", "type": "datetime", "nullable": true},
+    {"name": "CREATED_BY_ID", "type": "integer", "nullable": true},
+    {"name": "PUBLISHABLE", "type": "boolean", "nullable": true},
+    {"name": "STUDY_DEPARTMENT", "type": "string", "nullable": true},
+    {"name": "STUDY_PARTICIPANT_TYPE", "type": "string", "nullable": true},
+    {"name": "USER_ID", "type": "integer", "nullable": true},
+    {"name": "AUTHOR_USER_NAME", "type": "string", "nullable": false},
+    {"name": "AUTHOR_STUDY_TEAM_ROLE", "type": "string", "nullable": true},
+    {"name": "AUTHOR_ERESEARCH_ROLE", "type": "string", "nullable": true},
+    {"name": "AUTHOR_APPOINTMENTS", "type": "string", "nullable": true},
+    {"name": "PI_USER_NAME", "type": "string", "nullable": true},
+    {"name": "PI_APPOINTMENTS", "type": "string", "nullable": true},
+    {"name": "PRIOR_CREATED_COUNT", "type": "integer", "nullable": true},
+    {"name": "TOTAL_CREATED_COUNT", "type": "integer", "nullable": true},
+    {
+      "name": "MEMBER_OF_OTHER_STUDIES_COUNT",
+      "type": "integer",
+      "nullable": true
+    },
+    {"name": "LOGIN_DAYS", "type": "integer", "nullable": true},
+    {"name": "MIN_LOGIN_TIME", "type": "datetime", "nullable": true},
+    {"name": "MAX_LOGIN_TIME", "type": "datetime", "nullable": true},
+    {
+      "name": "TIME_SPENT_ON_STUDY_INFO_PAGE_MS",
+      "type": "integer",
+      "nullable": true
+    },
+    {
+      "name": "TIME_TO_FINISH_ADDING_STUDY_MS",
+      "type": "integer",
+      "nullable": true
+    },
+    {"name": "LATENCY_MS", "type": "integer", "nullable": true},
+    {"name": "SOURCE_SIZE_CHARS", "type": "integer", "nullable": true},
+    {"name": "SOURCE_TYPE", "type": "string", "nullable": true},
+    {"name": "STUDY_CONTENT_SOURCE", "type": "string", "nullable": true},
+    {
+      "name": "LLM_INFERRED_STUDY_CONTENT_SOURCE",
+      "type": "string",
+      "nullable": true
+    },
+    {
+      "name": "STUDY_CONTENT_SOURCE_OTHER_VALUE",
+      "type": "string",
+      "nullable": true
+    },
+    {
+      "name": "LLM_INFERRED_STUDY_CONTENT_SOURCE_OTHER_VALUE",
+      "type": "string",
+      "nullable": true
+    },
+    {"name": "USER_FEEDBACK_COMMENTS", "type": "string", "nullable": true},
+    {"name": "LLM_SUGGESTIONS", "type": "json_object", "nullable": true},
+    {"name": "SELECTED_SUGGESTIONS", "type": "json_object", "nullable": true},
+    {"name": "FINAL_SUBMISSION", "type": "json_object", "nullable": true},
+    {"name": "LLM_METADATA", "type": "json_object", "nullable": true}
+  ]
+}

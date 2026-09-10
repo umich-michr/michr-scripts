@@ -1,0 +1,5 @@
+# Ignore local operational inputs by default.
+*
+!.gitignore
+!audit-schema.json
+!audit-rows.example.sql
