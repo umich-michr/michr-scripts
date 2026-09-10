@@ -2,72 +2,99 @@
 
 Schema-aware, lazy sources of canonical tabular rows.
 
-A consuming program can process rows from CSV files and, later, database queries
-through one interface while receiving the same:
+The package gives consuming programs one interface for rows obtained from CSV
+files or DB-API queries:
 
-- case-sensitive column names;
-- column order;
-- canonical Python value types;
-- nullability behavior.
+```python
+with source.open_rows() as rows:
+    for row in rows:
+        process(row)
+```
 
----
+Both source types use the same `RowSchema` and conversion layer.
 
-## Basic usage
+## Responsibilities
 
-Load a schema and stream a CSV file:
+The package owns:
+
+- canonical row and schema models;
+- schema JSON parsing and loading;
+- value conversion and nullability validation;
+- CSV parsing;
+- DB-API query execution and lazy fetching;
+- SQL-file loading;
+- source-column validation;
+- deterministic file, cursor, and connection cleanup;
+- source-specific exceptions.
+
+It does not own:
+
+- application configuration precedence;
+- credentials or database-driver selection;
+- study-posting analysis;
+- audit-row selection;
+- aggregation;
+- report writing;
+- application logging;
+- command-line behavior.
+
+Database connection setup belongs to the consuming program. This package
+accepts a zero-argument connection factory.
+
+## Public API
+
+Important exports include:
 
 ```python
 from tabular_row_sources import (
+    ColumnSpec,
+    ColumnType,
+    CsvReadOptions,
     CsvRowSource,
+    DbApiQuerySource,
+    QueryParameters,
+    Row,
+    RowSchema,
+    RowSource,
+    convert_row,
+    convert_value,
     load_schema_json,
+    parse_schema_json,
+    read_sql_file,
 )
+```
 
-schema = load_schema_json("audit-records.schema.json")
+Expected failures derive from `RowSourceError`.
 
-source = CsvRowSource(
-    path="audit-export.csv",
-    schema=schema,
-)
+## Row source protocol
+
+Concrete sources satisfy the structural `RowSource` protocol:
+
+```python
+source.schema
 
 with source.open_rows() as rows:
     for row in rows:
         process(row)
 ```
 
-A source owns its resources. Always use `open_rows()` in a `with` statement so
-files, cursors, and connections close after:
-
-- normal completion;
-- early termination;
-- conversion failure;
-- consumer failure.
-
----
-
-## Row contract
-
-A canonical row is:
-
-```python
-type Row = dict[str, object]
-```
-
-Every source must:
+A source must:
 
 - use a supplied `RowSchema`;
-- preserve schema column order;
-- require exact schema-column names while allowing source reordering;
-- yield a fresh dictionary for every row;
-- convert values to canonical Python types;
-- enforce nullability;
 - stream rather than load an unbounded source;
-- close resources deterministically.
+- yield a fresh `dict[str, object]` for each row;
+- produce canonical values;
+- emit keys in schema order;
+- enforce nullability;
+- close owned resources after completion, failure, or early termination;
+- return a new context manager for every `open_rows()` call.
 
----
+Classes satisfy the protocol structurally and do not need to inherit from a
+package base class.
 
 ## Schema contract
 
-A schema is an ordered tuple of `ColumnSpec` values:
+A schema is an ordered tuple of column definitions:
 
 ```python
 from tabular_row_sources import (
@@ -81,82 +108,34 @@ schema = RowSchema(
         ColumnSpec(
             name="ID",
             data_type=ColumnType.INTEGER,
-            nullable=False,
-        ),
-        ColumnSpec(
-            name="STUDY_NUM",
-            data_type=ColumnType.STRING,
-            nullable=True,
         ),
         ColumnSpec(
             name="CREATED_AT",
             data_type=ColumnType.DATETIME,
             nullable=True,
         ),
+        ColumnSpec(
+            name="PAYLOAD",
+            data_type=ColumnType.JSON_OBJECT,
+            nullable=True,
+        ),
     )
 )
 ```
 
-Column names are:
+Column names are case-sensitive, nonblank, and unique.
 
-- case-sensitive;
-- nonblank;
-- unique;
-- ordered.
+A source must provide exactly the schema's column names:
 
-Sources must provide exactly the schema's case-sensitive column names. Missing,
-unexpected, blank, and duplicate columns are rejected. Source order may differ;
-yielded row dictionaries always follow schema order.
+- source order may differ;
+- missing columns are rejected;
+- unexpected columns are rejected;
+- blank or duplicate names are rejected;
+- output rows always follow schema order.
 
-A relaxed projection mode is not supported.
+Supported canonical types are:
 
----
-
-## Schema JSON
-
-Schemas may be parsed from JSON text:
-
-```python
-from tabular_row_sources import parse_schema_json
-
-schema = parse_schema_json(
-    """
-    {
-      "columns": [
-        {
-          "name": "ID",
-          "type": "integer",
-          "nullable": false
-        },
-        {
-          "name": "PAYLOAD",
-          "type": "json_object",
-          "nullable": false
-        }
-      ]
-    }
-    """
-)
-```
-
-Or loaded from a JSON file:
-
-```python
-from tabular_row_sources import load_schema_json
-
-schema = load_schema_json("audit-records.schema.json")
-```
-
-See the canonical
-[schema-format documentation](docs/schema-format.md)
-for the JSON format, supported types, nullability, conversion policy, and schema
-evolution guidance.
-
----
-
-## Canonical value types
-
-| Schema type | Canonical Python type |
+| Schema type | Python type |
 |---|---|
 | `string` | `str` |
 | `integer` | `int`, excluding `bool` |
@@ -167,84 +146,66 @@ evolution guidance.
 | `datetime` | `datetime.datetime` |
 | `json_object` | `dict[str, object]` |
 
-A shared schema lets CSV and database sources expose both the same row shape and
-the same canonical value types.
+See the canonical
+[schema-format documentation](docs/schema-format.md)
+for JSON syntax, accepted source representations, datetime formats,
+nullability, conversion rules, and schema evolution.
 
-Without conversion:
+## Loading a schema
 
-- CSV values are strings;
-- database drivers may return integers, decimals, dates, datetimes, bytes,
-  strings, or driver-specific objects.
-
----
-
-## Canonical conversion
-
-Concrete sources use the same conversion functions:
+Load a JSON schema file:
 
 ```python
-from tabular_row_sources import (
-    convert_row,
-    convert_value,
-)
+from tabular_row_sources import load_schema_json
+
+schema = load_schema_json("input/audit-schema.json")
 ```
 
-`convert_value()` converts one value according to a `ColumnSpec`.
+Or parse schema JSON directly:
 
-`convert_row()`:
+```python
+from tabular_row_sources import parse_schema_json
 
-- requires exact case-sensitive column names;
-- accepts source columns in any order;
-- validates every value;
-- enforces nullability;
-- returns a fresh dictionary in schema order;
-- may include a source row number in errors.
+schema = parse_schema_json(schema_text)
+```
 
-The conversion layer rejects ambiguous or lossy conversions. For example:
-
-- Booleans are not accepted as numeric values;
-- fractional values are not truncated to integers;
-- datetimes are not silently converted to dates;
-- arbitrary objects are not converted with `str()`;
-- non-finite numeric values are rejected;
-- JSON arrays and scalar values are not accepted as JSON objects.
-
----
+Invalid definitions raise `SchemaDefinitionError`. File-reading failures raise
+`SourceExecutionError`.
 
 ## CSV source
 
-`CsvRowSource`:
-
-- requires a header row;
-- requires exact header-name agreement with the schema;
-- accepts header columns in any order and emits schema-ordered rows;
-- validates blank and duplicate headers;
-- reads logical CSV records lazily;
-- converts values through the shared conversion layer;
-- supports configurable CSV parsing options;
-- supports explicit null markers;
-- removes an optional UTF-8 byte-order mark by default;
-- closes the file when the context exits.
-
-### Empty fields and null markers
-
-An empty CSV field remains `""` by default. Empty string and null are distinct.
-
-Configure explicit null markers when an export uses them:
-
 ```python
-source = CsvRowSource(
-    path="audit-export.csv",
-    schema=schema,
-    null_values=frozenset({"NULL", "\\N"}),
+from tabular_row_sources import (
+    CsvRowSource,
+    load_schema_json,
 )
+
+schema = load_schema_json("input/audit-schema.json")
+
+source = CsvRowSource(
+    path="input/audit.csv",
+    schema=schema,
+)
+
+with source.open_rows() as rows:
+    for row in rows:
+        process(row)
 ```
 
-Only exact configured markers become `None`.
+`CsvRowSource`:
 
-A resulting `None` is accepted only when the schema column is nullable.
+- validates the header against schema column names;
+- accepts header columns in any order;
+- reads logical CSV records lazily;
+- associates values with their actual header names;
+- emits rows in schema order;
+- converts values through the shared conversion layer;
+- closes the file when the context exits.
 
-### CSV parser options
+Default encoding is `utf-8-sig`, which accepts ordinary UTF-8 and removes an
+optional UTF-8 byte-order mark.
+
+### CSV options
 
 ```python
 from tabular_row_sources import CsvReadOptions
@@ -259,115 +220,29 @@ options = CsvReadOptions(
 )
 
 source = CsvRowSource(
-    path="audit-export.csv",
+    path="input/audit.csv",
     schema=schema,
     options=options,
 )
 ```
 
----
+### Null markers
 
-## Source protocol
-
-Concrete sources implement the structural `RowSource` protocol:
+An empty CSV field remains `""` unless explicitly configured as null.
 
 ```python
-with source.open_rows() as rows:
-    for row in rows:
-        process(row)
+source = CsvRowSource(
+    path="input/audit.csv",
+    schema=schema,
+    null_values=frozenset({"", "\\N"}),
+)
 ```
 
-The source exposes:
+Only exact configured markers become `None`. The schema then determines whether
+`None` is permitted for that column.
 
-```python
-source.schema
-```
-
-and returns a new context manager from each `open_rows()` call.
-
-A class satisfies the protocol structurally; it does not need to inherit from a
-package base class.
-
----
-
-## Nullability
-
-Database `NULL` values normally arrive as Python `None`.
-
-CSV fields become `None` only through explicit null-marker configuration.
-
-For every source:
-
-- `None` is retained when the schema column is nullable;
-- `None` is rejected when the schema column is not nullable.
-
-The package does not silently treat an empty string as null.
-
----
-
-## Exceptions
-
-All expected package failures derive from `RowSourceError`.
-
-| Exception | Meaning |
-|---|---|
-| `SchemaDefinitionError` | Schema JSON or schema objects are invalid |
-| `SourceConfigurationError` | Source options are invalid |
-| `SourceFormatError` | Source columns or row shape do not match the schema |
-| `ValueConversionError` | A value cannot be converted or violates nullability |
-| `SourceExecutionError` | A file or query cannot be opened, executed, fetched, decoded, or read |
-
-`ValueConversionError` is a subtype of `SourceFormatError`.
-
----
-
-## Scope
-
-This package owns:
-
-- schema models and validation;
-- schema JSON parsing and loading;
-- canonical value conversion;
-- exact column and row-shape validation;
-- lazy CSV reading;
-- lazy DB-API query reading;
-- reusable database connection-factory integration;
-- source resource lifecycle;
-- source exceptions.
-
-It does not own:
-
-- study-posting analysis;
-- audit-record eligibility;
-- source-to-analysis field mapping;
-- aggregation;
-- report generation;
-- output CSV writing;
-- application configuration policy;
-- application logging;
-- application CLI behavior.
-
-Those responsibilities belong to consuming programs.
-
----
-
-## Implementation status
-
-Available:
-
-- schema models and validation;
-- schema JSON parsing and loading;
-- canonical value and row conversion;
-- lazy CSV row source;
-- generic lazy DB-API query source;
-- package exception hierarchy.
-
-The package intentionally does not provide database-driver configuration.
-Driver-specific connection setup belongs to consuming programs or reusable
-driver adapters.
-
-The default test suite does not require network access, credentials, a live
-database, or Oracle client software.
+Null-marker policy belongs to the consumer because different exports represent
+null values differently.
 
 ## DB-API query source
 
@@ -378,8 +253,10 @@ from tabular_row_sources import DbApiQuerySource
 
 source = DbApiQuerySource(
     connect=connection_factory,
-    sql="SELECT ID, TITLE FROM RECORDS WHERE STATUS = :status",
-    parameters={"status": "ACTIVE"},
+    sql=("SELECT ID, TITLE FROM SYNTHETIC_RECORDS WHERE STATUS = :status"),
+    parameters={
+        "status": "ACTIVE",
+    },
     schema=schema,
     fetch_size=500,
 )
@@ -391,49 +268,94 @@ with source.open_rows() as rows:
 
 The query source:
 
-- creates a new connection and cursor for each `open_rows()` call;
+- creates a connection and cursor for each `open_rows()` call;
 - passes bind parameters separately from SQL;
-- validates result metadata against the schema;
-- sets cursor `arraysize`;
+- validates result-column names against the schema;
+- accepts result columns in any order;
 - calls `fetchmany()` rather than `fetchall()`;
-- converts values through the shared conversion layer;
-- closes cursor and connection when the context exits.
+- converts rows through the shared conversion layer;
+- closes the cursor and connection when the context exits.
 
 The source owns connections returned by its connection factory.
 
-Credentials, DSNs, environment variables, and SQL-file selection belong to
-adapters or consuming programs.
+It does not own:
+
+- credentials;
+- DSNs;
+- wallets;
+- dotenv or environment-variable policy;
+- database-driver selection.
 
 ## SQL files
 
-`DbApiQuerySource` accepts SQL text. It does not guess whether a string is SQL or
-a path.
+Load SQL explicitly:
 
-Load a version-controlled SQL file explicitly:
+```python
+from tabular_row_sources import read_sql_file
+
+sql = read_sql_file("input/report.sql")
+```
+
+`read_sql_file()`:
+
+- reads text using an explicit encoding;
+- rejects blank SQL;
+- preserves SQL after decoding;
+- does not execute, interpolate, parse, split, normalize, or remove comments.
+
+Bind values must remain separate from SQL text.
+
+## Canonical conversion
+
+The shared conversion API is available independently:
 
 ```python
 from tabular_row_sources import (
-    DbApiQuerySource,
-    read_sql_file,
-)
-
-sql = read_sql_file("queries/report.sql")
-
-source = DbApiQuerySource(
-    connect=connection_factory,
-    sql=sql,
-    schema=schema,
+    convert_row,
+    convert_value,
 )
 ```
 
-`read_sql_file()` preserves the SQL text after decoding. It does not interpolate,
-parse, split, normalize, or execute SQL.
+Conversion is strict. It rejects ambiguous or lossy values, including:
 
----
+- Booleans used as numeric values;
+- fractional values converted to integers;
+- datetimes silently converted to dates;
+- non-finite decimal or float values;
+- JSON arrays or scalars where an object is required;
+- unsupported arbitrary objects.
+
+`convert_row()` accepts source mappings in any column order and returns a fresh
+dictionary in schema order.
+
+Detailed conversion behavior is authoritative in
+[`docs/schema-format.md`](docs/schema-format.md).
+
+## Exceptions
+
+| Exception | Meaning |
+|---|---|
+| `SchemaDefinitionError` | Schema JSON or schema objects are invalid |
+| `SourceConfigurationError` | Source options are invalid |
+| `SourceFormatError` | Source names, row shape, or result metadata are invalid |
+| `ValueConversionError` | A value cannot be converted or violates nullability |
+| `SourceExecutionError` | A file or query cannot be opened, executed, fetched, decoded, or read |
+
+`ValueConversionError` is a subtype of `SourceFormatError`. All expected source
+failures derive from `RowSourceError`.
+
+## Security
+
+- Pass SQL bind values separately from SQL text.
+- Do not log source rows, credentials, or secret-bearing connection strings.
+- Do not embed database credentials or driver policy in this package.
+- Use synthetic rows and fake database objects in tests.
+- Default tests require no network access, database, credentials, or Oracle
+  client installation.
 
 ## Development
 
-Run commands from the repository root.
+Run from the repository root:
 
 ```bash
 make test PACKAGE=tabular-row-sources
@@ -441,10 +363,7 @@ make coverage PACKAGE=tabular-row-sources
 make check
 ```
 
-Shared setup and workspace guidance are documented in the
-[root README](../../../README.md).
-
----
+See the [root README](../../../README.md) for workspace-wide guidance.
 
 ## License
 
