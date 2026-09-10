@@ -19,6 +19,7 @@
 
   // src-layout support for editor tooling.
   "python.analysis.extraPaths": [
+    "${workspaceFolder}/python/packages/program-configuration/src",
     "${workspaceFolder}/python/packages/study-posting-ai-analysis/src",
     "${workspaceFolder}/python/packages/tabular-row-sources/src",
     "${workspaceFolder}/python/packages/text-post-edit-metrics/src",

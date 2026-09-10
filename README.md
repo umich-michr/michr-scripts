@@ -35,10 +35,19 @@ interface.
 
 | Package | Import | Purpose |
 |---|---|---|
+| [`program-configuration`](python/packages/program-configuration/) | `program_configuration` | Layered, typed, secret-aware configuration resolution for runnable programs |
+| [`tabular-row-sources`](python/packages/tabular-row-sources/) | `tabular_row_sources` | Schema-aware lazy CSV and DB-API row sources |
 | [`text-post-edit-metrics`](python/packages/text-post-edit-metrics/) | `text_post_edit_metrics` | Directional technical post-editing metrics for an initial text and its represented edited form |
-| [`study-posting-ai-analysis`](python/packages/study-posting-ai-analysis/) | `study_posting_ai_analysis` | Study-posting field policy, requiredness, selection analysis, contact, compensation, lookup analysis, parsing, and flattening |
+| [`study-posting-ai-analysis`](python/packages/study-posting-ai-analysis/) | `study_posting_ai_analysis` | Study-posting field policy, selection analysis, parsing, and flattening |
 
-There are currently no runnable programs.
+Current runnable-program project:
+
+| Program | Purpose |
+|---|---|
+| [`study-posting-audit-report`](python/programs/study-posting-audit-report/) | Produce normalized audit records and completed-AI field metrics from a configured row source |
+
+Its command-line entry point is planned; its current public Python API accepts a
+configured `RowSource`.
 
 ### Dependency direction
 
@@ -49,7 +58,13 @@ text-post-edit-metrics
           ↑
 study-posting-ai-analysis
           ↑
-future study-posting-audit-report
+study-posting-audit-report
+          ↓
+tabular-row-sources
+
+program-configuration
+          ↑
+study-posting-audit-report (planned CLI consumer)
 ```
 
 Rules:

@@ -9,6 +9,7 @@ resolution-markers = [
 [manifest]
 members = [
     "michr-scripts",
+    "program-configuration",
     "study-posting-ai-analysis",
     "study-posting-audit-report",
     "tabular-row-sources",
@@ -877,6 +878,11 @@ sdist = { url = "https://files.pythonhosted.org/packages/74/89/1f3e8e1fc3e97de0f
 wheels = [
     { url = "https://files.pythonhosted.org/packages/45/e2/bbb7129c9e7999a6b8ee9cca3b66486c25c423ab5a75f34071798b74ce94/pre_commit-4.6.2-py2.py3-none-any.whl", hash = "sha256:e2dde9a75d3bce11bd3831c26d134df00a2803c1d818be6a0383c3dcda25dc4e", size = 226202, upload-time = "2026-08-10T22:07:16.942Z" },
 ]
+
+[[package]]
+name = "program-configuration"
+version = "0.1.0"
+source = { editable = "python/packages/program-configuration" }
 
 [[package]]
 name = "py-serializable"

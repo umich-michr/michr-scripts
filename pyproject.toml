@@ -95,6 +95,7 @@ convention = "numpy"
 
 [tool.ruff.lint.isort]
 known-first-party = [
+    "program_configuration",
     "study_posting_ai_analysis",
     "study_posting_audit_report",
     "tabular_row_sources",

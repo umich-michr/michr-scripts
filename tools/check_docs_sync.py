@@ -19,6 +19,7 @@ import sys
 TEXT_PACKAGE = "python/packages/text-post-edit-metrics"
 STUDY_PACKAGE = "python/packages/study-posting-ai-analysis"
 ROW_SOURCE_PACKAGE = "python/packages/tabular-row-sources"
+CONFIG_PACKAGE = "python/packages/program-configuration"
 
 REPORT_PROGRAM = "python/programs/study-posting-audit-report"
 
@@ -28,7 +29,7 @@ STUDY_SPECIFICATION = f"{STUDY_PACKAGE}/docs/analysis-specification.md"
 STUDY_FLOW = f"{STUDY_PACKAGE}/docs/program-flow.md"
 ROW_SOURCE_README = f"{ROW_SOURCE_PACKAGE}/README.md"
 ROW_SOURCE_SCHEMA_DOC = f"{ROW_SOURCE_PACKAGE}/docs/schema-format.md"
-
+CONFIG_README = f"{CONFIG_PACKAGE}/README.md"
 REPORT_README = f"{REPORT_PROGRAM}/README.md"
 
 type DocumentationRequirement = tuple[str, str]
@@ -142,6 +143,18 @@ REQUIRED_DOCUMENTS: dict[str, tuple[DocumentationRequirement, ...]] = {
             "the program README documents row processing and analysis-selection policy",
         ),
     ),
+    f"{CONFIG_PACKAGE}/src/program_configuration/models.py": (
+        (
+            CONFIG_README,
+            "the package README documents setting and result models",
+        ),
+    ),
+    f"{CONFIG_PACKAGE}/src/program_configuration/resolution.py": (
+        (
+            CONFIG_README,
+            "the package README documents resolution precedence",
+        ),
+    ),
 }
 
 # Advisory pairings: these changes often require documentation, but not every
@@ -193,6 +206,24 @@ ADVISORY_DOCUMENTS: dict[str, tuple[DocumentationRequirement, ...]] = {
         (
             REPORT_README,
             "the program README documents dependencies and scope",
+        ),
+    ),
+    f"{CONFIG_PACKAGE}/src/program_configuration/__init__.py": (
+        (
+            CONFIG_README,
+            "the package README documents the public API",
+        ),
+    ),
+    f"{CONFIG_PACKAGE}/src/program_configuration/parsing.py": (
+        (
+            CONFIG_README,
+            "the package README documents reusable parsers",
+        ),
+    ),
+    f"{CONFIG_PACKAGE}/pyproject.toml": (
+        (
+            CONFIG_README,
+            "the package README documents dependencies and scope",
         ),
     ),
     "Makefile": (("README.md", "the root README documents development commands"),),
