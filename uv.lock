@@ -1257,12 +1257,14 @@ name = "study-posting-audit-report"
 version = "0.1.0"
 source = { editable = "python/programs/study-posting-audit-report" }
 dependencies = [
+    { name = "program-configuration" },
     { name = "study-posting-ai-analysis" },
     { name = "tabular-row-sources" },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "program-configuration", editable = "python/packages/program-configuration" },
     { name = "study-posting-ai-analysis", editable = "python/packages/study-posting-ai-analysis" },
     { name = "tabular-row-sources", editable = "python/packages/tabular-row-sources" },
 ]

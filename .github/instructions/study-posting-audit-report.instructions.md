@@ -9,8 +9,8 @@ This runnable program composes:
 - `tabular-row-sources`;
 - `study-posting-ai-analysis`;
 - transitively, `text-post-edit-metrics`;
-- the shared configuration-resolution package when command-line configuration
-  is added.
+- `program-configuration` for layered CLI, environment, dotenv, default, and
+  prompt resolution.
 
 It owns:
 
@@ -49,6 +49,18 @@ Free text remains excluded by default.
 
 Use named CLI options. Do not log source JSON payloads, selected text, final
 text, credentials, passwords, or secret-bearing connection strings.
+
+The CSV command must construct `CsvRowSource` and then call the existing report
+API. It must not duplicate row conversion, record processing, or output logic.
+
+Configuration precedence is owned by `program-configuration`:
+
+```text
+CLI → process environment → dotenv → default → prompt
+```
+
+The report program owns setting names, environment-variable names, workspace
+defaults, and command-line syntax.
 
 SQL bind values must be passed separately to the database driver. Never
 construct SQL by interpolating configuration values.

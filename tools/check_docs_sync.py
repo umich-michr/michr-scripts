@@ -167,6 +167,12 @@ REQUIRED_DOCUMENTS: dict[str, tuple[DocumentationRequirement, ...]] = {
             "the package README documents prompting behavior",
         ),
     ),
+    f"{REPORT_PROGRAM}/src/study_posting_audit_report/cli.py": (
+        (
+            REPORT_README,
+            "the program README documents command-line behavior",
+        ),
+    ),
 }
 
 # Advisory pairings: these changes often require documentation, but not every
@@ -236,6 +242,12 @@ ADVISORY_DOCUMENTS: dict[str, tuple[DocumentationRequirement, ...]] = {
         (
             CONFIG_README,
             "the package README documents dependencies and scope",
+        ),
+    ),
+    f"{REPORT_PROGRAM}/src/study_posting_audit_report/cli_config.py": (
+        (
+            REPORT_README,
+            "the program README documents configuration inputs and defaults",
         ),
     ),
     "Makefile": (("README.md", "the root README documents development commands"),),

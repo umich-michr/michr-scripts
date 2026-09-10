@@ -19,16 +19,18 @@ authors = [{ name = "University of Michigan" }]
 keywords = ["study-posting", "audit-report", "llm-evaluation", "csv-report"]
 
 dependencies = [
+    "program-configuration>=0.1.0",
     "study-posting-ai-analysis>=0.1.0",
     "tabular-row-sources>=0.1.0",
 ]
 
 [tool.uv.sources]
+program-configuration = { workspace = true }
 study-posting-ai-analysis = { workspace = true }
 tabular-row-sources = { workspace = true }
 
-# The CLI module is added in a later increment. Do not declare project.scripts
-# until the command has a tested implementation.
+[project.scripts]
+study-posting-audit-report = "study_posting_audit_report.cli:main"
 
 # ===========================================================================
 # Build

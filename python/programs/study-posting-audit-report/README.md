@@ -8,8 +8,8 @@ The program composes:
 - `study-posting-ai-analysis` for per-record study-posting analysis;
 - transitively, `text-post-edit-metrics` for generic text post-edit metrics.
 
-A command-line client for selecting CSV or Oracle input is planned but is not
-yet implemented. The current public API accepts an already configured
+The current command-line client reads CSV input. Oracle database input is the
+next planned source mode. The public Python API also accepts any configured
 `RowSource`.
 
 ## Architecture
@@ -187,6 +187,123 @@ The example SQL:
 The default database CLI will use `input/audit-rows.sql` after that CLI is
 implemented.
 
+## CSV command
+
+Run from the repository root:
+
+```bash
+uv run study-posting-audit-report csv \
+  --input path/to/audit.csv
+```
+
+The command uses these workspace defaults:
+
+| Setting | Default |
+|---|---|
+| Schema | `python/programs/study-posting-audit-report/input/audit-schema.json` |
+| Output directory | `output/study-posting-ai-audit-analysis/report/` |
+| Dotenv file | `.env` |
+| Include selected/final metric text | `false` |
+| CSV encoding | `utf-8-sig` |
+| Delimiter | `,` |
+| Quote character | `"` |
+| Escape character | none |
+| Null markers | empty field and `\N` |
+
+The output directory must not already exist.
+
+### Configuration precedence
+
+CSV command settings use:
+
+```text
+command line
+→ process environment
+→ .env
+→ default
+→ interactive prompt
+```
+
+The default `.env` file is optional. An explicitly requested `--env-file` must
+exist.
+
+Disable dotenv loading and prompting for a batch invocation:
+
+```bash
+uv run study-posting-audit-report csv \
+  --input path/to/audit.csv \
+  --no-env-file \
+  --no-prompt
+```
+
+### CSV options
+
+```text
+--input PATH
+--schema PATH
+--output PATH
+--include-text / --no-include-text
+--encoding NAME
+--delimiter CHARACTER
+--quotechar CHARACTER
+--escapechar CHARACTER
+--null-value TEXT
+--env-file PATH / --no-env-file
+--prompt / --no-prompt
+```
+
+Repeat `--null-value` to define multiple null markers:
+
+```bash
+uv run study-posting-audit-report csv \
+  --input path/to/audit.csv \
+  --null-value "" \
+  --null-value '\N'
+```
+
+Explicit CLI null markers replace environment, dotenv, and default markers.
+
+`--include-text` controls only the flattened `selected_text` and `final_text`
+columns in `field_metrics.csv`. It does not remove source payload columns from
+`records.csv`.
+
+### Environment variables
+
+| Setting | Environment variable |
+|---|---|
+| CSV input | `STUDY_POSTING_AUDIT_CSV_INPUT` |
+| Schema | `STUDY_POSTING_AUDIT_SCHEMA` |
+| Output directory | `STUDY_POSTING_AUDIT_OUTPUT` |
+| Include metric text | `STUDY_POSTING_AUDIT_INCLUDE_TEXT` |
+| CSV encoding | `STUDY_POSTING_AUDIT_CSV_ENCODING` |
+| Delimiter | `STUDY_POSTING_AUDIT_CSV_DELIMITER` |
+| Quote character | `STUDY_POSTING_AUDIT_CSV_QUOTECHAR` |
+| Escape character | `STUDY_POSTING_AUDIT_CSV_ESCAPECHAR` |
+| Null markers | `STUDY_POSTING_AUDIT_CSV_NULL_VALUES` |
+| Dotenv path | `STUDY_POSTING_AUDIT_ENV_FILE` |
+| Prompting | `STUDY_POSTING_AUDIT_PROMPT` |
+
+Environment and dotenv null markers use a JSON array:
+
+```dotenv
+STUDY_POSTING_AUDIT_CSV_NULL_VALUES=["","\\N"]
+```
+
+Boolean values accept:
+
+```text
+true, false, 1, 0, yes, no, on, off
+```
+
+### Exit behavior
+
+A successful command returns exit status `0` and prints the output paths and
+summary counts.
+
+Expected configuration, source, row-processing, analysis, and report-output
+failures return status `2` with a concise message on standard error. Expected
+failures do not print a traceback.
+
 ## Pure processing API
 
 Rows can be processed without writing files:
@@ -340,33 +457,28 @@ On failure:
 Errors must not contain analysis payloads, free text, credentials, passwords, or
 secret-bearing connection strings.
 
-## Planned CLI
+## Planned database command
 
-The planned client will support:
+Oracle database input is the next planned CLI increment:
 
 ```text
-study-posting-audit-report csv ...
 study-posting-audit-report database ...
 ```
 
-It will accept:
+It will use the existing generic `DbApiQuerySource` and the local
+`input/audit-rows.sql` query.
 
-- a CSV path or Oracle SQL input;
-- a schema path;
-- an output path;
-- database connection settings;
-- SQL bind parameters.
+The database command will add:
 
-Configuration resolution will use a shared reusable package with this
-precedence:
+- Oracle thin-mode connection creation;
+- username/password configuration;
+- Easy Connect or locally resolvable TNS aliases;
+- parameterized SQL values passed separately from SQL text;
+- driver selection designed for future extension.
 
-```text
-command line
-→ process environment
-→ .env
-→ default
-→ interactive prompt
-```
+Oracle connection policy will remain in this program. Generic row streaming
+will remain in `tabular-row-sources`.
+
 
 That CLI and configuration package are not yet implemented.
 
