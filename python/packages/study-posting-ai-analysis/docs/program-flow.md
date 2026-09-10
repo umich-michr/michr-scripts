@@ -1,36 +1,56 @@
 # Study-posting analysis flow
 
-This document describes the control flow of `study-posting-ai-analysis`.
+This document describes the control flow and package boundaries of
+`study-posting-ai-analysis`.
 
-For authoritative business rules, formulas, interpretation, and reporting
-terminology, see
+For authoritative field policy, requiredness, formulas, outcome definitions,
+reporting terminology, and interpretation, see
 [`analysis-specification.md`](analysis-specification.md).
 
-Technical text calculations are implemented by the sibling
-[`text-post-edit-metrics`](../../text-post-edit-metrics/) package.
-
-Mermaid diagrams render natively on GitHub and in VS Code with Mermaid-enabled
-Markdown preview.
-
----
+Generic text calculations are implemented by
+[`text-post-edit-metrics`](../../text-post-edit-metrics/).
 
 ## 1. Package boundary
 
-`study-posting-ai-analysis` is a pure library. It receives three objects and
-returns structured field results or flattened dictionaries.
+The package is a pure, one-record analysis library:
+
+```text
+suggested object
+selected object
+final object
+        ↓
+study-posting-ai-analysis
+        ↓
+structured field results
+        ↓
+optional flattened dictionaries
+```
+
+It performs no:
+
+- database or SQL access;
+- audit-row selection;
+- CSV or filesystem I/O;
+- batch iteration;
+- aggregation;
+- logging;
+- command-line handling;
+- report publication.
+
+A consuming program owns those responsibilities.
 
 ```mermaid
 flowchart LR
     subgraph Consumer["Consuming program"]
-        SOURCE["Database, CSV, HTTP,<br/>or another source"]
-        SELECT["Eligibility and<br/>source-column mapping"]
-        HANDLE["Record loop,<br/>error handling,<br/>aggregation, output"]
+        SOURCE["CSV, database,<br/>or another source"]
+        SELECT["Record selection and<br/>source-column mapping"]
+        HANDLE["Batch policy,<br/>aggregation, output"]
     end
 
     subgraph Study["study-posting-ai-analysis"]
         PARSE["parse_analysis_inputs()<br/>optional JSON decoding"]
-        ANALYZE["analyze_objects()<br/>validate and analyze fields"]
-        FLATTEN["flatten_analysis_results()<br/>one dictionary per field"]
+        ANALYZE["analyze_objects()<br/>validate and analyze"]
+        FLATTEN["flatten_analysis_results()<br/>one row per field"]
     end
 
     SOURCE --> SELECT --> PARSE
@@ -38,21 +58,58 @@ flowchart LR
     FLATTEN --> HANDLE
 ```
 
-The consuming program owns:
-
-- database and file access;
-- audit-row eligibility;
-- source-column mapping;
-- record identifiers;
-- batch iteration;
-- logging and failure policy;
-- aggregation and report writing.
-
 The library raises exceptions and never logs.
 
----
+## 2. End-to-end analysis
 
-## 2. Input decoding
+The public composition path is:
+
+```python
+from study_posting_ai_analysis import (
+    analyze_objects,
+    flatten_analysis_results,
+    parse_analysis_inputs,
+)
+
+suggested, selected, final = parse_analysis_inputs(
+    suggested_payload,
+    selected_payload,
+    final_payload,
+)
+
+results = analyze_objects(
+    suggested,
+    selected,
+    final,
+)
+
+rows = flatten_analysis_results(
+    results,
+    record_id="synthetic-record",
+    include_text=False,
+)
+```
+
+A caller that already has validated dictionaries may skip decoding and call
+`analyze_objects()` directly.
+
+```mermaid
+flowchart TB
+    PAYLOADS["Suggested, selected,<br/>and final payloads"]
+    PARSE["Optional JSON-object decoding"]
+    KEYS["Validate object types<br/>and configured fields"]
+    DISPATCH["Dispatch by FieldKind"]
+    SPECIALIZED["Text, contact, compensation,<br/>and lookup analyzers"]
+    RESULTS["dict[str, AnalysisResult]"]
+    FLATTEN["Optional flattening"]
+    ROWS["list[dict[str, object]]"]
+
+    PAYLOADS --> PARSE --> KEYS --> DISPATCH
+    DISPATCH --> SPECIALIZED --> RESULTS
+    RESULTS --> FLATTEN --> ROWS
+```
+
+## 3. Input decoding
 
 `parse_json_object()` accepts:
 
@@ -65,46 +122,44 @@ flowchart TB
     INPUT["Input value"]
     MISSING{"Missing?"}
     BYTES{"Bytes?"}
-    UTF8["Decode as UTF-8"]
+    DECODE["Decode UTF-8"]
     STRING{"String?"}
     BLANK{"Blank?"}
     JSON["json.loads()"]
     OBJECT{"Dictionary?"}
-    RESULT["dict[str, object]"]
+    RESULT["Fresh dict[str, object]"]
 
     INPUT --> MISSING
-    MISSING -->|Yes| E_MISSING["InputParseError<br/>value is missing"]
+    MISSING -->|Yes| E_MISSING["InputParseError"]
     MISSING -->|No| BYTES
 
-    BYTES -->|Yes| UTF8
-    UTF8 -->|Invalid| E_UTF8["InputParseError<br/>invalid UTF-8"]
-    UTF8 -->|Valid| STRING
+    BYTES -->|Yes| DECODE
+    DECODE -->|Invalid| E_UTF8["InputParseError"]
+    DECODE -->|Valid| STRING
     BYTES -->|No| STRING
 
     STRING -->|Yes| BLANK
-    BLANK -->|Yes| E_BLANK["InputParseError<br/>value is blank"]
+    BLANK -->|Yes| E_BLANK["InputParseError"]
     BLANK -->|No| JSON
-    JSON -->|Malformed| E_JSON["InputParseError<br/>line and column reported"]
+    JSON -->|Malformed| E_JSON["InputParseError"]
     JSON -->|Decoded| OBJECT
 
     STRING -->|No| OBJECT
-    OBJECT -->|No| E_OBJECT["InputParseError<br/>must contain an object"]
+    OBJECT -->|No| E_OBJECT["InputParseError"]
     OBJECT -->|Yes| RESULT
 ```
 
-Valid JSON may decode to a list, number, string, Boolean, or null. Those values
-are rejected because the analysis requires a JSON object.
+Valid JSON values that are not objects are rejected.
 
-`parse_analysis_inputs()` applies this behavior to the suggested, selected, and
-final payloads.
+`parse_analysis_inputs()` applies this behavior independently to the suggested,
+selected, and final payloads.
 
----
+## 4. Top-level field dispatch
 
-## 3. Top-level field dispatch
+`analyze_objects()` validates top-level fields against `FIELD_SPECS`.
 
-`analyze_objects()` validates all top-level keys against `FIELD_SPECS`.
-
-An unknown field is rejected so a form change cannot be silently ignored.
+Unknown fields are rejected so a source or form change cannot be silently
+ignored.
 
 ```mermaid
 flowchart TB
@@ -114,14 +169,14 @@ flowchart TB
     KIND{"FieldKind"}
 
     INPUTS --> VALIDATE --> UNKNOWN
-    UNKNOWN -->|Yes| ERROR["ValueError<br/>add field to FIELD_SPECS"]
+    UNKNOWN -->|Yes| ERROR["ValueError"]
     UNKNOWN -->|No| KIND
 
-    KIND -->|TEXT| TEXT["analyze_text_field()<br/>title, purpose,<br/>description, about"]
-    KIND -->|CONTACT| CONTACT["analyze_contact()<br/>four subfields"]
-    KIND -->|COMPENSATION| COMP["analyze_compensation()<br/>text plus Boolean"]
-    KIND -->|LOOKUP| LOOKUP["analyze_lookup_values()<br/>integer ID sets"]
-    KIND -->|MERGED| MERGED["No separate result<br/>handled by another field"]
+    KIND -->|TEXT| TEXT["analyze_text_field()"]
+    KIND -->|CONTACT| CONTACT["analyze_contact()"]
+    KIND -->|COMPENSATION| COMP["analyze_compensation()"]
+    KIND -->|LOOKUP| LOOKUP["analyze_lookup_values()"]
+    KIND -->|MERGED| MERGED["Handled within another result"]
 
     TEXT --> RESULTS["dict[str, AnalysisResult]"]
     CONTACT --> RESULTS
@@ -129,338 +184,188 @@ flowchart TB
     LOOKUP --> RESULTS
 ```
 
-`offersCompensation` is configured as `MERGED`. It is reported within the
-compensation result rather than as an independent result.
+`offersCompensation` is a merged field represented within the compensation
+result rather than as an independent result.
 
-The top-level `contact` object expands into:
+The contact object expands into four separately reported results:
 
-- `contact.email`;
-- `contact.name`;
-- `contact.phone`;
-- `contact.website`.
+```text
+contact.email
+contact.name
+contact.phone
+contact.website
+```
 
-A complete valid input therefore produces twelve field results.
+A complete valid analysis produces twelve field results.
 
----
+Field definitions and requiredness are authoritative in the
+[analysis specification](analysis-specification.md).
 
-## 4. Text outcome classification
+## 5. Shared text-analysis path
 
-Ordinary text, contact text, and selected compensation text share the same final
+Ordinary text, contact text, and selected compensation text use the same
 comparison path.
 
 ```mermaid
 flowchart TB
-    START["Validate offered and<br/>selected text"]
-    MULTIPLE{"More than one<br/>selection?"}
-    SELECTED{"Suggestion<br/>selected?"}
-    REQUIRED{"Final blank<br/>and required?"}
-    FIND["Find selection in<br/>offered suggestions"]
-    OFFERED{"Selection<br/>was offered?"}
+    START["Validate offered, selected,<br/>and final values"]
+    SELECTED{"Suggestion selected?"}
+    VALID_SELECTION["Confirm selected value<br/>was offered"]
+    FINAL["Validate final requiredness"]
     COMPARE["compare_selected_text()"]
-    BLANK{"Final blank?"}
-    EXACT{"Selected equals final?"}
-    COSMETIC{"Equal under cosmetic<br/>transformation?"}
+    OUTCOME{"Text outcome"}
 
-    START --> MULTIPLE
-    MULTIPLE -->|Yes| E_MULTIPLE["ValueError"]
-    MULTIPLE -->|No| SELECTED
+    START --> SELECTED
 
-    SELECTED -->|No| REQUIRED
-    REQUIRED -->|Yes| E_REQUIRED["ValueError"]
-    REQUIRED -->|No| UNASSISTED["UNASSISTED<br/>editing_metrics = None"]
+    SELECTED -->|No| FINAL
+    FINAL -->|Invalid| E_REQUIRED["ValueError"]
+    FINAL -->|Valid| UNASSISTED["UNASSISTED<br/>no editing metrics"]
 
-    SELECTED -->|Yes| FIND --> OFFERED
-    OFFERED -->|No| E_OFFER["ValueError"]
-    OFFERED -->|Yes| COMPARE
+    SELECTED -->|Yes| VALID_SELECTION
+    VALID_SELECTION -->|Invalid| E_SELECTION["ValueError"]
+    VALID_SELECTION -->|Valid| COMPARE
 
-    COMPARE --> BLANK
-    BLANK -->|"Yes, optional"| REMOVED["REMOVED<br/>editing_metrics = None"]
-    BLANK -->|"Yes, required"| E_REQUIRED
-    BLANK -->|No| EXACT
+    COMPARE --> OUTCOME
+    OUTCOME -->|Blank optional final| REMOVED["REMOVED<br/>no editing metrics"]
+    OUTCOME -->|Exact| EXACT["EXACT"]
+    OUTCOME -->|Cosmetic equivalent| COSMETIC["COSMETIC_EQUIVALENT"]
+    OUTCOME -->|Otherwise| EDITED["EDITED"]
 
-    EXACT -->|Yes| M_EXACT["EXACT"]
-    EXACT -->|No| COSMETIC
-    COSMETIC -->|Yes| M_COSMETIC["COSMETIC_EQUIVALENT"]
-    COSMETIC -->|No| M_EDITED["EDITED"]
-
-    M_EXACT --> METRICS
-    M_COSMETIC --> METRICS
-    M_EDITED --> METRICS
-
-    METRICS["text_post_edit_metrics.analyze_post_edit()"]
-    METRICS --> RESULT["PostEditingResult attached to<br/>TextFieldAnalysis.editing_metrics"]
+    EXACT --> METRICS["analyze_post_edit()"]
+    COSMETIC --> METRICS
+    EDITED --> METRICS
+    METRICS --> RESULT["PostEditingResult attached<br/>to field result"]
 ```
 
-Classification order is:
+The classification order and outcome meanings are defined in the
+[analysis specification](analysis-specification.md#5-outcome-vocabulary).
 
-```text
-blank → exact → cosmetic-equivalent → edited
-```
+Selected, nonblank outcomes receive generic editing metrics. `REMOVED` and
+`UNASSISTED` do not.
 
-Metrics are calculated for all selected, nonblank outcomes—including `EXACT`
-and `COSMETIC_EQUIVALENT`.
+## 6. Generic metric delegation
 
-`REMOVED` and `UNASSISTED` have no `PostEditingResult`.
-
----
-
-## 5. Generic text-metric delegation
-
-The study package determines whether comparison is appropriate. The generic
-package performs the calculation.
+The study package decides whether a generic text comparison is appropriate.
+`text-post-edit-metrics` performs the calculation.
 
 ```mermaid
 flowchart LR
     subgraph Study["study-posting-ai-analysis"]
-        CLASSIFY["Classify selected<br/>study field"]
-        ATTACH["Attach metrics to<br/>field result"]
+        CLASSIFY["Validate and classify<br/>selected study text"]
+        ATTACH["Attach PostEditingResult<br/>to field result"]
     end
 
     subgraph Metrics["text-post-edit-metrics"]
         ANALYZE["analyze_post_edit()<br/>suggestion → final"]
-        TER["TER-derived metrics"]
-        CHAR["Character metrics"]
-        SOFT["Weighted soft-word metrics"]
-        COUNTS["Character and word counts"]
-        RESULT["PostEditingResult"]
+        RESULT["TER, character,<br/>soft-word, counts"]
     end
 
     CLASSIFY -->|"Selected and nonblank"| ANALYZE
-    ANALYZE --> TER
-    ANALYZE --> CHAR
-    ANALYZE --> SOFT
-    ANALYZE --> COUNTS
-
-    TER --> RESULT
-    CHAR --> RESULT
-    SOFT --> RESULT
-    COUNTS --> RESULT
-
-    RESULT --> ATTACH
+    ANALYZE --> RESULT --> ATTACH
 ```
 
-The study package contains no TER, Levenshtein, or weighted soft-word
-implementation.
-
-`PostEditingResult` contains no form-field identity. Field identity remains in:
-
-- the result-dictionary key;
-- `Pick.kind`;
-- flattened `field_name`.
-
-The metric package’s argument direction is significant:
+The argument direction is:
 
 ```text
 suggestion = selected or applied AI text
 final      = final saved text
 ```
 
-Normalized denominators use final-text length.
+The study package contains no TER, character-distance, or weighted soft-word
+implementation.
 
----
+`PostEditingResult` contains no study field name. Field identity remains in:
 
-## 6. Cosmetic-equivalence policy
+- the result-dictionary key;
+- `Pick.kind`;
+- flattened `field_name`.
 
-Cosmetic equivalence is a study-specific classification rule, not metric
-preprocessing.
+Study cosmetic normalization is used only for outcome classification. The
+original selected and final strings are passed to `analyze_post_edit()`.
 
-```mermaid
-flowchart LR
-    INPUT["Selected and final text"]
-    NFKD["NFKD decomposition"]
-    CASE["Unicode case folding"]
-    MARKS["Remove combining marks"]
-    PUNCT["Replace punctuation<br/>and symbols with spaces"]
-    SPACE["Collapse whitespace"]
-    EQUAL{"Results equal?"}
+## 7. Specialized analyzers
 
-    INPUT --> NFKD --> CASE --> MARKS --> PUNCT --> SPACE --> EQUAL
-    EQUAL -->|Yes| COSMETIC["COSMETIC_EQUIVALENT"]
-    EQUAL -->|No| EDITED["EDITED"]
-```
+### Contact
 
-The original selected and final strings—not cosmetically transformed strings—are
-passed to `text_post_edit_metrics.analyze_post_edit()`.
+`analyze_contact()`:
 
-This preserves capitalization, punctuation, diacritic, and whitespace edits in
-the underlying metrics.
+1. validates the suggested, selected, and final contact objects;
+2. rejects unknown subfields;
+3. validates each selected contact value against the offered value;
+4. applies the shared text-analysis path independently to each contact
+   subfield;
+5. returns four `TextFieldAnalysis` results.
 
----
+### Compensation
 
-## 7. Contact analysis
+`analyze_compensation()`:
 
-Each contact subfield offers at most one suggestion.
+1. validates categorized text suggestions;
+2. validates the suggested and saved compensation Booleans;
+3. enforces compensation-text requiredness from the saved Boolean;
+4. applies the shared text-analysis path when text was selected;
+5. returns one `CompensationAnalysis`.
 
-```mermaid
-flowchart TB
-    CONTACT["Suggested, selected,<br/>and final contact objects"]
-    CLEAN["clean_contact()<br/>validate fields and values"]
-    FIELD["For each contact subfield"]
-    SELECTED{"Suggestion selected?"}
-    OFFERED{"Suggestion offered<br/>and selection equal?"}
-    REQUIRED{"Final blank<br/>and required?"}
+Boolean acceptance and text editing remain separate result dimensions.
 
-    CONTACT --> CLEAN --> FIELD --> SELECTED
+### Lookup fields
 
-    SELECTED -->|No| REQUIRED
-    REQUIRED -->|Yes| ERROR_REQUIRED["ValueError"]
-    REQUIRED -->|No| UNASSISTED["UNASSISTED"]
+`analyze_lookup_values()`:
 
-    SELECTED -->|Yes| OFFERED
-    OFFERED -->|No| ERROR_OFFER["ValueError"]
-    OFFERED -->|Yes| TEXT["Shared text<br/>comparison path"]
+1. validates offered, picked, and saved integer IDs;
+2. rejects Boolean values;
+3. confirms every picked ID was offered;
+4. derives retained, dropped, added, and saved-not-offered sets;
+5. classifies the outcome;
+6. calculates assisted Jaccard similarity when applicable;
+7. returns `LookupValueAnalysis`.
 
-    TEXT --> RESULT["TextFieldAnalysis"]
-    UNASSISTED --> RESULT
-```
+Lookup similarity remains separate from text effort-saved metrics.
 
-Required contact fields:
+Detailed specialized policy is authoritative in the
+[analysis specification](analysis-specification.md).
 
-- `email`;
-- `name`.
+## 8. Flattening
 
-Optional contact fields:
-
-- `phone`;
-- `website`.
-
-Unknown contact subfields are rejected.
-
----
-
-## 8. Compensation analysis
-
-Compensation combines categorized text suggestions with the
-`offersCompensation` Boolean.
-
-```mermaid
-flowchart TB
-    START["analyze_compensation()"]
-    FLAGS["Validate suggested<br/>and saved Booleans"]
-    SAVED{"Saved Boolean"}
-    SELECTED{"Text suggestion<br/>selected?"}
-    REQUIRED{"Required text<br/>present?"}
-
-    START --> FLAGS --> SAVED
-
-    SAVED -->|Missing| E_FLAG["ValueError"]
-    SAVED -->|True| TEXT_REQUIRED["Text required"]
-    SAVED -->|False| TEXT_OPTIONAL["Text optional"]
-
-    TEXT_REQUIRED --> SELECTED
-    TEXT_OPTIONAL --> SELECTED
-
-    SELECTED -->|Yes| TEXT["Shared text<br/>comparison path"]
-    SELECTED -->|No| REQUIRED
-
-    REQUIRED -->|"Required and blank"| E_TEXT["ValueError"]
-    REQUIRED -->|"Present or optional"| UNASSISTED["UNASSISTED"]
-
-    TEXT --> RESULT["CompensationAnalysis"]
-    UNASSISTED --> RESULT
-```
-
-Compensation-text categories:
-
-- `genericCompensation`;
-- `specificCompensation`.
-
-At most one text suggestion may be selected across both categories.
-
-The result reports Boolean acceptance separately from text outcome:
-
-- `flag_suggested`;
-- `flag_saved`;
-- `flag_accepted`;
-- `flag_changed`;
-- `compensation_text_required`.
-
----
-
-## 9. Lookup analysis
-
-Lookup values are sets of integer IDs.
-
-```mermaid
-flowchart TB
-    START["Validate offered,<br/>picked, and saved IDs"]
-    VALID{"Every picked ID<br/>was offered?"}
-    ANY{"Any ID picked?"}
-    EQUAL{"Picked equals saved?"}
-    JACCARD["Jaccard similarity<br/>intersection ÷ union"]
-
-    START --> VALID
-    VALID -->|No| ERROR["ValueError"]
-    VALID -->|Yes| ANY
-
-    ANY -->|No| UNASSISTED["UNASSISTED<br/>similarity = 0.0 policy value"]
-    ANY -->|Yes| EQUAL
-
-    EQUAL -->|Yes| EXACT["EXACT<br/>similarity = 1.0"]
-    EQUAL -->|No| JACCARD --> EDITED["EDITED"]
-
-    UNASSISTED --> RESULT["LookupValueAnalysis"]
-    EXACT --> RESULT
-    EDITED --> RESULT
-```
-
-Booleans are rejected because `bool` is a subclass of `int`.
-
-Derived sets are:
-
-- `kept = picked ∩ saved`;
-- `dropped = picked − saved`;
-- `added = saved − picked`;
-- `saved_not_offered = saved − offered`.
-
-Lookup similarity must not be combined with text effort-saved scores.
-
----
-
-## 10. Flattening
-
-`flatten_analysis_results()` converts structured field results into plain
+`flatten_analysis_results()` converts structured field results into canonical
 tabular dictionaries.
 
 ```mermaid
 flowchart TB
     RESULTS["dict[str, AnalysisResult]"]
-    EACH["For each field"]
-    TEMPLATE["Create row from<br/>FLATTENED_COLUMNS"]
-    KIND{"Result type"}
+    EACH["For each field result"]
+    TEMPLATE["Initialize every<br/>FLATTENED_COLUMNS entry"]
+    TYPE{"Result type"}
 
-    RESULTS --> EACH --> TEMPLATE --> KIND
+    RESULTS --> EACH --> TEMPLATE --> TYPE
 
-    KIND -->|Text| TEXT["Populate offer, pick,<br/>policy, and metric fields"]
-    KIND -->|Compensation| COMP["Populate text fields<br/>plus Boolean fields"]
-    KIND -->|Lookup| LOOKUP["Populate similarity<br/>and serialized ID sets"]
+    TYPE -->|Text| TEXT["Populate text outcome,<br/>policy, and metrics"]
+    TYPE -->|Compensation| COMP["Populate text plus<br/>Boolean fields"]
+    TYPE -->|Lookup| LOOKUP["Populate similarity and<br/>serialized ID sets"]
 
     TEXT --> PRIVACY{"include_text?"}
     COMP --> PRIVACY
     PRIVACY -->|Yes| INCLUDE["Include selected<br/>and final text"]
     PRIVACY -->|No| OMIT["Leave text columns None"]
 
-    INCLUDE --> ROW["Flat dictionary"]
+    INCLUDE --> ROW["Canonical flat row"]
     OMIT --> ROW
     LOOKUP --> ROW
-
-    ROW --> OUTPUT["list[dict[str, object]]"]
 ```
 
-Every row:
+Every flattened row:
 
 - contains every name in `FLATTENED_COLUMNS`;
 - preserves canonical column order;
 - contains only `None`, `bool`, `int`, `float`, or `str`;
-- excludes free text unless explicitly requested.
+- excludes selected and final text unless `include_text=True`.
 
-Lookup rows leave text metric and policy fields as `None`.
+Lookup sets are serialized as sorted JSON arrays. Lookup rows leave
+text-specific metric and policy columns as `None`.
 
-Identifier sets are serialized as sorted JSON arrays.
+The consuming program owns file output and data-handling controls.
 
----
-
-## 11. Error boundary
+## 9. Errors
 
 The library raises and never logs.
 
@@ -468,15 +373,15 @@ The library raises and never logs.
 |---|---|
 | Missing, blank, malformed, or non-object JSON | `InputParseError` |
 | Wrong runtime type | `TypeError` |
-| Requiredness or form-policy violation | `ValueError` |
+| Requiredness or study-policy violation | `ValueError` |
 | Unknown field | `ValueError` |
 | Selected value that was not offered | `ValueError` |
 
-A consuming program determines whether an invalid record:
+A consuming program decides whether an invalid record:
 
 - aborts processing;
 - is recorded and skipped;
-- is sent to a review queue.
+- is sent for review.
 
-Record identifiers, logging, and batch-failure policy remain outside the
-library.
+Record IDs, logging, batch policy, and report publication remain outside this
+package.
