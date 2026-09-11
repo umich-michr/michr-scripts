@@ -508,13 +508,13 @@ def test_csv_command_generates_normalized_report(
     assert provider.read_calls == []
 
     records_path = output_directory / "records.csv"
-    metrics_path = output_directory / "field_metrics.csv"
+    metrics_path = output_directory / "ai_assistance_metrics.csv"
 
     assert records_path.is_file()
     assert metrics_path.is_file()
 
     record_header, record_rows = read_csv(records_path)
-    metric_header, metric_rows = read_csv(metrics_path)
+    metric_header, ai_assistance_rows = read_csv(metrics_path)
 
     assert tuple(record_header) == (
         "ID",
@@ -535,17 +535,17 @@ def test_csv_command_generates_normalized_report(
     assert record_rows[1]["END_TIME"] == "\\N"
 
     assert tuple(metric_header) == tuple(FLATTENED_COLUMNS)
-    assert metric_rows == []
+    assert ai_assistance_rows == []
 
     output_text = standard_output.getvalue()
 
     assert f"Report directory: {output_directory}" in output_text
     assert f"Records CSV: {records_path}" in output_text
-    assert f"Field metrics CSV: {metrics_path}" in output_text
+    assert f"AI assistance metrics CSV: {metrics_path}" in output_text
     assert "Source rows: 2" in output_text
     assert "Analyzed rows: 0" in output_text
     assert "Skipped rows: 2" in output_text
-    assert "Field metric rows: 0" in output_text
+    assert "AI assistance rows: 0" in output_text
 
 
 def test_csv_command_analyzes_completed_ai_row(
@@ -576,16 +576,18 @@ def test_csv_command_analyzes_completed_ai_row(
     assert error_output.getvalue() == ""
 
     _, record_rows = read_csv(output_directory / "records.csv")
-    metric_header, metric_rows = read_csv(output_directory / "field_metrics.csv")
+    metric_header, ai_assistance_rows = read_csv(
+        output_directory / "ai_assistance_metrics.csv"
+    )
 
     assert len(record_rows) == 1
     assert record_rows[0]["ID"] == "1003"
     assert record_rows[0]["END_TIME"] == ("2026-05-18T10:00:00.123456")
 
     assert tuple(metric_header) == tuple(FLATTENED_COLUMNS)
-    assert len(metric_rows) == 12
-    assert {row["record_id"] for row in metric_rows} == {"1003"}
-    assert {row["field_name"] for row in metric_rows} == {
+    assert len(ai_assistance_rows) == 12
+    assert {row["record_id"] for row in ai_assistance_rows} == {"1003"}
+    assert {row["field_name"] for row in ai_assistance_rows} == {
         "about",
         "compensation",
         "contact.email",
@@ -599,15 +601,15 @@ def test_csv_command_analyzes_completed_ai_row(
         "title",
         "topics",
     }
-    assert all(row["selected_text"] == "\\N" for row in metric_rows)
-    assert all(row["final_text"] == "\\N" for row in metric_rows)
+    assert all(row["selected_text"] == "\\N" for row in ai_assistance_rows)
+    assert all(row["final_text"] == "\\N" for row in ai_assistance_rows)
 
     output_text = standard_output.getvalue()
 
     assert "Source rows: 1" in output_text
     assert "Analyzed rows: 1" in output_text
     assert "Skipped rows: 0" in output_text
-    assert "Field metric rows: 12" in output_text
+    assert "AI assistance rows: 12" in output_text
 
 
 def test_csv_command_uses_environment_configuration(
@@ -1076,13 +1078,13 @@ def test_database_command_generates_report_with_oracle_adapter(
     assert connection.closed is True
 
     records_path = output_directory / "records.csv"
-    metrics_path = output_directory / "field_metrics.csv"
+    metrics_path = output_directory / "ai_assistance_metrics.csv"
 
     assert records_path.is_file()
     assert metrics_path.is_file()
 
     _, record_rows = read_csv(records_path)
-    metric_header, metric_rows = read_csv(metrics_path)
+    metric_header, ai_assistance_rows = read_csv(metrics_path)
 
     assert len(record_rows) == 1
     assert record_rows[0]["ID"] == "1003"
@@ -1090,12 +1092,12 @@ def test_database_command_generates_report_with_oracle_adapter(
     assert record_rows[0]["ATTEMPT_RESULT"] == "COMPLETE"
 
     assert tuple(metric_header) == tuple(FLATTENED_COLUMNS)
-    assert len(metric_rows) == 12
-    assert {row["record_id"] for row in metric_rows} == {"1003"}
+    assert len(ai_assistance_rows) == 12
+    assert {row["record_id"] for row in ai_assistance_rows} == {"1003"}
 
     output_text = standard_output.getvalue()
 
     assert "Source rows: 1" in output_text
     assert "Analyzed rows: 1" in output_text
     assert "Skipped rows: 0" in output_text
-    assert "Field metric rows: 12" in output_text
+    assert "AI assistance rows: 12" in output_text

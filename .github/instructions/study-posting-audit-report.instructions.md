@@ -35,7 +35,7 @@ It must not duplicate:
 Default successful outputs are:
 
 - `records.csv`: one row per source record;
-- `field_metrics.csv`: one row per analyzed field.
+- `ai_assistance_metrics.csv`: one row per analyzed field.
 
 `field_metrics.record_id` joins to the configured source ID column in
 `records.csv`.

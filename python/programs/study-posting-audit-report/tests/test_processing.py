@@ -207,7 +207,9 @@ def metric_row_for_field(
     field_name: str,
 ) -> dict[str, object]:
     """Return one flattened metric row by field name."""
-    matches = [row for row in outcome.metric_rows if row["field_name"] == field_name]
+    matches = [
+        row for row in outcome.ai_assistance_rows if row["field_name"] == field_name
+    ]
 
     assert len(matches) == 1
 
@@ -432,15 +434,15 @@ def test_extract_record_id_rejects_unsupported_type(
 
 
 def test_analyze_audit_row_produces_one_metric_row_per_field() -> None:
-    metric_rows = analyze_audit_row(
+    ai_assistance_rows = analyze_audit_row(
         completed_ai_source_row(),
         config=AuditReportConfig(),
         row_number=1,
         record_id=1001,
     )
 
-    assert len(metric_rows) == 12
-    assert {row["field_name"] for row in metric_rows} == {
+    assert len(ai_assistance_rows) == 12
+    assert {row["field_name"] for row in ai_assistance_rows} == {
         "about",
         "compensation",
         "contact.email",
@@ -457,37 +459,37 @@ def test_analyze_audit_row_produces_one_metric_row_per_field() -> None:
 
 
 def test_analyze_audit_row_carries_record_id_to_every_metric() -> None:
-    metric_rows = analyze_audit_row(
+    ai_assistance_rows = analyze_audit_row(
         completed_ai_source_row(),
         config=AuditReportConfig(),
         row_number=1,
         record_id="audit-1001",
     )
 
-    assert all(row["record_id"] == "audit-1001" for row in metric_rows)
+    assert all(row["record_id"] == "audit-1001" for row in ai_assistance_rows)
 
 
 def test_analyze_audit_row_excludes_text_by_default() -> None:
-    metric_rows = analyze_audit_row(
+    ai_assistance_rows = analyze_audit_row(
         completed_ai_source_row(),
         config=AuditReportConfig(),
         row_number=1,
         record_id=1001,
     )
 
-    for row in metric_rows:
+    for row in ai_assistance_rows:
         assert row["selected_text"] is None
         assert row["final_text"] is None
 
 
 def test_analyze_audit_row_includes_text_when_enabled() -> None:
-    metric_rows = analyze_audit_row(
+    ai_assistance_rows = analyze_audit_row(
         completed_ai_source_row(),
         config=AuditReportConfig(include_text=True),
         row_number=1,
         record_id=1001,
     )
-    title = next(row for row in metric_rows if row["field_name"] == "title")
+    title = next(row for row in ai_assistance_rows if row["field_name"] == "title")
 
     assert title["selected_text"] == "Title suggestion"
     assert title["final_text"] == "Title suggestion"
@@ -597,7 +599,7 @@ def test_completed_ai_row_is_analyzed() -> None:
     )
 
     assert outcome.analyzed is True
-    assert len(outcome.metric_rows) == 12
+    assert len(outcome.ai_assistance_rows) == 12
 
 
 def test_completed_manual_row_is_preserved_without_analysis() -> None:
@@ -613,7 +615,7 @@ def test_completed_manual_row_is_preserved_without_analysis() -> None:
     assert outcome.record == row
     assert outcome.record is not row
     assert outcome.analyzed is False
-    assert outcome.metric_rows == ()
+    assert outcome.ai_assistance_rows == ()
 
 
 @pytest.mark.parametrize(
@@ -650,7 +652,7 @@ def test_incomplete_ai_row_is_preserved_without_analysis(
 
     assert outcome.record == row
     assert outcome.analyzed is False
-    assert outcome.metric_rows == ()
+    assert outcome.ai_assistance_rows == ()
 
 
 def test_non_ai_row_does_not_inspect_result_or_payloads() -> None:
@@ -668,7 +670,7 @@ def test_non_ai_row_does_not_inspect_result_or_payloads() -> None:
     )
 
     assert outcome.analyzed is False
-    assert outcome.metric_rows == ()
+    assert outcome.ai_assistance_rows == ()
 
 
 def test_completed_ai_row_requires_end_time() -> None:
@@ -804,9 +806,9 @@ def test_process_audit_rows_preserves_every_selected_and_skipped_record() -> Non
         False,
         True,
     ]
-    assert outcomes[0].metric_rows == ()
-    assert outcomes[1].metric_rows == ()
-    assert len(outcomes[2].metric_rows) == 12
+    assert outcomes[0].ai_assistance_rows == ()
+    assert outcomes[1].ai_assistance_rows == ()
+    assert len(outcomes[2].ai_assistance_rows) == 12
 
 
 def test_process_audit_rows_assigns_one_based_source_numbers() -> None:
@@ -943,7 +945,7 @@ def test_processing_is_lazy() -> None:
     assert events == ["first", "second"]
 
 
-def test_metric_rows_are_fresh_dictionaries() -> None:
+def test_ai_assistance_rows_are_fresh_dictionaries() -> None:
     outcome = next(
         process_audit_rows(
             [completed_ai_source_row()],

@@ -295,11 +295,13 @@ def _print_report(
 
     print(f"Report directory: {report.output_directory}", file=output)
     print(f"Records CSV: {report.records_path}", file=output)
-    print(f"Field metrics CSV: {report.field_metrics_path}", file=output)
+    print(
+        f"AI assistance metrics CSV: {report.ai_assistance_metrics_path}", file=output
+    )
     print(f"Source rows: {summary.source_rows}", file=output)
     print(f"Analyzed rows: {summary.analyzed_rows}", file=output)
     print(f"Skipped rows: {summary.skipped_rows}", file=output)
-    print(f"Field metric rows: {summary.metric_rows}", file=output)
+    print(f"AI assistance rows: {summary.ai_assistance_rows}", file=output)
 
 
 def _run_csv_from_namespace(

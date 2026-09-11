@@ -12,7 +12,7 @@ import pytest
 
 from study_posting_ai_analysis import FLATTENED_COLUMNS
 from study_posting_audit_report import (
-    FIELD_METRICS_FILENAME,
+    AI_ASSISTANCE_METRICS_FILENAME,
     RECORDS_FILENAME,
     AuditOutputError,
     AuditReportConfig,
@@ -309,18 +309,20 @@ def test_generate_report_writes_two_files_and_summary(
 
     assert report.output_directory == output_directory
     assert report.records_path == output_directory / RECORDS_FILENAME
-    assert report.field_metrics_path == (output_directory / FIELD_METRICS_FILENAME)
+    assert report.ai_assistance_metrics_path == (
+        output_directory / AI_ASSISTANCE_METRICS_FILENAME
+    )
 
     assert output_directory.is_dir()
     assert report.records_path.is_file()
-    assert report.field_metrics_path.is_file()
+    assert report.ai_assistance_metrics_path.is_file()
 
     assert report.summary.source_rows == 3
     assert report.summary.analyzable_rows == 1
     assert report.summary.analyzed_rows == 1
     assert report.summary.skipped_rows == 2
     assert report.summary.failed_rows == 0
-    assert report.summary.metric_rows == 12
+    assert report.summary.ai_assistance_rows == 12
 
     assert source.open_count == 1
     assert source.closed is True
@@ -407,7 +409,7 @@ def test_only_completed_ai_rows_produce_field_metrics(
     )
 
     _, record_rows = read_csv_rows(report.records_path)
-    _, metric_rows = read_csv_rows(report.field_metrics_path)
+    _, ai_assistance_rows = read_csv_rows(report.ai_assistance_metrics_path)
 
     assert len(record_rows) == 3
     assert report.summary.source_rows == 3
@@ -415,11 +417,11 @@ def test_only_completed_ai_rows_produce_field_metrics(
     assert report.summary.analyzed_rows == 1
     assert report.summary.skipped_rows == 2
     assert report.summary.failed_rows == 0
-    assert report.summary.metric_rows == 12
-    assert {row["record_id"] for row in metric_rows} == {"1003"}
+    assert report.summary.ai_assistance_rows == 12
+    assert {row["record_id"] for row in ai_assistance_rows} == {"1003"}
 
 
-def test_field_metrics_csv_uses_canonical_columns(
+def test_ai_assistance_metrics_csv_uses_canonical_columns(
     tmp_path: Path,
 ) -> None:
     source = InMemoryRowSource(
@@ -432,7 +434,7 @@ def test_field_metrics_csv_uses_canonical_columns(
         output_directory=tmp_path / "report",
     )
 
-    header, rows = read_csv_rows(report.field_metrics_path)
+    header, rows = read_csv_rows(report.ai_assistance_metrics_path)
 
     assert tuple(header) == tuple(FLATTENED_COLUMNS)
     assert len(rows) == 12
@@ -453,7 +455,7 @@ def test_field_metrics_csv_uses_canonical_columns(
     }
 
 
-def test_field_metrics_exclude_free_text_by_default(
+def test_ai_assistance_metrics_exclude_free_text_by_default(
     tmp_path: Path,
 ) -> None:
     source = InMemoryRowSource(
@@ -466,13 +468,13 @@ def test_field_metrics_exclude_free_text_by_default(
         output_directory=tmp_path / "report",
     )
 
-    _, rows = read_csv_rows(report.field_metrics_path)
+    _, rows = read_csv_rows(report.ai_assistance_metrics_path)
 
     assert all(row["selected_text"] == "\\N" for row in rows)
     assert all(row["final_text"] == "\\N" for row in rows)
 
 
-def test_field_metrics_include_text_when_enabled(
+def test_ai_assistance_metrics_include_text_when_enabled(
     tmp_path: Path,
 ) -> None:
     source = InMemoryRowSource(
@@ -486,7 +488,7 @@ def test_field_metrics_include_text_when_enabled(
         config=AuditReportConfig(include_text=True),
     )
 
-    _, rows = read_csv_rows(report.field_metrics_path)
+    _, rows = read_csv_rows(report.ai_assistance_metrics_path)
     title = next(row for row in rows if row["field_name"] == "title")
 
     assert title["selected_text"] == "Title suggestion"
@@ -507,19 +509,19 @@ def test_empty_source_publishes_header_only_files(
     )
 
     record_header, record_rows = read_csv_rows(report.records_path)
-    metric_header, metric_rows = read_csv_rows(report.field_metrics_path)
+    metric_header, ai_assistance_rows = read_csv_rows(report.ai_assistance_metrics_path)
 
     assert tuple(record_header) == audit_schema().column_names
     assert tuple(metric_header) == tuple(FLATTENED_COLUMNS)
     assert record_rows == []
-    assert metric_rows == []
+    assert ai_assistance_rows == []
 
     assert report.summary.source_rows == 0
     assert report.summary.analyzable_rows == 0
     assert report.summary.analyzed_rows == 0
     assert report.summary.skipped_rows == 0
     assert report.summary.failed_rows == 0
-    assert report.summary.metric_rows == 0
+    assert report.summary.ai_assistance_rows == 0
 
 
 def test_custom_output_options_apply_to_both_files(
@@ -542,7 +544,7 @@ def test_custom_output_options_apply_to_both_files(
     )
 
     records_bytes = (output_directory / RECORDS_FILENAME).read_bytes()
-    metrics_bytes = (output_directory / FIELD_METRICS_FILENAME).read_bytes()
+    metrics_bytes = (output_directory / AI_ASSISTANCE_METRICS_FILENAME).read_bytes()
 
     assert b"\r\n" in records_bytes
     assert b"\r\n" in metrics_bytes
@@ -936,4 +938,4 @@ def test_unsupported_output_value_publishes_nothing(
 
 def test_output_filenames_are_stable() -> None:
     assert RECORDS_FILENAME == "records.csv"
-    assert FIELD_METRICS_FILENAME == "field_metrics.csv"
+    assert AI_ASSISTANCE_METRICS_FILENAME == "ai_assistance_metrics.csv"

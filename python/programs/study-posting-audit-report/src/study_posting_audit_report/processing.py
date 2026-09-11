@@ -382,7 +382,7 @@ def process_audit_rows(
             record_id=record_id,
         )
 
-        metric_rows = (
+        ai_assistance_rows = (
             analyze_audit_row(
                 row,
                 config=config,
@@ -398,5 +398,5 @@ def process_audit_rows(
             record_id=record_id,
             record=dict(row),
             analyzed=analyzed,
-            metric_rows=metric_rows,
+            ai_assistance_rows=ai_assistance_rows,
         )

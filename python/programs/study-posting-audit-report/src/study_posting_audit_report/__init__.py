@@ -1,7 +1,7 @@
 """Study-posting authoring audit-report program.
 
 This program composes schema-aware row sources with study-posting analysis and
-writes normalized source-record and field-metric CSV outputs.
+writes normalized source-record and AI-assistance metrics CSV outputs.
 """
 
 from study_posting_audit_report.config import (
@@ -17,13 +17,13 @@ from study_posting_audit_report.errors import (
     RecordId,
 )
 from study_posting_audit_report.models import (
+    AiAssistanceRow,
     AuditCsvReport,
     AuditReportSummary,
-    MetricRow,
     ProcessedAuditRow,
 )
 from study_posting_audit_report.output import (
-    FIELD_METRICS_FILENAME,
+    AI_ASSISTANCE_METRICS_FILENAME,
     RECORDS_FILENAME,
     CsvOutputOptions,
     generate_csv_report,
@@ -39,8 +39,9 @@ from study_posting_audit_report.processing import (
 __version__ = "0.1.0"
 
 __all__ = [
-    "FIELD_METRICS_FILENAME",
+    "AI_ASSISTANCE_METRICS_FILENAME",
     "RECORDS_FILENAME",
+    "AiAssistanceRow",
     "AuditColumnMapping",
     "AuditCsvReport",
     "AuditOutputError",
@@ -51,7 +52,6 @@ __all__ = [
     "AuditRowError",
     "AuditSourceError",
     "CsvOutputOptions",
-    "MetricRow",
     "ProcessedAuditRow",
     "RecordId",
     "__version__",

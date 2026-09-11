@@ -44,7 +44,7 @@ from tabular_row_sources import (
 )
 
 RECORDS_FILENAME = "records.csv"
-FIELD_METRICS_FILENAME = "field_metrics.csv"
+AI_ASSISTANCE_METRICS_FILENAME = "ai_assistance_metrics.csv"
 
 
 def _require_nonblank_string(
@@ -361,10 +361,10 @@ def _write_staged_report(
     )
 
     records_path = staging_directory / RECORDS_FILENAME
-    metrics_path = staging_directory / FIELD_METRICS_FILENAME
+    ai_assistance_path = staging_directory / AI_ASSISTANCE_METRICS_FILENAME
 
     record_columns = source.schema.column_names
-    metric_columns = tuple(FLATTENED_COLUMNS)
+    ai_assistance_columns = tuple(FLATTENED_COLUMNS)
 
     records_handle, records_writer = _open_csv_output(
         records_path,
@@ -372,18 +372,18 @@ def _write_staged_report(
         lineterminator=options.lineterminator,
         columns=record_columns,
     )
-    metrics_handle, metrics_writer = _open_csv_output(
-        metrics_path,
+    ai_assistance_handle, ai_assistance_writer = _open_csv_output(
+        ai_assistance_path,
         encoding=options.encoding,
         lineterminator=options.lineterminator,
-        columns=metric_columns,
+        columns=ai_assistance_columns,
     )
 
     source_rows = 0
     analyzable_rows = 0
     analyzed_rows = 0
     skipped_rows = 0
-    metric_rows = 0
+    ai_assistance_rows = 0
 
     try:
         with source.open_rows() as rows:
@@ -407,21 +407,21 @@ def _write_staged_report(
                 else:
                     skipped_rows += 1
 
-                for metric_row in outcome.metric_rows:
-                    metrics_writer.writerow(
+                for ai_assistance_row in outcome.ai_assistance_rows:
+                    ai_assistance_writer.writerow(
                         _serialize_row(
-                            metric_row,
-                            columns=metric_columns,
+                            ai_assistance_row,
+                            columns=ai_assistance_columns,
                             null_value=options.null_value,
                         )
                     )
-                    metric_rows += 1
+                    ai_assistance_rows += 1
 
         _flush_and_sync(records_handle)
-        _flush_and_sync(metrics_handle)
+        _flush_and_sync(ai_assistance_handle)
     finally:
         records_handle.close()
-        metrics_handle.close()
+        ai_assistance_handle.close()
 
     return AuditReportSummary(
         source_rows=source_rows,
@@ -429,7 +429,7 @@ def _write_staged_report(
         analyzed_rows=analyzed_rows,
         skipped_rows=skipped_rows,
         failed_rows=0,
-        metric_rows=metric_rows,
+        ai_assistance_rows=ai_assistance_rows,
     )
 
 
@@ -448,7 +448,7 @@ def generate_csv_report(
         Schema-aware canonical row source.
     output_directory
         New directory that will contain ``records.csv`` and
-        ``field_metrics.csv``. It must not already exist.
+        ``ai_assistance_metrics.csv``. It must not already exist.
     config
         Audit-report configuration. Defaults to ``AuditReportConfig()``.
     output_options
@@ -542,6 +542,6 @@ def generate_csv_report(
     return AuditCsvReport(
         output_directory=destination,
         records_path=destination / RECORDS_FILENAME,
-        field_metrics_path=destination / FIELD_METRICS_FILENAME,
+        ai_assistance_metrics_path=(destination / AI_ASSISTANCE_METRICS_FILENAME),
         summary=summary,
     )

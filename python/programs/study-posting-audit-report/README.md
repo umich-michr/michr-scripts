@@ -60,7 +60,7 @@ study-posting-ai-analysis
             ↓
  text-post-edit-metrics
             ↓
- records.csv + field_metrics.csv
+ records.csv + ai_assistance_metrics.csv
 ```
 
 | Component | Responsibility |
@@ -81,7 +81,7 @@ A successful report contains:
 ```text
 report/
 ├── records.csv
-└── field_metrics.csv
+└── ai_assistance_metrics.csv
 ```
 
 ### `records.csv`
@@ -94,7 +94,7 @@ Contains every successfully processed source record, including:
 
 Columns follow canonical schema order.
 
-### `field_metrics.csv`
+### `ai_assistance_metrics.csv`
 
 Contains one row per analyzed study-posting field using
 `study_posting_ai_analysis.FLATTENED_COLUMNS`.
@@ -246,7 +246,7 @@ true, false, 1, 0, yes, no, on, off
 | Prompting | `STUDY_POSTING_AUDIT_PROMPT` | `true` |
 
 `--include-text` controls only the flattened `selected_text` and `final_text`
-columns in `field_metrics.csv`. It does not remove source payloads from
+columns in `ai_assistance_metrics.csv`. It does not remove source payloads from
 `records.csv`.
 
 ## CSV command
@@ -432,7 +432,7 @@ with source.open_rows() as rows:
     for outcome in process_audit_rows(rows, config=config):
         consume_record(outcome.record)
 
-        for metric_row in outcome.metric_rows:
+        for metric_row in outcome.ai_assistance_rows:
             consume_metric(metric_row)
 ```
 

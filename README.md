@@ -68,7 +68,7 @@ study-posting-ai-analysis
             ↓
  text-post-edit-metrics
             ↓
- records.csv + field_metrics.csv
+ records.csv + ai_assistance_metrics.csv
 ```
 
 Dependency rules:
@@ -306,7 +306,7 @@ The program writes normalized:
 
 ```text
 records.csv
-field_metrics.csv
+ai_assistance_metrics.csv
 ```
 
 See the

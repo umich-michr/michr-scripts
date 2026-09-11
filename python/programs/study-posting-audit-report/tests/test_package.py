@@ -7,7 +7,7 @@ import pytest
 
 import study_posting_audit_report as package
 from study_posting_audit_report import (
-    FIELD_METRICS_FILENAME,
+    AI_ASSISTANCE_METRICS_FILENAME,
     RECORDS_FILENAME,
     AuditColumnMapping,
     AuditCsvReport,
@@ -230,7 +230,7 @@ def test_report_summary_preserves_counts() -> None:
         analyzed_rows=3,
         skipped_rows=6,
         failed_rows=1,
-        metric_rows=36,
+        ai_assistance_rows=36,
     )
 
     assert summary.source_rows == 10
@@ -238,7 +238,7 @@ def test_report_summary_preserves_counts() -> None:
     assert summary.analyzed_rows == 3
     assert summary.skipped_rows == 6
     assert summary.failed_rows == 1
-    assert summary.metric_rows == 36
+    assert summary.ai_assistance_rows == 36
 
 
 def test_program_exceptions_share_one_base_class() -> None:
@@ -285,6 +285,29 @@ def test_public_api_exports_output_serialization() -> None:
 def test_public_api_exports_report_generation() -> None:
     assert package.AuditCsvReport is AuditCsvReport
     assert package.AuditSourceError is AuditSourceError
-    assert package.FIELD_METRICS_FILENAME == FIELD_METRICS_FILENAME
+    assert package.AI_ASSISTANCE_METRICS_FILENAME == AI_ASSISTANCE_METRICS_FILENAME
     assert package.RECORDS_FILENAME == RECORDS_FILENAME
     assert package.generate_csv_report is generate_csv_report
+
+
+def test_ai_assistance_output_vocabulary_is_public_contract() -> None:
+    assert "AI_ASSISTANCE_METRICS_FILENAME" in package.__all__
+    assert "AiAssistanceRow" in package.__all__
+
+    assert hasattr(package, "AI_ASSISTANCE_METRICS_FILENAME")
+    assert hasattr(package, "AiAssistanceRow")
+
+    assert "FIELD_METRICS_FILENAME" not in package.__all__
+    assert "MetricRow" not in package.__all__
+
+    assert not hasattr(package, "FIELD_METRICS_FILENAME")
+    assert not hasattr(package, "MetricRow")
+
+    assert "ai_assistance_rows" in ProcessedAuditRow.__annotations__
+    assert "metric_rows" not in ProcessedAuditRow.__annotations__
+
+    assert "ai_assistance_rows" in AuditReportSummary.__annotations__
+    assert "metric_rows" not in AuditReportSummary.__annotations__
+
+    assert "ai_assistance_metrics_path" in AuditCsvReport.__annotations__
+    assert "field_metrics_path" not in AuditCsvReport.__annotations__
