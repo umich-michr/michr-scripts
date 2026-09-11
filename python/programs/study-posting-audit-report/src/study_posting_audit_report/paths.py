@@ -34,5 +34,5 @@ def default_output_directory() -> Path:
 
 
 def default_dotenv_path() -> Path:
-    """Return the default workspace dotenv path."""
-    return workspace_root() / ".env"
+    """Return the default program-local dotenv path."""
+    return program_directory() / ".env"

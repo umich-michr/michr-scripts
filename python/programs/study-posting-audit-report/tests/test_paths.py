@@ -47,8 +47,8 @@ def test_default_output_directory_is_under_workspace_output() -> None:
     )
 
 
-def test_default_dotenv_path_is_workspace_dotenv() -> None:
-    assert default_dotenv_path() == workspace_root() / ".env"
+def test_default_dotenv_path_is_program_dotenv() -> None:
+    assert default_dotenv_path() == program_directory() / ".env"
 
 
 def test_path_functions_return_absolute_paths() -> None:

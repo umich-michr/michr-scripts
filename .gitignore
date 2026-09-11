@@ -51,6 +51,8 @@ python/programs/*/reports/
 # ---------------------------------------------------------------------------
 .env
 .env.*
+# Committable templates contain no secrets.
+!.env.example
 
 # ---------------------------------------------------------------------------
 # Editors and operating systems
