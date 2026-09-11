@@ -56,7 +56,7 @@ jobs:
             find python/packages python/programs tools \
               -type f \
               <math><mrow><mo>−</mo></mrow><mrow><mi>n</mi><mi>a</mi><mi>m</mi><msup><mi>e</mi><mo lspace="0em" rspace="0em" class="tml-prime">′</mo></msup><mo>∗</mo></mrow><mrow><mi>.</mi><mi>p</mi><msup><mi>y</mi><mo lspace="0em" rspace="0em" class="tml-prime">′</mo></msup><mo>−</mo></mrow><mrow><mi>o</mi><mo>−</mo></mrow><mrow><mi>n</mi><mi>a</mi><mi>m</mi><msup><mi>e</mi><mo lspace="0em" rspace="0em" class="tml-prime">′</mo></msup><mo>∗</mo></mrow><mrow><mi>.</mi><mi>p</mi><mi>y</mi><msup><mi>i</mi><mo lspace="0em" rspace="0em" class="tml-prime">′</mo></msup></mrow></math> \
-              -print 2>/dev/null
+              -print0 2>/dev/null
           )
 
           if [ "${#python_files[@]}" -eq 0 ]; then
@@ -79,7 +79,7 @@ jobs:
 
       - name: Audit locked dependencies
         if: always()
-        run: make audit-deps
+        run: env -u FORCE_COLOR NO_COLOR=1 make audit-deps
 
       - name: Scan Python source for security issues
         if: always()
