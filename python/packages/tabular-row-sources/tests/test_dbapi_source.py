@@ -75,6 +75,13 @@ class FakeCursor:
         self.closed = True
 
 
+class FakeFetchInfo:
+    """Synthetic driver metadata object exposing a column name."""
+
+    def __init__(self, name: object) -> None:
+        self.name = name
+
+
 class FakeConnection:
     """Configurable fake implementing the connection behavior used by source."""
 
@@ -184,6 +191,11 @@ def representative_schema() -> RowSchema:
 def description_for(*names: str) -> tuple[tuple[object, ...], ...]:
     """Return DB-API-style cursor description entries."""
     return tuple((name, None, None, None, None, None, None) for name in names)
+
+
+def object_description_for(*names: str) -> tuple[FakeFetchInfo, ...]:
+    """Return python-oracledb-style metadata objects."""
+    return tuple(FakeFetchInfo(name) for name in names)
 
 
 def make_source(
@@ -785,10 +797,12 @@ def test_description_must_be_sequence(description: object) -> None:
     ["ID", b"ID", 42, object()],
     ids=["string", "bytes", "integer", "object"],
 )
-def test_description_item_must_be_sequence(item: object) -> None:
+def test_description_item_must_be_sequence_or_expose_name(
+    item: object,
+) -> None:
     with pytest.raises(
         SourceFormatError,
-        match="description item 1 must be a sequence",
+        match="description item 1 must be a sequence or expose a name attribute",
     ):
         metadata_failure([item])
 
@@ -842,6 +856,50 @@ def test_result_column_names_must_match_schema(
         match="result columns do not match schema names",
     ):
         metadata_failure(description)
+
+
+def test_description_accepts_objects_with_name_attributes() -> None:
+    cursor = FakeCursor(
+        description=object_description_for("ID", "TITLE"),
+        batches=[
+            [("1", "First")],
+            [],
+        ],
+    )
+    source, _, _ = make_source(cursor)
+
+    assert collect_rows(source) == [
+        {
+            "ID": 1,
+            "TITLE": "First",
+        }
+    ]
+
+
+def test_object_description_column_name_must_be_string() -> None:
+    with pytest.raises(
+        SourceFormatError,
+        match="column name 1 must be a string",
+    ):
+        metadata_failure(
+            (
+                FakeFetchInfo(42),
+                FakeFetchInfo("TITLE"),
+            )
+        )
+
+
+def test_object_description_column_name_must_not_be_blank() -> None:
+    with pytest.raises(
+        SourceFormatError,
+        match="column name 1 must not be blank",
+    ):
+        metadata_failure(
+            (
+                FakeFetchInfo("   "),
+                FakeFetchInfo("TITLE"),
+            )
+        )
 
 
 # ---------------------------------------------------------------------------

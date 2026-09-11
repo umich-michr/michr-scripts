@@ -111,6 +111,14 @@ the wrong columns while allowing harmless source-column reordering.
 
 A projection mode that ignores missing or unexpected columns is not supported.
 
+DB-API metadata may represent each result column as either:
+
+- a standard DB-API description sequence whose first item is the column name;
+- a driver metadata object exposing a string `name` attribute.
+
+This supports standard tuple-shaped descriptions and drivers such as
+python-oracledb while preserving the same strict schema-name validation.
+
 ---
 
 ## 5. Nullability

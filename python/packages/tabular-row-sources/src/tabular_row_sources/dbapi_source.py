@@ -180,7 +180,13 @@ def _require_cursor(value: object) -> _CursorProtocol:
 def _column_names_from_description(
     description: object,
 ) -> tuple[str, ...]:
-    """Extract ordered column names from DB-API cursor metadata."""
+    """Extract ordered column names from DB-API cursor metadata.
+
+    Standard DB-API descriptions contain sequence items whose first value is
+    the column name. Some drivers, including current python-oracledb versions,
+    return metadata objects exposing the column name through a ``name``
+    attribute instead.
+    """
     if description is None:
         raise SourceFormatError("DB-API query did not return a result-set description")
 
@@ -194,20 +200,24 @@ def _column_names_from_description(
     names: list[str] = []
 
     for position, item in enumerate(description_items, start=1):
-        if not isinstance(item, Sequence) or isinstance(
+        if isinstance(item, Sequence) and not isinstance(
             item,
             (str, bytes, bytearray),
         ):
-            raise SourceFormatError(
-                f"DB-API description item {position} must be a sequence"
-            )
+            description_item = cast("Sequence[object]", item)
 
-        description_item = cast("Sequence[object]", item)
+            if not description_item:
+                raise SourceFormatError(f"DB-API description item {position} is empty")
 
-        if not description_item:
-            raise SourceFormatError(f"DB-API description item {position} is empty")
+            name = description_item[0]
+        else:
+            name = getattr(item, "name", None)
 
-        name = description_item[0]
+            if name is None:
+                raise SourceFormatError(
+                    f"DB-API description item {position} must be a sequence "
+                    "or expose a name attribute"
+                )
 
         if not isinstance(name, str):
             raise SourceFormatError(f"DB-API column name {position} must be a string")

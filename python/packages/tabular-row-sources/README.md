@@ -270,6 +270,8 @@ The query source:
 
 - creates a connection and cursor for each `open_rows()` call;
 - passes bind parameters separately from SQL;
+- reads column names from standard DB-API description sequences or compatible
+  driver metadata objects exposing a `name` attribute;
 - validates result-column names against the schema;
 - accepts result columns in any order;
 - calls `fetchmany()` rather than `fetchall()`;
