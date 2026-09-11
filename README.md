@@ -238,6 +238,12 @@ Do not manually activate `.venv`, invoke `pip`, or edit `uv.lock`.
 | `make check` | Run the complete quality gate |
 | `make hooks-run` | Run pre-commit hooks against all files |
 | `make clean` | Remove generated reports and caches |
+| `make clean-output` | Explicitly remove application output under the repository-root `output/` directory |
+
+`make clean-output` is intentionally separate from `make clean`, `make check`,
+and CI. It deletes operational program output, which may contain sensitive data
+or be expensive to regenerate. Move or archive any needed report before running
+it.
 
 Run `make` without arguments for the complete target list.
 

@@ -65,7 +65,7 @@ endif
         audit audit-deps audit-code \
         test test-fast test-slow coverage coverage-open \
         check ci members validate-package \
-        clean clean-reports clean-caches clean-venv distclean \
+        clean clean-reports clean-output clean-caches clean-venv distclean \
         hooks hooks-run hooks-update hooks-clean doctor
 
 
@@ -130,6 +130,7 @@ help:
 	@echo ""
 	@echo "  Cleaning"
 	@echo "    clean            Remove reports and tool caches"
+	@echo "    clean-output     Remove application output under output/"
 	@echo "    clean-reports    Remove generated reports only"
 	@echo "    clean-caches     Remove pytest, ruff, mypy, bytecode caches"
 	@echo "    clean-venv       Remove the virtual environment"
@@ -312,6 +313,15 @@ clean: clean-reports clean-caches
 clean-reports:
 	@rm -rf $(REPORTS_DIR)
 	@rm -rf python/packages/*/$(REPORTS_DIR) python/programs/*/$(REPORTS_DIR)
+
+clean-output:
+	@if [ -e "$(CURDIR)/output" ]; then \
+	  echo "Removing application output directory: $(CURDIR)/output"; \
+	  rm -rf "$(CURDIR)/output"; \
+	  echo "Removed application output directory: $(CURDIR)/output"; \
+	else \
+	  echo "No application output directory exists: $(CURDIR)/output"; \
+	fi
 
 clean-caches:
 	@rm -rf .pytest_cache .ruff_cache .mypy_cache
