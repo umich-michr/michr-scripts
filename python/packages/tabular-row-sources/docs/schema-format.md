@@ -277,6 +277,15 @@ When a schema changes:
 
 All concrete sources use the same conversion layer.
 
+DB-API sources may receive CLOB or BLOB wrapper objects from a driver. When a
+result value exposes a callable, zero-argument `read()` method, the DB-API source
+reads it before applying canonical conversion. CLOB text can therefore become a
+canonical string, and UTF-8 BLOB content can be accepted by JSON-object
+conversion.
+
+Large-object materialization is source extraction rather than a schema type.
+The schema still controls the required canonical result type.
+
 ### Accepted source representations
 
 | Schema type | Accepted source values |

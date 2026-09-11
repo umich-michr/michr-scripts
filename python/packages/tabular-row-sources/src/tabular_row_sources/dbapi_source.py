@@ -290,6 +290,32 @@ def _require_result_row(
     return cast("Sequence[object]", value)
 
 
+def _materialize_result_value(
+    value: object,
+    *,
+    row_number: int,
+    column_name: str,
+) -> object:
+    """Read a DB-API large-object value before canonical conversion.
+
+    Some DB-API drivers return CLOB or BLOB values as objects exposing a
+    zero-argument ``read()`` method. Other native values are returned
+    unchanged.
+    """
+    try:
+        reader = getattr(value, "read", None)
+
+        if not callable(reader):
+            return value
+
+        return reader()
+    except Exception as error:
+        raise SourceExecutionError(
+            f"Could not read DB-API value for row {row_number}, "
+            f"column {column_name!r}: {error}"
+        ) from error
+
+
 def _iter_query_rows(
     cursor: _CursorProtocol,
     *,
@@ -330,13 +356,18 @@ def _iter_query_rows(
                     f"values; expected {expected_count}"
                 )
 
-            source_row: dict[object, object] = dict(
-                zip(
+            source_row: dict[object, object] = {
+                column_name: _materialize_result_value(
+                    value,
+                    row_number=row_number,
+                    column_name=column_name,
+                )
+                for column_name, value in zip(
                     column_names,
                     values,
                     strict=True,
                 )
-            )
+            }
 
             yield convert_row(
                 source_row,

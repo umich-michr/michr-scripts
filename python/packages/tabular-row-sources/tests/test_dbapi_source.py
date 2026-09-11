@@ -136,6 +136,29 @@ class FakeConnect:
         return self.values.pop(0)
 
 
+class FakeLargeObject:
+    """Synthetic DB-API large object exposing ``read()``."""
+
+    def __init__(
+        self,
+        value: object,
+        *,
+        error: Exception | None = None,
+    ) -> None:
+        self._value = value
+        self._error = error
+        self.read_calls = 0
+
+    def read(self) -> object:
+        """Return the configured value or raise the configured error."""
+        self.read_calls += 1
+
+        if self._error is not None:
+            raise self._error
+
+        return self._value
+
+
 class InvalidConnection:
     """Object missing the required connection methods."""
 
@@ -393,6 +416,95 @@ def test_query_source_can_be_opened_repeatedly() -> None:
     assert connect.calls == 2
     assert first_connection.closed is True
     assert second_connection.closed is True
+
+
+def test_query_source_materializes_large_object_string() -> None:
+    title = FakeLargeObject("Large-object title")
+    cursor = FakeCursor(
+        description=description_for("ID", "TITLE"),
+        batches=[
+            [("1", title)],
+            [],
+        ],
+    )
+    source, _, _ = make_source(cursor)
+
+    rows = collect_rows(source)
+
+    assert rows == [
+        {
+            "ID": 1,
+            "TITLE": "Large-object title",
+        }
+    ]
+    assert title.read_calls == 1
+
+
+def test_query_source_materializes_large_object_json_bytes() -> None:
+    payload = FakeLargeObject(b'{"title":"Synthetic title"}')
+    schema = RowSchema(
+        columns=(
+            ColumnSpec(
+                name="ID",
+                data_type=ColumnType.INTEGER,
+            ),
+            ColumnSpec(
+                name="PAYLOAD",
+                data_type=ColumnType.JSON_OBJECT,
+            ),
+        )
+    )
+    cursor = FakeCursor(
+        description=description_for("ID", "PAYLOAD"),
+        batches=[
+            [("1", payload)],
+            [],
+        ],
+    )
+    source, _, _ = make_source(
+        cursor,
+        schema=schema,
+    )
+
+    rows = collect_rows(source)
+
+    assert rows == [
+        {
+            "ID": 1,
+            "PAYLOAD": {
+                "title": "Synthetic title",
+            },
+        }
+    ]
+    assert payload.read_calls == 1
+
+
+def test_large_object_read_failure_is_wrapped_without_value() -> None:
+    large_object = FakeLargeObject(
+        "unused",
+        error=RuntimeError("large object unavailable"),
+    )
+    cursor = FakeCursor(
+        description=description_for("ID", "TITLE"),
+        batches=[
+            [("1", large_object)],
+        ],
+    )
+    source, connection, _ = make_source(cursor)
+
+    with pytest.raises(
+        SourceExecutionError,
+        match=(
+            "Could not read DB-API value for row 1, "
+            "column 'TITLE': large object unavailable"
+        ),
+    ) as captured:
+        collect_rows(source)
+
+    assert isinstance(captured.value.__cause__, RuntimeError)
+    assert large_object.read_calls == 1
+    assert cursor.closed is True
+    assert connection.closed is True
 
 
 # ---------------------------------------------------------------------------

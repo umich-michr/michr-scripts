@@ -277,6 +277,12 @@ The query source:
 - calls `fetchmany()` rather than `fetchall()`;
 - converts rows through the shared conversion layer;
 - closes the cursor and connection when the context exits.
+- materializes driver-provided CLOB or BLOB objects exposing `read()` before
+  canonical conversion;
+
+Large-object materialization happens one field at a time while its row is being
+processed. The row stream remains lazy, although an individual CLOB or BLOB
+field is read completely before canonical conversion.
 
 The source owns connections returned by its connection factory.
 
