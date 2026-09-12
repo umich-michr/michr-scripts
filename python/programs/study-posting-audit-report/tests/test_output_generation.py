@@ -3,6 +3,7 @@
 from collections.abc import Generator, Iterator
 from contextlib import AbstractContextManager, contextmanager
 import csv
+from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -13,6 +14,8 @@ import pytest
 from study_posting_ai_analysis import FLATTENED_COLUMNS
 from study_posting_audit_report import (
     AI_ASSISTANCE_METRICS_FILENAME,
+    READABILITY_COLUMNS,
+    READABILITY_METRICS_FILENAME,
     RECORDS_FILENAME,
     AuditOutputError,
     AuditReportConfig,
@@ -282,6 +285,133 @@ def read_csv_rows(
 def staging_directories(parent: Path, destination_name: str) -> list[Path]:
     """Return temporary report directories left beside a destination."""
     return sorted(parent.glob(f".{destination_name}.*"))
+
+
+@dataclass(frozen=True, slots=True)
+class FakeReadabilityResult:
+    """Deterministic readability result used at the report boundary."""
+
+    flesch_kincaid_grade: float
+    automated_readability_index: float
+    coleman_liau_index: float
+    gunning_fog: float
+    dale_chall_readability_score: float
+    estimated_reading_time_seconds: float
+    sentence_count: int
+    word_count: int
+    syllable_count: int
+    letter_count: int
+    polysyllable_count: int
+
+
+class RecordingReadabilityAnalyzer:
+    """Record analyzed texts and return deterministic synthetic results."""
+
+    def __init__(
+        self,
+        *,
+        error: Exception | None = None,
+    ) -> None:
+        self.error = error
+        self.calls: list[str] = []
+
+    def __call__(self, text: str) -> FakeReadabilityResult:
+        """Analyze one text or raise the configured error."""
+        self.calls.append(text)
+
+        if self.error is not None:
+            raise self.error
+
+        length = len(text)
+
+        return FakeReadabilityResult(
+            flesch_kincaid_grade=float(length),
+            automated_readability_index=float(length) + 0.1,
+            coleman_liau_index=float(length) + 0.2,
+            gunning_fog=float(length) + 0.3,
+            dale_chall_readability_score=float(length) + 0.4,
+            estimated_reading_time_seconds=float(length) / 10.0,
+            sentence_count=1,
+            word_count=len(text.split()),
+            syllable_count=length + 1,
+            letter_count=sum(character.isalpha() for character in text),
+            polysyllable_count=1,
+        )
+
+
+def completed_ai_readability_row(
+    *,
+    record_id: int = 2001,
+) -> Row:
+    """Return one completed AI row covering readability extraction policy."""
+    row = completed_ai_row(record_id=record_id)
+    suggested = row["LLM_SUGGESTIONS"]
+    selected = row["SELECTED_SUGGESTIONS"]
+    final = row["FINAL_SUBMISSION"]
+
+    assert isinstance(suggested, dict)
+    assert isinstance(selected, dict)
+    assert isinstance(final, dict)
+
+    suggested["title"] = [
+        "First title suggestion",
+        "Selected title suggestion",
+    ]
+    selected["title"] = ["Selected title suggestion"]
+    final["title"] = "Final saved title"
+
+    suggested["about"] = ["About suggestion"]
+    selected["about"] = []
+    final["about"] = ""
+
+    suggested["purpose"] = []
+    selected["purpose"] = []
+    final["purpose"] = "Final saved purpose"
+
+    suggested["description"] = ["Description suggestion"]
+    selected["description"] = ["Description suggestion"]
+    final["description"] = "Final saved description"
+
+    suggested["compensation"] = {
+        "genericCompensation": [
+            "Generic compensation one",
+        ],
+        "specificCompensation": [
+            "Selected specific compensation",
+            "Other specific compensation",
+        ],
+    }
+    selected["compensation"] = {
+        "genericCompensation": [],
+        "specificCompensation": [
+            "Selected specific compensation",
+        ],
+    }
+    suggested["offersCompensation"] = True
+    final["offersCompensation"] = True
+    final["compensation"] = "Final saved compensation"
+
+    return row
+
+
+def completed_manual_readability_row(
+    *,
+    record_id: int = 2002,
+) -> Row:
+    """Return one completed manual row with final readability text."""
+    row = manual_row(record_id=record_id)
+    final = row["FINAL_SUBMISSION"]
+
+    assert isinstance(final, dict)
+
+    final["title"] = "Manual final title"
+    final["about"] = "Manual final about"
+    final["purpose"] = "Manual final purpose"
+    final["description"] = "Manual final description"
+    final["offersCompensation"] = True
+    final["compensation"] = "Manual final compensation"
+
+    return row
 
 
 # ---------------------------------------------------------------------------
@@ -570,6 +700,179 @@ def test_parent_directories_are_created(
 
     assert report.output_directory == output_directory
     assert output_directory.is_dir()
+
+
+def test_report_writes_normalized_readability_rows(
+    tmp_path: Path,
+) -> None:
+    analyzer = RecordingReadabilityAnalyzer()
+    source = InMemoryRowSource(
+        schema=audit_schema(),
+        rows=[
+            completed_ai_readability_row(record_id=2001),
+            completed_manual_readability_row(record_id=2002),
+            incomplete_ai_row(record_id=2003),
+        ],
+    )
+    output_directory = tmp_path / "report"
+
+    report = generate_csv_report(
+        source,
+        output_directory=output_directory,
+        readability_analyzer=analyzer,
+    )
+
+    readability_path = output_directory / READABILITY_METRICS_FILENAME
+
+    assert report.readability_metrics_path == readability_path
+    assert readability_path.is_file()
+
+    header, rows = read_csv_rows(readability_path)
+
+    assert tuple(header) == tuple(READABILITY_COLUMNS)
+    assert len(rows) == 16
+    assert report.summary.readability_rows == 16
+
+    assert analyzer.calls == [
+        "First title suggestion",
+        "Selected title suggestion",
+        "Final saved title",
+        "About suggestion",
+        "Final saved purpose",
+        "Description suggestion",
+        "Final saved description",
+        "Generic compensation one",
+        "Selected specific compensation",
+        "Other specific compensation",
+        "Final saved compensation",
+        "Manual final title",
+        "Manual final about",
+        "Manual final purpose",
+        "Manual final description",
+        "Manual final compensation",
+    ]
+    ai_title_rows = [
+        row
+        for row in rows
+        if row["record_id"] == "2001" and row["field_name"] == "title"
+    ]
+
+    assert ai_title_rows == [
+        {
+            "record_id": "2001",
+            "attempt_type": "AI",
+            "field_name": "title",
+            "text_role": "SUGGESTED",
+            "suggestion_kind": "title",
+            "suggestion_index": "0",
+            "selected": "false",
+            "flesch_kincaid_grade": "22.0",
+            "automated_readability_index": "22.1",
+            "coleman_liau_index": "22.2",
+            "gunning_fog": "22.3",
+            "dale_chall_readability_score": "22.4",
+            "estimated_reading_time_seconds": "2.2",
+            "sentence_count": "1",
+            "word_count": "3",
+            "syllable_count": "23",
+            "letter_count": "20",
+            "polysyllable_count": "1",
+        },
+        {
+            "record_id": "2001",
+            "attempt_type": "AI",
+            "field_name": "title",
+            "text_role": "SUGGESTED",
+            "suggestion_kind": "title",
+            "suggestion_index": "1",
+            "selected": "true",
+            "flesch_kincaid_grade": "25.0",
+            "automated_readability_index": "25.1",
+            "coleman_liau_index": "25.2",
+            "gunning_fog": "25.3",
+            "dale_chall_readability_score": "25.4",
+            "estimated_reading_time_seconds": "2.5",
+            "sentence_count": "1",
+            "word_count": "3",
+            "syllable_count": "26",
+            "letter_count": "23",
+            "polysyllable_count": "1",
+        },
+        {
+            "record_id": "2001",
+            "attempt_type": "AI",
+            "field_name": "title",
+            "text_role": "FINAL",
+            "suggestion_kind": "\\N",
+            "suggestion_index": "\\N",
+            "selected": "\\N",
+            "flesch_kincaid_grade": "17.0",
+            "automated_readability_index": "17.1",
+            "coleman_liau_index": "17.2",
+            "gunning_fog": "17.3",
+            "dale_chall_readability_score": "17.4",
+            "estimated_reading_time_seconds": "1.7",
+            "sentence_count": "1",
+            "word_count": "3",
+            "syllable_count": "18",
+            "letter_count": "15",
+            "polysyllable_count": "1",
+        },
+    ]
+    compensation_suggestions = [
+        row
+        for row in rows
+        if row["record_id"] == "2001"
+        and row["field_name"] == "compensation"
+        and row["text_role"] == "SUGGESTED"
+    ]
+
+    assert [
+        (
+            row["suggestion_kind"],
+            row["suggestion_index"],
+            row["selected"],
+        )
+        for row in compensation_suggestions
+    ] == [
+        ("genericCompensation", "0", "false"),
+        ("specificCompensation", "0", "true"),
+        ("specificCompensation", "1", "false"),
+    ]
+    manual_rows = [row for row in rows if row["record_id"] == "2002"]
+
+    assert len(manual_rows) == 5
+    assert {row["text_role"] for row in manual_rows} == {"FINAL"}
+    assert {row["attempt_type"] for row in manual_rows} == {"MANUAL"}
+    assert all(row["suggestion_kind"] == "\\N" for row in manual_rows)
+    assert all(row["suggestion_index"] == "\\N" for row in manual_rows)
+    assert all(row["selected"] == "\\N" for row in manual_rows)
+
+    assert not any(row["record_id"] == "2003" for row in rows)
+    assert "text" not in header
+
+
+def test_empty_report_writes_readability_header(
+    tmp_path: Path,
+) -> None:
+    analyzer = RecordingReadabilityAnalyzer()
+    source = InMemoryRowSource(
+        schema=audit_schema(),
+        rows=[],
+    )
+
+    report = generate_csv_report(
+        source,
+        output_directory=tmp_path / "report",
+        readability_analyzer=analyzer,
+    )
+
+    header, rows = read_csv_rows(report.readability_metrics_path)
+
+    assert tuple(header) == tuple(READABILITY_COLUMNS)
+    assert rows == []
+    assert report.summary.readability_rows == 0
+    assert analyzer.calls == []
 
 
 # ---------------------------------------------------------------------------
@@ -929,6 +1232,43 @@ def test_unsupported_output_value_publishes_nothing(
     assert source.closed is True
     assert not output_directory.exists()
     assert staging_directories(tmp_path, "report") == []
+
+
+def test_readability_failure_publishes_nothing(
+    tmp_path: Path,
+) -> None:
+    sensitive_text = "SYNTHETIC-SENSITIVE-READABILITY-TEXT"
+    row = completed_manual_readability_row()
+    final = row["FINAL_SUBMISSION"]
+
+    assert isinstance(final, dict)
+
+    final["title"] = sensitive_text
+    analyzer = RecordingReadabilityAnalyzer(
+        error=ValueError(f"could not analyze {sensitive_text}")
+    )
+    source = InMemoryRowSource(
+        schema=audit_schema(),
+        rows=[row],
+    )
+    output_directory = tmp_path / "report"
+
+    with pytest.raises(
+        AuditRowError,
+        match="readability analysis failed",
+    ) as captured:
+        generate_csv_report(
+            source,
+            output_directory=output_directory,
+            readability_analyzer=analyzer,
+        )
+
+    assert sensitive_text not in str(captured.value)
+    assert source.closed is True
+    assert not output_directory.exists()
+    assert staging_directories(tmp_path, "report") == []
+    assert captured.value.__cause__ is None
+    assert captured.value.__context__ is None
 
 
 # ---------------------------------------------------------------------------

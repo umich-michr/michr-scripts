@@ -38,6 +38,11 @@ from study_posting_audit_report.processing import (
     process_audit_rows,
     validate_source_schema,
 )
+from study_posting_audit_report.readability import (
+    READABILITY_COLUMNS,
+    ReadabilityAnalyzer,
+    analyze_readability_for_row,
+)
 from tabular_row_sources import (
     RowSource,
     RowSourceError,
@@ -45,6 +50,7 @@ from tabular_row_sources import (
 
 RECORDS_FILENAME = "records.csv"
 AI_ASSISTANCE_METRICS_FILENAME = "ai_assistance_metrics.csv"
+READABILITY_METRICS_FILENAME = "readability_metrics.csv"
 
 
 def _require_nonblank_string(
@@ -353,6 +359,7 @@ def _write_staged_report(
     staging_directory: Path,
     config: AuditReportConfig,
     options: CsvOutputOptions,
+    readability_analyzer: ReadabilityAnalyzer | None,
 ) -> AuditReportSummary:
     """Process one source and write both staged CSV files."""
     validate_source_schema(
@@ -362,9 +369,11 @@ def _write_staged_report(
 
     records_path = staging_directory / RECORDS_FILENAME
     ai_assistance_path = staging_directory / AI_ASSISTANCE_METRICS_FILENAME
+    readability_path = staging_directory / READABILITY_METRICS_FILENAME
 
     record_columns = source.schema.column_names
     ai_assistance_columns = tuple(FLATTENED_COLUMNS)
+    readability_columns = tuple(READABILITY_COLUMNS)
 
     records_handle, records_writer = _open_csv_output(
         records_path,
@@ -379,11 +388,19 @@ def _write_staged_report(
         columns=ai_assistance_columns,
     )
 
+    readability_handle, readability_writer = _open_csv_output(
+        readability_path,
+        encoding=options.encoding,
+        lineterminator=options.lineterminator,
+        columns=readability_columns,
+    )
+
     source_rows = 0
     analyzable_rows = 0
     analyzed_rows = 0
     skipped_rows = 0
     ai_assistance_rows = 0
+    readability_rows = 0
 
     try:
         with source.open_rows() as rows:
@@ -417,11 +434,32 @@ def _write_staged_report(
                     )
                     ai_assistance_rows += 1
 
+                if readability_analyzer is not None:
+                    rows_for_readability = analyze_readability_for_row(
+                        outcome.record,
+                        config=config,
+                        row_number=outcome.source_row_number,
+                        record_id=outcome.record_id,
+                        analyzer=readability_analyzer,
+                    )
+
+                    for readability_row in rows_for_readability:
+                        readability_writer.writerow(
+                            _serialize_row(
+                                readability_row,
+                                columns=readability_columns,
+                                null_value=options.null_value,
+                            )
+                        )
+                        readability_rows += 1
+
         _flush_and_sync(records_handle)
         _flush_and_sync(ai_assistance_handle)
+        _flush_and_sync(readability_handle)
     finally:
         records_handle.close()
         ai_assistance_handle.close()
+        readability_handle.close()
 
     return AuditReportSummary(
         source_rows=source_rows,
@@ -430,6 +468,7 @@ def _write_staged_report(
         skipped_rows=skipped_rows,
         failed_rows=0,
         ai_assistance_rows=ai_assistance_rows,
+        readability_rows=readability_rows,
     )
 
 
@@ -439,8 +478,9 @@ def generate_csv_report(
     output_directory: str | Path,
     config: AuditReportConfig | None = None,
     output_options: CsvOutputOptions | None = None,
+    readability_analyzer: ReadabilityAnalyzer | None = None,
 ) -> AuditCsvReport:
-    """Generate and atomically publish a two-file CSV report.
+    """Generate and atomically publish a three-file CSV report.
 
     Parameters
     ----------
@@ -518,6 +558,7 @@ def generate_csv_report(
                 staging_directory=staging_path,
                 config=report_config,
                 options=options,
+                readability_analyzer=readability_analyzer,
             )
         except RowSourceError as error:
             raise AuditSourceError(f"Could not read audit source: {error}") from error
@@ -543,5 +584,6 @@ def generate_csv_report(
         output_directory=destination,
         records_path=destination / RECORDS_FILENAME,
         ai_assistance_metrics_path=(destination / AI_ASSISTANCE_METRICS_FILENAME),
+        readability_metrics_path=(destination / READABILITY_METRICS_FILENAME),
         summary=summary,
     )

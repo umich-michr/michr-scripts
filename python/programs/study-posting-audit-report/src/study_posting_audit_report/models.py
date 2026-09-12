@@ -45,16 +45,18 @@ class AuditReportSummary:
     source_rows
         Total source rows read.
     analyzable_rows
-        Completed AI rows selected for analysis.
+        Completed AI rows selected for AI-assistance analysis.
     analyzed_rows
-        Analyzable rows successfully analyzed.
+        AI-assistance rows successfully analyzed at record level.
     skipped_rows
-        Manual and incomplete rows preserved without analysis.
+        Manual and incomplete rows preserved without AI-assistance analysis.
     failed_rows
         Analyzable rows that failed under a non-fail-fast policy. This remains
         zero while the program uses fail-fast processing.
     ai_assistance_rows
         AI-assistance rows produced.
+    readability_rows
+        Readability text-instance rows produced.
     """
 
     source_rows: int
@@ -63,6 +65,7 @@ class AuditReportSummary:
     skipped_rows: int
     failed_rows: int
     ai_assistance_rows: int
+    readability_rows: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,6 +80,8 @@ class AuditCsvReport:
         Canonical source-record CSV.
     ai_assistance_metrics_path
         Long-format AI-assistance metrics CSV.
+    readability_metrics_path
+        Long-format readability metrics CSV.
     summary
         Counts produced by the completed run.
     """
@@ -84,4 +89,5 @@ class AuditCsvReport:
     output_directory: Path
     records_path: Path
     ai_assistance_metrics_path: Path
+    readability_metrics_path: Path
     summary: AuditReportSummary

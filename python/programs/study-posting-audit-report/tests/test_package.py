@@ -8,6 +8,8 @@ import pytest
 import study_posting_audit_report as package
 from study_posting_audit_report import (
     AI_ASSISTANCE_METRICS_FILENAME,
+    READABILITY_COLUMNS,
+    READABILITY_METRICS_FILENAME,
     RECORDS_FILENAME,
     AuditColumnMapping,
     AuditCsvReport,
@@ -231,6 +233,7 @@ def test_report_summary_preserves_counts() -> None:
         skipped_rows=6,
         failed_rows=1,
         ai_assistance_rows=36,
+        readability_rows=20,
     )
 
     assert summary.source_rows == 10
@@ -239,6 +242,7 @@ def test_report_summary_preserves_counts() -> None:
     assert summary.skipped_rows == 6
     assert summary.failed_rows == 1
     assert summary.ai_assistance_rows == 36
+    assert summary.readability_rows == 20
 
 
 def test_program_exceptions_share_one_base_class() -> None:
@@ -311,3 +315,33 @@ def test_ai_assistance_output_vocabulary_is_public_contract() -> None:
 
     assert "ai_assistance_metrics_path" in AuditCsvReport.__annotations__
     assert "field_metrics_path" not in AuditCsvReport.__annotations__
+
+
+def test_readability_output_vocabulary_is_public_contract() -> None:
+    assert package.READABILITY_METRICS_FILENAME == READABILITY_METRICS_FILENAME
+    assert package.READABILITY_COLUMNS == READABILITY_COLUMNS
+
+    assert READABILITY_METRICS_FILENAME == "readability_metrics.csv"
+    assert tuple(READABILITY_COLUMNS) == (
+        "record_id",
+        "attempt_type",
+        "field_name",
+        "text_role",
+        "suggestion_kind",
+        "suggestion_index",
+        "selected",
+        "flesch_kincaid_grade",
+        "automated_readability_index",
+        "coleman_liau_index",
+        "gunning_fog",
+        "dale_chall_readability_score",
+        "estimated_reading_time_seconds",
+        "sentence_count",
+        "word_count",
+        "syllable_count",
+        "letter_count",
+        "polysyllable_count",
+    )
+
+    assert "readability_rows" in AuditReportSummary.__annotations__
+    assert "readability_metrics_path" in AuditCsvReport.__annotations__

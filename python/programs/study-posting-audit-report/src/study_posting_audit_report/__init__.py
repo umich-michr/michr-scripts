@@ -24,6 +24,7 @@ from study_posting_audit_report.models import (
 )
 from study_posting_audit_report.output import (
     AI_ASSISTANCE_METRICS_FILENAME,
+    READABILITY_METRICS_FILENAME,
     RECORDS_FILENAME,
     CsvOutputOptions,
     generate_csv_report,
@@ -35,11 +36,20 @@ from study_posting_audit_report.processing import (
     process_audit_rows,
     validate_source_schema,
 )
+from study_posting_audit_report.readability import (
+    READABILITY_COLUMNS,
+    ReadabilityAnalyzer,
+    ReadabilityResultLike,
+    ReadabilityRow,
+    analyze_readability_for_row,
+)
 
 __version__ = "0.1.0"
 
 __all__ = [
     "AI_ASSISTANCE_METRICS_FILENAME",
+    "READABILITY_COLUMNS",
+    "READABILITY_METRICS_FILENAME",
     "RECORDS_FILENAME",
     "AiAssistanceRow",
     "AuditColumnMapping",
@@ -53,9 +63,13 @@ __all__ = [
     "AuditSourceError",
     "CsvOutputOptions",
     "ProcessedAuditRow",
+    "ReadabilityAnalyzer",
+    "ReadabilityResultLike",
+    "ReadabilityRow",
     "RecordId",
     "__version__",
     "analyze_audit_row",
+    "analyze_readability_for_row",
     "extract_record_id",
     "generate_csv_report",
     "process_audit_rows",
