@@ -35,10 +35,11 @@ It must not duplicate:
 Default successful outputs are:
 
 - `records.csv`: one row per source record;
-- `ai_assistance_metrics.csv`: one row per analyzed field.
+- `ai_assistance_metrics.csv`: one row per analyzed study field;
+- `readability_metrics.csv`: one row per analyzed nonblank text instance.
 
-`field_metrics.record_id` joins to the configured source ID column in
-`records.csv`.
+`ai_assistance_metrics.record_id` and `readability_metrics.record_id` join to
+the configured source ID column in `records.csv`.
 
 Record IDs must be non-null and unique. Manual and incomplete attempts remain in
 `records.csv` without field metrics. Completed AI attempts require a non-null
@@ -77,3 +78,8 @@ documented requirement explicitly introduces thick mode.
 Do not include passwords in command-line options, representations, errors, or
 logs. Oracle tests must use injected or monkeypatched connectors and must not
 contact a live database.
+
+Readability analysis applies to completed rows. Completed AI rows contribute
+offered suggestions and final values; completed manual rows contribute final
+values only. Incomplete rows contribute no readability rows. Blank text is
+skipped, and readability output must not include source text.
