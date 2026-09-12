@@ -4,8 +4,8 @@ A report is written into a temporary sibling directory. After source processing,
 analysis, serialization, flushing, and file closure all succeed, that directory
 is renamed to the requested output directory.
 
-The requested output directory must not already exist. This permits the two
-report files to be published together with one same-filesystem directory rename.
+The requested output directory must not already exist. This permits all report
+files to be published together with one same-filesystem directory rename.
 
 The current policy is fail-fast. Any source, row, analysis, serialization, or
 write failure removes the temporary directory and publishes no report.
@@ -89,7 +89,7 @@ class CsvOutputOptions:
     Parameters
     ----------
     encoding
-        Encoding for both output files.
+        Encoding for all output files.
     null_value
         Reserved CSV text representing Python ``None``.
     lineterminator
@@ -361,7 +361,7 @@ def _write_staged_report(
     options: CsvOutputOptions,
     readability_analyzer: ReadabilityAnalyzer | None,
 ) -> AuditReportSummary:
-    """Process one source and write both staged CSV files."""
+    """Process one source and write all staged CSV files."""
     validate_source_schema(
         source.schema,
         config=config,
@@ -487,12 +487,16 @@ def generate_csv_report(
     source
         Schema-aware canonical row source.
     output_directory
-        New directory that will contain ``records.csv`` and
-        ``ai_assistance_metrics.csv``. It must not already exist.
+        New directory that will contain ``records.csv``,
+        ``ai_assistance_metrics.csv``, and ``readability_metrics.csv``. It must not
+        already exist.
     config
         Audit-report configuration. Defaults to ``AuditReportConfig()``.
     output_options
         CSV serialization options. Defaults to ``CsvOutputOptions()``.
+    readability_analyzer
+        Optional callable used to analyze extracted nonblank text. When omitted,
+        the readability output contains only its header.
 
     Returns
     -------
@@ -512,7 +516,7 @@ def generate_csv_report(
 
     Notes
     -----
-    The output directory is published with a same-filesystem rename after both
+    The output directory is published with a same-filesystem rename after all
     files are complete. Existing output directories are never overwritten.
     """
     destination = _require_output_directory(output_directory)

@@ -1,4 +1,4 @@
-"""Tests for atomic two-file study-posting report generation."""
+"""Tests for atomic normalized study-posting report generation."""
 
 from collections.abc import Generator, Iterator
 from contextlib import AbstractContextManager, contextmanager
@@ -419,7 +419,7 @@ def completed_manual_readability_row(
 # ---------------------------------------------------------------------------
 
 
-def test_generate_report_writes_two_files_and_summary(
+def test_generate_report_writes_three_files_and_summary(
     tmp_path: Path,
 ) -> None:
     source = InMemoryRowSource(
@@ -442,10 +442,14 @@ def test_generate_report_writes_two_files_and_summary(
     assert report.ai_assistance_metrics_path == (
         output_directory / AI_ASSISTANCE_METRICS_FILENAME
     )
+    assert report.readability_metrics_path == (
+        output_directory / READABILITY_METRICS_FILENAME
+    )
 
     assert output_directory.is_dir()
     assert report.records_path.is_file()
     assert report.ai_assistance_metrics_path.is_file()
+    assert report.readability_metrics_path.is_file()
 
     assert report.summary.source_rows == 3
     assert report.summary.analyzable_rows == 1
@@ -453,6 +457,7 @@ def test_generate_report_writes_two_files_and_summary(
     assert report.summary.skipped_rows == 2
     assert report.summary.failed_rows == 0
     assert report.summary.ai_assistance_rows == 12
+    assert report.summary.readability_rows == 0
 
     assert source.open_count == 1
     assert source.closed is True
@@ -640,11 +645,16 @@ def test_empty_source_publishes_header_only_files(
 
     record_header, record_rows = read_csv_rows(report.records_path)
     metric_header, ai_assistance_rows = read_csv_rows(report.ai_assistance_metrics_path)
+    readability_header, readability_rows = read_csv_rows(
+        report.readability_metrics_path
+    )
 
     assert tuple(record_header) == audit_schema().column_names
     assert tuple(metric_header) == tuple(FLATTENED_COLUMNS)
+    assert tuple(readability_header) == tuple(READABILITY_COLUMNS)
     assert record_rows == []
     assert ai_assistance_rows == []
+    assert readability_rows == []
 
     assert report.summary.source_rows == 0
     assert report.summary.analyzable_rows == 0
@@ -652,9 +662,10 @@ def test_empty_source_publishes_header_only_files(
     assert report.summary.skipped_rows == 0
     assert report.summary.failed_rows == 0
     assert report.summary.ai_assistance_rows == 0
+    assert report.summary.readability_rows == 0
 
 
-def test_custom_output_options_apply_to_both_files(
+def test_custom_output_options_apply_to_all_files(
     tmp_path: Path,
 ) -> None:
     source = InMemoryRowSource(
@@ -675,9 +686,11 @@ def test_custom_output_options_apply_to_both_files(
 
     records_bytes = (output_directory / RECORDS_FILENAME).read_bytes()
     metrics_bytes = (output_directory / AI_ASSISTANCE_METRICS_FILENAME).read_bytes()
+    readability_bytes = (output_directory / READABILITY_METRICS_FILENAME).read_bytes()
 
     assert b"\r\n" in records_bytes
     assert b"\r\n" in metrics_bytes
+    assert b"\r\n" in readability_bytes
 
     _, rows = read_csv_rows(output_directory / RECORDS_FILENAME)
 
@@ -1279,3 +1292,4 @@ def test_readability_failure_publishes_nothing(
 def test_output_filenames_are_stable() -> None:
     assert RECORDS_FILENAME == "records.csv"
     assert AI_ASSISTANCE_METRICS_FILENAME == "ai_assistance_metrics.csv"
+    assert READABILITY_METRICS_FILENAME == "readability_metrics.csv"

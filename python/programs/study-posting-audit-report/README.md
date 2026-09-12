@@ -109,8 +109,9 @@ The files join through:
 ```text
 records.<configured record ID column>
     =
-field_metrics.record_id
+ai_assistance_metrics.record_id
 ```
+`readability_metrics.record_id` joins to the same configured source ID column.
 
 Record IDs must be non-null and unique within a run.
 
