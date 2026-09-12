@@ -100,6 +100,7 @@ known-first-party = [
     "study_posting_audit_report",
     "tabular_row_sources",
     "text_post_edit_metrics",
+    "text_readability_metrics",
 ]
 force-sort-within-sections = true
 
@@ -147,6 +148,11 @@ enable_error_code = [
 [[tool.mypy.overrides]]
 module = ["sacrebleu.*"]
 implicit_reexport = true
+
+# textstat does not publish a py.typed marker or separate type stubs.
+[[tool.mypy.overrides]]
+module = ["textstat", "textstat.*"]
+ignore_missing_imports = true
 
 # ===========================================================================
 # Bandit: shared

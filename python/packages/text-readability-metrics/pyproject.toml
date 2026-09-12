@@ -1,0 +1,87 @@
+# ===========================================================================
+# text-readability-metrics
+#
+# Generic semantic readability metrics for nonblank English text.
+#
+# This package owns metric calculation and result validation. It contains no
+# study-specific field extraction, database access, CSV output, or CLI policy.
+#
+# Shared Ruff, mypy, and Bandit configuration lives at the workspace root.
+# ===========================================================================
+
+[project]
+name = "text-readability-metrics"
+version = "0.1.0"
+description = "Semantic readability metrics for English text."
+readme = "README.md"
+requires-python = ">=3.14"
+license = "MIT"
+authors = [{ name = "University of Michigan" }]
+keywords = [
+    "readability",
+    "flesch-kincaid",
+    "automated-readability-index",
+    "coleman-liau",
+    "gunning-fog",
+    "dale-chall",
+]
+
+dependencies = [
+    "textstat>=0.7,<0.8",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/text_readability_metrics"]
+
+[tool.pytest.ini_options]
+minversion = "9.0"
+testpaths = ["tests"]
+addopts = [
+    "--import-mode=importlib",
+    "--strict-markers",
+    "--strict-config",
+    "-ra",
+    "--showlocals",
+    "--tb=short",
+    "--durations=10",
+]
+filterwarnings = ["error"]
+log_cli = false
+
+[tool.coverage.run]
+source = ["text_readability_metrics"]
+branch = true
+parallel = false
+relative_files = true
+
+[tool.coverage.paths]
+source = [
+    "src/text_readability_metrics",
+    "*/site-packages/text_readability_metrics",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+skip_empty = true
+precision = 2
+fail_under = 95
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "@overload",
+    "@abstractmethod",
+    "if __name__ == .__main__.:",
+    "class .*\\(Protocol\\):",
+]
+
+[tool.coverage.html]
+directory = "reports/htmlcov"
+
+[tool.coverage.xml]
+output = "reports/coverage.xml"
