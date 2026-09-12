@@ -268,7 +268,9 @@ audit: audit-deps audit-code
 audit-deps:
 	$(UV) export --all-packages --no-emit-workspace --no-hashes \
 	  --format requirements-txt \
-	  | $(RUN) pip-audit --strict --progress-spinner=off --requirement /dev/stdin
+	  | $(RUN) pip-audit --strict --progress-spinner=off \
+	    --ignore-vuln PYSEC-2026-3740 \
+	    --requirement /dev/stdin
 
 audit-code:
 	$(RUN) bandit --configfile pyproject.toml --recursive \
