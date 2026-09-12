@@ -49,6 +49,7 @@ jobs:
         run: make format-check
 
       - name: Run Ruff with GitHub annotations
+        if: always()
         run: |
           uv run ruff check \
             --config pyproject.toml \
