@@ -49,26 +49,13 @@ jobs:
         run: make format-check
 
       - name: Run Ruff with GitHub annotations
-        if: always()
-        shell: bash
         run: |
-          mapfile -t python_files < <(
-            find python/packages python/programs tools \
-              -type f \
-              <math><mrow><mo>−</mo></mrow><mrow><mi>n</mi><mi>a</mi><mi>m</mi><msup><mi>e</mi><mo lspace="0em" rspace="0em" class="tml-prime">′</mo></msup><mo>∗</mo></mrow><mrow><mi>.</mi><mi>p</mi><msup><mi>y</mi><mo lspace="0em" rspace="0em" class="tml-prime">′</mo></msup><mo>−</mo></mrow><mrow><mi>o</mi><mo>−</mo></mrow><mrow><mi>n</mi><mi>a</mi><mi>m</mi><msup><mi>e</mi><mo lspace="0em" rspace="0em" class="tml-prime">′</mo></msup><mo>∗</mo></mrow><mrow><mi>.</mi><mi>p</mi><mi>y</mi><msup><mi>i</mi><mo lspace="0em" rspace="0em" class="tml-prime">′</mo></msup></mrow></math> \
-              -print0 2>/dev/null
-          )
-
-          if [ "${#python_files[@]}" -eq 0 ]; then
-            echo "No Python files found."
-            exit 0
-          fi
-
           uv run ruff check \
             --config pyproject.toml \
             --output-format=github \
-            "${python_files[@]}"
-
+            python/packages \
+            python/programs \
+            tools
       - name: Run strict type checking
         if: always()
         run: make typecheck
