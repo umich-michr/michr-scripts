@@ -30,8 +30,8 @@ The result contains:
 - letter_count;
 - polysyllable_count.
 
-The implementation uses textstat with the fixed en_US language profile.estimated_reading_time_seconds is expressed in seconds.
-Readability scores may legitimately be negative for short or unusual text. Every score must be finite. Estimated reading time must be finite andnonnegative. Counts must be nonnegative integers.
+The implementation uses textstat with the fixed en_US language profile. `estimated_reading_time_seconds` is expressed in seconds.
+Readability scores may legitimately be negative for short or unusual text. Every score must be finite. Estimated reading time must be finite and nonnegative. Counts must be nonnegative integers.
 
 ## Input validation
 
@@ -40,7 +40,7 @@ Malformed or non-finite backend results raise `InvalidReadabilityResultError`. B
 
 ## Interpretation
 
-Readability formulas estimate characteristics associated with sentence length,word length, syllables, and familiar-word lists. They do not determine whethertext is correct, useful, inclusive, understandable to a particular audience, oraccessible.
+Readability formulas estimate characteristics associated with sentence length, word length, syllables, and familiar-word lists. They do not determine whethertext is correct, useful, inclusive, understandable to a particular audience, oraccessible.
 
 Scores can vary across implementations and versions because tokenization,sentence segmentation, syllable estimation, and word-list behavior vary. The package constrains `textstat` to a compatible version range, and the workspace lockfile records the exact resolved version.
 
