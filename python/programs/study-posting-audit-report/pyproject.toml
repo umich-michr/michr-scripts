@@ -23,12 +23,14 @@ dependencies = [
     "program-configuration>=0.1.0",
     "study-posting-ai-analysis>=0.1.0",
     "tabular-row-sources>=0.1.0",
+    "text-readability-metrics>=0.1.0",
 ]
 
 [tool.uv.sources]
 program-configuration = { workspace = true }
 study-posting-ai-analysis = { workspace = true }
 tabular-row-sources = { workspace = true }
+text-readability-metrics = { workspace = true }
 
 [project.scripts]
 study-posting-audit-report = "study_posting_audit_report.cli:main"

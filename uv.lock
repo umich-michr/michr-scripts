@@ -1472,6 +1472,7 @@ dependencies = [
     { name = "program-configuration" },
     { name = "study-posting-ai-analysis" },
     { name = "tabular-row-sources" },
+    { name = "text-readability-metrics" },
 ]
 
 [package.metadata]
@@ -1480,6 +1481,7 @@ requires-dist = [
     { name = "program-configuration", editable = "python/packages/program-configuration" },
     { name = "study-posting-ai-analysis", editable = "python/packages/study-posting-ai-analysis" },
     { name = "tabular-row-sources", editable = "python/packages/tabular-row-sources" },
+    { name = "text-readability-metrics", editable = "python/packages/text-readability-metrics" },
 ]
 
 [[package]]

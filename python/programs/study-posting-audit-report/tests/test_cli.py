@@ -11,6 +11,7 @@ import sys
 import pytest
 
 from study_posting_ai_analysis import FLATTENED_COLUMNS
+from study_posting_audit_report import READABILITY_COLUMNS
 from study_posting_audit_report.cli import (
     build_parser,
     main,
@@ -327,6 +328,30 @@ def read_csv(
         return list(fieldnames), list(reader)
 
 
+def assert_completed_ai_readability_output(
+    path: Path,
+    *,
+    record_id: str,
+) -> None:
+    """Assert the expected readability output for one completed AI fixture."""
+    header, rows = read_csv(path)
+
+    assert tuple(header) == tuple(READABILITY_COLUMNS)
+    assert len(rows) == 8
+    assert {row["record_id"] for row in rows} == {record_id}
+    assert {row["text_role"] for row in rows} == {
+        "SUGGESTED",
+        "FINAL",
+    }
+    assert {row["field_name"] for row in rows} == {
+        "about",
+        "description",
+        "purpose",
+        "title",
+    }
+    assert "text" not in header
+
+
 def base_arguments(
     *,
     input_path: Path,
@@ -509,12 +534,15 @@ def test_csv_command_generates_normalized_report(
 
     records_path = output_directory / "records.csv"
     metrics_path = output_directory / "ai_assistance_metrics.csv"
+    readability_path = output_directory / "readability_metrics.csv"
 
     assert records_path.is_file()
     assert metrics_path.is_file()
+    assert readability_path.is_file()
 
     record_header, record_rows = read_csv(records_path)
     metric_header, ai_assistance_rows = read_csv(metrics_path)
+    readability_header, readability_rows = read_csv(readability_path)
 
     assert tuple(record_header) == (
         "ID",
@@ -537,15 +565,28 @@ def test_csv_command_generates_normalized_report(
     assert tuple(metric_header) == tuple(FLATTENED_COLUMNS)
     assert ai_assistance_rows == []
 
+    assert tuple(readability_header) == tuple(READABILITY_COLUMNS)
+    assert len(readability_rows) == 1
+    assert readability_rows[0]["record_id"] == "1001"
+    assert readability_rows[0]["attempt_type"] == "MANUAL"
+    assert readability_rows[0]["field_name"] == "title"
+    assert readability_rows[0]["text_role"] == "FINAL"
+    assert readability_rows[0]["suggestion_kind"] == "\\N"
+    assert readability_rows[0]["suggestion_index"] == "\\N"
+    assert readability_rows[0]["selected"] == "\\N"
+    assert "text" not in readability_header
+
     output_text = standard_output.getvalue()
 
     assert f"Report directory: {output_directory}" in output_text
     assert f"Records CSV: {records_path}" in output_text
     assert f"AI assistance metrics CSV: {metrics_path}" in output_text
+    assert f"Readability metrics CSV: {readability_path}" in output_text
     assert "Source rows: 2" in output_text
     assert "Analyzed rows: 0" in output_text
     assert "Skipped rows: 2" in output_text
     assert "AI assistance rows: 0" in output_text
+    assert "Readability rows: 1" in output_text
 
 
 def test_csv_command_analyzes_completed_ai_row(
@@ -604,12 +645,18 @@ def test_csv_command_analyzes_completed_ai_row(
     assert all(row["selected_text"] == "\\N" for row in ai_assistance_rows)
     assert all(row["final_text"] == "\\N" for row in ai_assistance_rows)
 
+    assert_completed_ai_readability_output(
+        output_directory / "readability_metrics.csv",
+        record_id="1003",
+    )
+
     output_text = standard_output.getvalue()
 
     assert "Source rows: 1" in output_text
     assert "Analyzed rows: 1" in output_text
     assert "Skipped rows: 0" in output_text
     assert "AI assistance rows: 12" in output_text
+    assert "Readability rows: 8" in output_text
 
 
 def test_csv_command_uses_environment_configuration(
@@ -1079,9 +1126,11 @@ def test_database_command_generates_report_with_oracle_adapter(
 
     records_path = output_directory / "records.csv"
     metrics_path = output_directory / "ai_assistance_metrics.csv"
+    readability_path = output_directory / "readability_metrics.csv"
 
     assert records_path.is_file()
     assert metrics_path.is_file()
+    assert readability_path.is_file()
 
     _, record_rows = read_csv(records_path)
     metric_header, ai_assistance_rows = read_csv(metrics_path)
@@ -1095,9 +1144,107 @@ def test_database_command_generates_report_with_oracle_adapter(
     assert len(ai_assistance_rows) == 12
     assert {row["record_id"] for row in ai_assistance_rows} == {"1003"}
 
+    assert_completed_ai_readability_output(
+        readability_path,
+        record_id="1003",
+    )
+
     output_text = standard_output.getvalue()
 
     assert "Source rows: 1" in output_text
     assert "Analyzed rows: 1" in output_text
     assert "Skipped rows: 0" in output_text
     assert "AI assistance rows: 12" in output_text
+    assert f"Readability metrics CSV: {readability_path}" in output_text
+    assert "Readability rows: 8" in output_text
+
+
+def test_equivalent_csv_and_database_inputs_produce_identical_reports(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    schema_path = write_schema(tmp_path)
+    source_row = completed_ai_csv_row()
+
+    csv_input_path = write_csv_rows(
+        tmp_path,
+        [source_row],
+    )
+    csv_output_directory = tmp_path / "csv-report"
+
+    csv_status = main(
+        base_arguments(
+            input_path=csv_input_path,
+            schema_path=schema_path,
+            output_directory=csv_output_directory,
+        ),
+        environment={},
+        prompt_provider=NoninteractivePromptProvider(),
+        output=StringIO(),
+        error_output=StringIO(),
+    )
+
+    database_row = tuple(source_row)
+    cursor = FakeDatabaseCursor([database_row])
+    connection = FakeDatabaseConnection(cursor)
+
+    def fake_connect(
+        *,
+        user: str,
+        password: str,
+        dsn: str,
+    ) -> object:
+        del user, password, dsn
+        return connection
+
+    monkeypatch.setattr(
+        "study_posting_audit_report.connections.oracle.oracledb.connect",
+        fake_connect,
+    )
+
+    sql_path = tmp_path / "audit.sql"
+    sql_path.write_text(
+        (
+            "SELECT ID, END_TIME, ATTEMPT_TYPE, ATTEMPT_RESULT, "
+            "LLM_SUGGESTIONS, SELECTED_SUGGESTIONS, FINAL_SUBMISSION "
+            "FROM SYNTHETIC_AUDIT"
+        ),
+        encoding="utf-8",
+    )
+    database_output_directory = tmp_path / "database-report"
+
+    database_status = main(
+        [
+            "database",
+            "--dsn",
+            "database.example:1521/service",
+            "--username",
+            "report_user",
+            "--sql-file",
+            str(sql_path),
+            "--schema",
+            str(schema_path),
+            "--output",
+            str(database_output_directory),
+            "--no-env-file",
+            "--no-prompt",
+        ],
+        environment={
+            "STUDY_POSTING_AUDIT_DB_PASSWORD": _SYNTHETIC_SENSITIVE_VALUE,
+        },
+        prompt_provider=NoninteractivePromptProvider(),
+        output=StringIO(),
+        error_output=StringIO(),
+    )
+
+    assert csv_status == 0
+    assert database_status == 0
+
+    for filename in (
+        "records.csv",
+        "ai_assistance_metrics.csv",
+        "readability_metrics.csv",
+    ):
+        assert (csv_output_directory / filename).read_bytes() == (
+            database_output_directory / filename
+        ).read_bytes()

@@ -35,6 +35,7 @@ development interface.
 | [`program-configuration`](python/packages/program-configuration/) | `program_configuration` | Layered, typed, secret-aware configuration resolution |
 | [`tabular-row-sources`](python/packages/tabular-row-sources/) | `tabular_row_sources` | Schema-aware lazy CSV and DB-API row sources |
 | [`text-post-edit-metrics`](python/packages/text-post-edit-metrics/) | `text_post_edit_metrics` | Generic directional text post-edit metrics |
+| [`text-readability-metrics`](python/packages/text-readability-metrics/) | `text_readability_metrics` | Generic English readability metrics and counts |
 | [`study-posting-ai-analysis`](python/packages/study-posting-ai-analysis/) | `study_posting_ai_analysis` | Study-posting field policy, parsing, analysis, and flattening |
 
 ### Programs
@@ -51,6 +52,7 @@ The audit-report program composes reusable packages:
 study-posting-audit-report
 ├── program-configuration
 ├── tabular-row-sources
+├── text-readability-metrics
 └── study-posting-ai-analysis
     └── text-post-edit-metrics
 ```
@@ -68,7 +70,7 @@ study-posting-ai-analysis
             ↓
  text-post-edit-metrics
             ↓
- records.csv + ai_assistance_metrics.csv
+ records.csv + ai_assistance_metrics.csv + readability_metrics.csv
 ```
 
 Dependency rules:
@@ -151,6 +153,17 @@ See:
 - the [package README](python/packages/text-post-edit-metrics/README.md);
 - the [methodology](python/packages/text-post-edit-metrics/docs/methodology.md);
 - the [verification strategy](python/packages/text-post-edit-metrics/docs/verification.md).
+
+### `text-readability-metrics`
+
+Analyzes nonblank English text:
+
+```python
+from text_readability_metrics import analyze_readability
+
+result = analyze_readability(
+    "Synthetic text used for readability analysis."
+)
 
 ### `study-posting-ai-analysis`
 
@@ -307,6 +320,7 @@ The program writes normalized:
 ```text
 records.csv
 ai_assistance_metrics.csv
+readability_metrics.csv
 ```
 
 See the
@@ -405,6 +419,7 @@ or operational programs belong under the language-specific program area.
 | Tabular schema and conversion | `tabular-row-sources/docs/schema-format.md` |
 | Shared agent rules | `.github/copilot-instructions.md` |
 | Member-specific rules | `.github/instructions/` |
+| Generic readability metrics | `text-readability-metrics/README.md` |
 
 A behavior or public-contract change is incomplete until its owning
 documentation is updated.

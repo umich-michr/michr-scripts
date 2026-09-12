@@ -8,6 +8,7 @@ The program composes:
 - `program-configuration` for CLI, environment, dotenv, defaults, and prompts;
 - `tabular-row-sources` for schema-aware lazy row streaming;
 - `study-posting-ai-analysis` for per-record study analysis;
+- `text-readability-metrics` for generic English readability metrics;
 - transitively, `text-post-edit-metrics` for generic text metrics.
 
 ## Quick start
@@ -60,7 +61,7 @@ study-posting-ai-analysis
             ↓
  text-post-edit-metrics
             ↓
- records.csv + ai_assistance_metrics.csv
+ records.csv + ai_assistance_metrics.csv + readability_metrics.csv
 ```
 
 | Component | Responsibility |
@@ -69,6 +70,7 @@ study-posting-ai-analysis
 | `tabular-row-sources` | Stream and canonically convert CSV or DB-API rows |
 | `study-posting-ai-analysis` | Apply study-specific policy to one record |
 | `text-post-edit-metrics` | Calculate generic directional text metrics |
+| `text-readability-metrics` | Calculate generic English readability metrics |
 | This program | Select rows for analysis and publish the report |
 
 The program does not duplicate source conversion, study policy, or metric
@@ -81,7 +83,8 @@ A successful report contains:
 ```text
 report/
 ├── records.csv
-└── ai_assistance_metrics.csv
+├── ai_assistance_metrics.csv
+└── readability_metrics.csv
 ```
 
 ### `records.csv`
@@ -110,6 +113,27 @@ field_metrics.record_id
 ```
 
 Record IDs must be non-null and unique within a run.
+
+### `readability_metrics.csv`
+
+Contains one row per analyzed, nonblank text instance for:
+
+- `title`;
+- `about`;
+- `purpose`;
+- `description`;
+- `compensation`.
+
+For completed AI attempts, the output includes every offered suggestion and
+each nonblank final value. The `selected` column identifies the first offered
+suggestion matching the selected value. Compensation suggestions retain their
+`genericCompensation` or `specificCompensation` kind and per-kind index.
+
+For completed manual attempts, only nonblank final values are analyzed.
+Incomplete attempts produce no readability rows.
+
+The CSV contains metrics and labels but does not contain the source text.
+Command-line runs use `text-readability-metrics` with its fixed English profile.
 
 ## Analysis selection
 
@@ -405,12 +429,17 @@ The output API accepts any configured `RowSource`:
 
 ```python
 from study_posting_audit_report import generate_csv_report
+from text_readability_metrics import analyze_readability
 
 report = generate_csv_report(
     source,
     output_directory="output/report",
+    readability_analyzer=analyze_readability,
 )
 ```
+The analyzer is injected at the report boundary. Omitting
+`readability_analyzer` still creates `readability_metrics.csv`, but with only
+its header.
 
 Pure row processing is also available:
 
@@ -447,7 +476,8 @@ with source.open_rows() as rows:
 | `analyzed_rows` | Selected rows successfully analyzed |
 | `skipped_rows` | Manual and incomplete rows preserved without analysis |
 | `failed_rows` | Reserved for a future non-fail-fast policy |
-| `metric_rows` | Field-level metric rows written |
+| `ai_assistance_rows` | AI-assistance field-metric rows written |
+| `readability_rows` | Readability text-instance rows written |
 
 The current implementation is fail-fast. For a published report:
 
@@ -471,7 +501,7 @@ On failure:
 
 ## Privacy and security
 
-Both output files may contain sensitive institutional data.
+Report outputs may contain sensitive institutional data.
 
 In particular, `records.csv` preserves source columns and may contain:
 
