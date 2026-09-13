@@ -1,4 +1,4 @@
-"""Loaded-input and validation-result models."""
+"""Loaded-input, derived-data, and validation-result models."""
 
 from dataclasses import dataclass
 
@@ -24,3 +24,29 @@ class ValidationSummary:
     incomplete_attempt_count: int
     ai_assistance_metric_row_count: int
     readability_metric_row_count: int
+
+
+@dataclass(frozen=True, slots=True)
+class DescriptiveStatistics:
+    """One explicit descriptive summary for numeric observations."""
+
+    nonmissing_count: int
+    missing_count: int
+    minimum: float | None
+    percentile_25: float | None
+    median: float | None
+    average: float | None
+    standard_deviation: float | None
+    percentile_75: float | None
+    percentile_90: float | None
+    maximum: float | None
+
+
+@dataclass(frozen=True, slots=True)
+class AppointmentQualityFinding:
+    """One malformed source appointment value."""
+
+    audit_record_id: int
+    appointment_source: str
+    appointment_index: int
+    issue_name: str
