@@ -2,14 +2,19 @@ from pathlib import Path
 
 import study_posting_audit_exploration as package
 from study_posting_audit_exploration import (
+    AttemptHistoryTables,
     AuditExplorationError,
     ExplorationConfigurationError,
     ExplorationInputConfig,
     ExplorationInputError,
+    ExplorationPublication,
+    ExplorationRunConfig,
     ExplorationValidationError,
     LoadedAuditReport,
     ValidationSummary,
+    derive_attempt_histories,
     load_audit_report,
+    publish_exploration,
     validate_audit_report,
 )
 
@@ -40,3 +45,11 @@ def test_exceptions_share_one_base_class() -> None:
     assert issubclass(ExplorationConfigurationError, AuditExplorationError)
     assert issubclass(ExplorationInputError, AuditExplorationError)
     assert issubclass(ExplorationValidationError, AuditExplorationError)
+
+
+def test_public_api_exports_batch_three_contract() -> None:
+    assert package.ExplorationRunConfig is ExplorationRunConfig
+    assert package.AttemptHistoryTables is AttemptHistoryTables
+    assert package.ExplorationPublication is ExplorationPublication
+    assert package.derive_attempt_histories is derive_attempt_histories
+    assert package.publish_exploration is publish_exploration

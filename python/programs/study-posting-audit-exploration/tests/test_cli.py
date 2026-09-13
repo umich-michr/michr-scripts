@@ -1,5 +1,6 @@
 from collections.abc import Sequence
 from io import StringIO
+import json
 from pathlib import Path
 import runpy
 import sys
@@ -23,6 +24,22 @@ def test_parser_exposes_validate_command() -> None:
 
     assert namespace.command == "validate"
     assert namespace.input_report == "synthetic-report"
+
+
+def test_parser_exposes_analyze_command() -> None:
+    namespace = build_parser().parse_args(
+        [
+            "analyze",
+            "--input-report",
+            "synthetic-report",
+            "--output",
+            "synthetic-output",
+        ]
+    )
+
+    assert namespace.command == "analyze"
+    assert namespace.input_report == "synthetic-report"
+    assert namespace.output == "synthetic-output"
 
 
 def test_cli_validates_report_without_printing_identifiers(
@@ -57,6 +74,67 @@ def test_cli_validates_report_without_printing_identifiers(
     assert "completion-author@example.edu" not in text
 
 
+def test_analyze_command_publishes_audit_records(
+    valid_report_directory: Path,
+    tmp_path: Path,
+) -> None:
+    output_directory = tmp_path / "exploration"
+    output = StringIO()
+    error_output = StringIO()
+
+    status = main(
+        [
+            "analyze",
+            "--input-report",
+            str(valid_report_directory),
+            "--output",
+            str(output_directory),
+        ],
+        output=output,
+        error_output=error_output,
+    )
+
+    assert status == 0
+    assert error_output.getvalue() == ""
+
+    manifest_path = output_directory / "analysis_manifest.json"
+    audit_directory = output_directory / "analysis-audit-records"
+    attempt_path = audit_directory / "study_attempt_author_history.csv"
+    study_path = audit_directory / "study_attempt_history.csv"
+    author_path = audit_directory / "author_history.csv"
+
+    assert manifest_path.is_file()
+    assert attempt_path.is_file()
+    assert study_path.is_file()
+    assert author_path.is_file()
+
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+    assert manifest["source_row_counts"] == {
+        "ai_assistance_metrics": 1,
+        "readability_metrics": 2,
+        "records": 2,
+    }
+    assert manifest["analysis_audit_record_row_counts"] == {
+        "author_history": 2,
+        "study_attempt_author_history": 2,
+        "study_attempt_history": 1,
+    }
+    assert manifest["output_file_count"] == 4
+    assert manifest["warning_count"] == 0
+
+    text = output.getvalue()
+
+    assert f"Exploration directory: {output_directory}" in text
+    assert f"Manifest: {manifest_path}" in text
+    assert f"Attempt history CSV: {attempt_path}" in text
+    assert f"Study history CSV: {study_path}" in text
+    assert f"Author history CSV: {author_path}" in text
+    assert "Published files: 4" in text
+    assert "SYNTHETIC-STUDY-1" not in text
+    assert "completion-author@example.edu" not in text
+
+
 def test_cli_reports_expected_failure_without_traceback(
     tmp_path: Path,
 ) -> None:
@@ -76,6 +154,30 @@ def test_cli_reports_expected_failure_without_traceback(
     assert status == 2
     assert output.getvalue() == ""
     assert "error: Input report directory does not exist" in error_output.getvalue()
+
+
+def test_analyze_rejects_existing_output_directory(
+    valid_report_directory: Path,
+    tmp_path: Path,
+) -> None:
+    output_directory = tmp_path / "existing"
+    output_directory.mkdir()
+    error_output = StringIO()
+
+    status = main(
+        [
+            "analyze",
+            "--input-report",
+            str(valid_report_directory),
+            "--output",
+            str(output_directory),
+        ],
+        output=StringIO(),
+        error_output=error_output,
+    )
+
+    assert status == 2
+    assert "Output directory already exists" in error_output.getvalue()
 
 
 def test_main_uses_default_streams(

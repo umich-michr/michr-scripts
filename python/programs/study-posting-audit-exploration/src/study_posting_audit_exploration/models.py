@@ -1,6 +1,7 @@
-"""Loaded-input, derived-data, and validation-result models."""
+"""Loaded-input, derived-data, publication, and validation models."""
 
 from dataclasses import dataclass
+from pathlib import Path
 
 import pandas as pd
 
@@ -59,3 +60,15 @@ class AttemptHistoryTables:
     study_attempt_author_history: pd.DataFrame
     study_attempt_history: pd.DataFrame
     author_history: pd.DataFrame
+
+
+@dataclass(frozen=True, slots=True)
+class ExplorationPublication:
+    """Successfully published Batch 3 exploration output."""
+
+    output_directory: Path
+    manifest_path: Path
+    study_attempt_author_history_path: Path
+    study_attempt_history_path: Path
+    author_history_path: Path
+    output_file_count: int

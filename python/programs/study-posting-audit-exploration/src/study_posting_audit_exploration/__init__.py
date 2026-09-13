@@ -1,6 +1,9 @@
 """Exploratory analysis of normalized study-posting audit reports."""
 
-from study_posting_audit_exploration.config import ExplorationInputConfig
+from study_posting_audit_exploration.config import (
+    ExplorationInputConfig,
+    ExplorationRunConfig,
+)
 from study_posting_audit_exploration.derivation import (
     AppointmentQualityFinding,
     author_changed,
@@ -20,9 +23,11 @@ from study_posting_audit_exploration.loading import load_audit_report
 from study_posting_audit_exploration.models import (
     AttemptHistoryTables,
     DescriptiveStatistics,
+    ExplorationPublication,
     LoadedAuditReport,
     ValidationSummary,
 )
+from study_posting_audit_exploration.publication import publish_exploration
 from study_posting_audit_exploration.statistics import describe_numeric
 from study_posting_audit_exploration.validation import validate_audit_report
 
@@ -36,6 +41,8 @@ __all__ = [
     "ExplorationConfigurationError",
     "ExplorationInputConfig",
     "ExplorationInputError",
+    "ExplorationPublication",
+    "ExplorationRunConfig",
     "ExplorationValidationError",
     "LoadedAuditReport",
     "ValidationSummary",
@@ -47,6 +54,7 @@ __all__ = [
     "describe_numeric",
     "effective_author_role",
     "load_audit_report",
+    "publish_exploration",
     "same_author_within_study",
     "validate_audit_report",
 ]
