@@ -1,5 +1,11 @@
 """Exploratory analysis of normalized study-posting audit reports."""
 
+from study_posting_audit_exploration.aggregation import (
+    build_author_handoff_summary,
+    build_overview_summary,
+    build_overview_tables,
+    build_study_attempt_history_summary,
+)
 from study_posting_audit_exploration.config import (
     ExplorationInputConfig,
     ExplorationRunConfig,
@@ -25,6 +31,7 @@ from study_posting_audit_exploration.models import (
     DescriptiveStatistics,
     ExplorationPublication,
     LoadedAuditReport,
+    OverviewTables,
     ValidationSummary,
 )
 from study_posting_audit_exploration.publication import publish_exploration
@@ -45,9 +52,14 @@ __all__ = [
     "ExplorationRunConfig",
     "ExplorationValidationError",
     "LoadedAuditReport",
+    "OverviewTables",
     "ValidationSummary",
     "__version__",
     "author_changed",
+    "build_author_handoff_summary",
+    "build_overview_summary",
+    "build_overview_tables",
+    "build_study_attempt_history_summary",
     "derive_appointments",
     "derive_attempt_histories",
     "derive_role_columns",

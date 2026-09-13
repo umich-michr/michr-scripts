@@ -1,4 +1,4 @@
-"""Loaded-input, derived-data, publication, and validation models."""
+"""Loaded-input, derived-data, aggregation, publication, and validation models."""
 
 from dataclasses import dataclass
 from pathlib import Path
@@ -63,8 +63,17 @@ class AttemptHistoryTables:
 
 
 @dataclass(frozen=True, slots=True)
+class OverviewTables:
+    """Faculty-facing overview and attempt-history aggregate tables."""
+
+    overview_summary: pd.DataFrame
+    study_attempt_history_summary: pd.DataFrame
+    author_handoff_summary: pd.DataFrame
+
+
+@dataclass(frozen=True, slots=True)
 class ExplorationPublication:
-    """Successfully published Batch 3 exploration output."""
+    """Successfully published exploration output."""
 
     output_directory: Path
     manifest_path: Path
