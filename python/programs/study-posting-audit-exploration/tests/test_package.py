@@ -2,6 +2,7 @@ from pathlib import Path
 
 import study_posting_audit_exploration as package
 from study_posting_audit_exploration import (
+    AttemptAnalysisTables,
     AttemptHistoryTables,
     AuditExplorationError,
     ExplorationConfigurationError,
@@ -11,7 +12,10 @@ from study_posting_audit_exploration import (
     ExplorationRunConfig,
     ExplorationValidationError,
     LoadedAuditReport,
+    OverviewTables,
     ValidationSummary,
+    build_attempt_analysis_tables,
+    build_overview_tables,
     derive_attempt_histories,
     load_audit_report,
     publish_exploration,
@@ -53,3 +57,13 @@ def test_public_api_exports_batch_three_contract() -> None:
     assert package.ExplorationPublication is ExplorationPublication
     assert package.derive_attempt_histories is derive_attempt_histories
     assert package.publish_exploration is publish_exploration
+
+
+def test_public_api_exports_batch_four_overview_contract() -> None:
+    assert package.OverviewTables is OverviewTables
+    assert package.build_overview_tables is build_overview_tables
+
+
+def test_public_api_exports_attempt_analysis_contract() -> None:
+    assert package.AttemptAnalysisTables is AttemptAnalysisTables
+    assert package.build_attempt_analysis_tables is (build_attempt_analysis_tables)

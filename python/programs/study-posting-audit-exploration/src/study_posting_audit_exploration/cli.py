@@ -5,6 +5,10 @@ from collections.abc import Sequence
 import sys
 from typing import TextIO
 
+from study_posting_audit_exploration.aggregation import (
+    build_attempt_analysis_tables,
+    build_overview_tables,
+)
 from study_posting_audit_exploration.config import (
     ExplorationInputConfig,
     ExplorationRunConfig,
@@ -49,7 +53,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     analyze_parser = subparsers.add_parser(
         "analyze",
-        help="Publish derived analysis-audit records.",
+        help="Publish exploration outputs.",
     )
     _add_input_argument(analyze_parser)
     analyze_parser.add_argument(
@@ -104,9 +108,47 @@ def _run_analyze(
     *,
     output: TextIO,
 ) -> None:
-    """Derive and publish Batch 3 exploration output."""
+    """Derive and publish current exploration output."""
     report, _ = _load_and_validate(namespace.input_report)
     histories = derive_attempt_histories(report.records)
+    attempts = histories.study_attempt_author_history.copy()
+
+    source_columns = report.records.loc[
+        :,
+        [
+            "ID",
+            "SOURCE_TYPE",
+            "STUDY_CONTENT_SOURCE",
+            "LLM_INFERRED_STUDY_CONTENT_SOURCE",
+            "STUDY_CONTENT_SOURCE_OTHER_VALUE",
+            "LLM_INFERRED_STUDY_CONTENT_SOURCE_OTHER_VALUE",
+        ],
+    ].rename(
+        columns={
+            "ID": "audit_record_id",
+            "SOURCE_TYPE": "source_type",
+            "STUDY_CONTENT_SOURCE": "study_content_source",
+            "LLM_INFERRED_STUDY_CONTENT_SOURCE": ("llm_inferred_study_content_source"),
+            "STUDY_CONTENT_SOURCE_OTHER_VALUE": ("study_content_source_other_value"),
+            "LLM_INFERRED_STUDY_CONTENT_SOURCE_OTHER_VALUE": (
+                "llm_inferred_study_content_source_other_value"
+            ),
+        }
+    )
+    attempts = attempts.merge(
+        source_columns,
+        on="audit_record_id",
+        how="left",
+        validate="one_to_one",
+    )
+
+    overview_tables = build_overview_tables(
+        attempts=attempts,
+        studies=histories.study_attempt_history,
+        authors=histories.author_history,
+    )
+    attempt_tables = build_attempt_analysis_tables(attempts)
+
     publication = publish_exploration(
         config=ExplorationRunConfig(
             input_report_directory=namespace.input_report,
@@ -114,6 +156,8 @@ def _run_analyze(
         ),
         report=report,
         histories=histories,
+        overview_tables=overview_tables,
+        attempt_tables=attempt_tables,
     )
 
     print(
@@ -131,6 +175,33 @@ def _run_analyze(
     )
     print(
         f"Author history CSV: {publication.author_history_path}",
+        file=output,
+    )
+    print(
+        f"Overview summary CSV: {publication.overview_summary_path}",
+        file=output,
+    )
+    print(
+        f"Study-attempt history summary CSV: "
+        f"{publication.study_attempt_history_summary_path}",
+        file=output,
+    )
+    print(
+        f"Author handoff summary CSV: {publication.author_handoff_summary_path}",
+        file=output,
+    )
+    print(
+        f"Grouped attempt summary CSV: {publication.grouped_attempt_summary_path}",
+        file=output,
+    )
+    print(
+        f"Content-source concordance summary CSV: "
+        f"{publication.content_source_concordance_summary_path}",
+        file=output,
+    )
+    print(
+        f"Content-source concordance matrix CSV: "
+        f"{publication.content_source_concordance_matrix_path}",
         file=output,
     )
     print(

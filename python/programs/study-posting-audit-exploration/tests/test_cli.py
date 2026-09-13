@@ -74,7 +74,7 @@ def test_cli_validates_report_without_printing_identifiers(
     assert "completion-author@example.edu" not in text
 
 
-def test_analyze_command_publishes_audit_records(
+def test_analyze_command_publishes_attempt_analysis_outputs(
     valid_report_directory: Path,
     tmp_path: Path,
 ) -> None:
@@ -99,14 +99,38 @@ def test_analyze_command_publishes_audit_records(
 
     manifest_path = output_directory / "analysis_manifest.json"
     audit_directory = output_directory / "analysis-audit-records"
-    attempt_path = audit_directory / "study_attempt_author_history.csv"
-    study_path = audit_directory / "study_attempt_history.csv"
-    author_path = audit_directory / "author_history.csv"
+    overview_directory = output_directory / "overview"
+    attempts_directory = output_directory / "attempts"
 
-    assert manifest_path.is_file()
-    assert attempt_path.is_file()
-    assert study_path.is_file()
-    assert author_path.is_file()
+    attempt_history_path = audit_directory / "study_attempt_author_history.csv"
+    study_history_path = audit_directory / "study_attempt_history.csv"
+    author_history_path = audit_directory / "author_history.csv"
+
+    overview_path = overview_directory / "overview_summary.csv"
+    history_summary_path = overview_directory / "study_attempt_history_summary.csv"
+    handoff_path = overview_directory / "author_handoff_summary.csv"
+
+    grouped_attempt_path = attempts_directory / "grouped_attempt_summary.csv"
+    concordance_summary_path = (
+        attempts_directory / "content_source_concordance_summary.csv"
+    )
+    concordance_matrix_path = (
+        attempts_directory / "content_source_concordance_matrix.csv"
+    )
+
+    for path in (
+        manifest_path,
+        attempt_history_path,
+        study_history_path,
+        author_history_path,
+        overview_path,
+        history_summary_path,
+        handoff_path,
+        grouped_attempt_path,
+        concordance_summary_path,
+        concordance_matrix_path,
+    ):
+        assert path.is_file()
 
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
 
@@ -120,17 +144,30 @@ def test_analyze_command_publishes_audit_records(
         "study_attempt_author_history": 2,
         "study_attempt_history": 1,
     }
-    assert manifest["output_file_count"] == 4
+    assert manifest["overview_row_counts"]["author_handoff_summary"] == 1
+    assert manifest["overview_row_counts"]["study_attempt_history_summary"] == 4
+    assert manifest["attempt_analysis_row_counts"]["grouped_attempt_summary"] > 0
+    assert (
+        manifest["attempt_analysis_row_counts"]["content_source_concordance_summary"]
+        == 3
+    )
+    assert manifest["output_file_count"] == 10
     assert manifest["warning_count"] == 0
 
     text = output.getvalue()
 
     assert f"Exploration directory: {output_directory}" in text
     assert f"Manifest: {manifest_path}" in text
-    assert f"Attempt history CSV: {attempt_path}" in text
-    assert f"Study history CSV: {study_path}" in text
-    assert f"Author history CSV: {author_path}" in text
-    assert "Published files: 4" in text
+    assert f"Attempt history CSV: {attempt_history_path}" in text
+    assert f"Study history CSV: {study_history_path}" in text
+    assert f"Author history CSV: {author_history_path}" in text
+    assert f"Overview summary CSV: {overview_path}" in text
+    assert f"Study-attempt history summary CSV: {history_summary_path}" in text
+    assert f"Author handoff summary CSV: {handoff_path}" in text
+    assert f"Grouped attempt summary CSV: {grouped_attempt_path}" in text
+    assert f"Content-source concordance summary CSV: {concordance_summary_path}" in text
+    assert f"Content-source concordance matrix CSV: {concordance_matrix_path}" in text
+    assert "Published files: 10" in text
     assert "SYNTHETIC-STUDY-1" not in text
     assert "completion-author@example.edu" not in text
 
@@ -153,7 +190,7 @@ def test_cli_reports_expected_failure_without_traceback(
 
     assert status == 2
     assert output.getvalue() == ""
-    assert "error: Input report directory does not exist" in error_output.getvalue()
+    assert "error: Input report directory does not exist" in (error_output.getvalue())
 
 
 def test_analyze_rejects_existing_output_directory(

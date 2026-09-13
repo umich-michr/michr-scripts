@@ -1,4 +1,4 @@
-"""Atomic publication of exploration analysis-audit records."""
+"""Atomic publication of exploration outputs."""
 
 import os
 from pathlib import Path
@@ -13,9 +13,11 @@ from study_posting_audit_exploration.errors import (
     ExplorationInputError,
 )
 from study_posting_audit_exploration.models import (
+    AttemptAnalysisTables,
     AttemptHistoryTables,
     ExplorationPublication,
     LoadedAuditReport,
+    OverviewTables,
 )
 from study_posting_audit_exploration.publication.manifest import (
     manifest_filename,
@@ -23,10 +25,22 @@ from study_posting_audit_exploration.publication.manifest import (
 )
 
 _ANALYSIS_AUDIT_DIRECTORY = "analysis-audit-records"
+_OVERVIEW_DIRECTORY = "overview"
+_ATTEMPTS_DIRECTORY = "attempts"
+
 _STUDY_ATTEMPT_AUTHOR_HISTORY_FILENAME = "study_attempt_author_history.csv"
 _STUDY_ATTEMPT_HISTORY_FILENAME = "study_attempt_history.csv"
 _AUTHOR_HISTORY_FILENAME = "author_history.csv"
-_OUTPUT_FILE_COUNT = 4
+
+_OVERVIEW_SUMMARY_FILENAME = "overview_summary.csv"
+_STUDY_ATTEMPT_HISTORY_SUMMARY_FILENAME = "study_attempt_history_summary.csv"
+_AUTHOR_HANDOFF_SUMMARY_FILENAME = "author_handoff_summary.csv"
+
+_GROUPED_ATTEMPT_SUMMARY_FILENAME = "grouped_attempt_summary.csv"
+_CONTENT_SOURCE_CONCORDANCE_SUMMARY_FILENAME = "content_source_concordance_summary.csv"
+_CONTENT_SOURCE_CONCORDANCE_MATRIX_FILENAME = "content_source_concordance_matrix.csv"
+
+_OUTPUT_FILE_COUNT = 10
 
 
 def _write_frame(
@@ -49,50 +63,108 @@ def _sync_file(path: Path) -> None:
         os.fsync(handle.fileno())
 
 
+def _output_frames(
+    *,
+    histories: AttemptHistoryTables,
+    overview_tables: OverviewTables,
+    attempt_tables: AttemptAnalysisTables,
+    audit_directory: Path,
+    overview_directory: Path,
+    attempts_directory: Path,
+) -> tuple[tuple[pd.DataFrame, Path], ...]:
+    """Return every DataFrame and stable staging path."""
+    return (
+        (
+            histories.study_attempt_author_history,
+            audit_directory / _STUDY_ATTEMPT_AUTHOR_HISTORY_FILENAME,
+        ),
+        (
+            histories.study_attempt_history,
+            audit_directory / _STUDY_ATTEMPT_HISTORY_FILENAME,
+        ),
+        (
+            histories.author_history,
+            audit_directory / _AUTHOR_HISTORY_FILENAME,
+        ),
+        (
+            overview_tables.overview_summary,
+            overview_directory / _OVERVIEW_SUMMARY_FILENAME,
+        ),
+        (
+            overview_tables.study_attempt_history_summary,
+            overview_directory / _STUDY_ATTEMPT_HISTORY_SUMMARY_FILENAME,
+        ),
+        (
+            overview_tables.author_handoff_summary,
+            overview_directory / _AUTHOR_HANDOFF_SUMMARY_FILENAME,
+        ),
+        (
+            attempt_tables.grouped_attempt_summary,
+            attempts_directory / _GROUPED_ATTEMPT_SUMMARY_FILENAME,
+        ),
+        (
+            attempt_tables.content_source_concordance_summary,
+            attempts_directory / _CONTENT_SOURCE_CONCORDANCE_SUMMARY_FILENAME,
+        ),
+        (
+            attempt_tables.content_source_concordance_matrix,
+            attempts_directory / _CONTENT_SOURCE_CONCORDANCE_MATRIX_FILENAME,
+        ),
+    )
+
+
 def _write_staging_output(
     staging_directory: Path,
     *,
     config: ExplorationRunConfig,
     report: LoadedAuditReport,
     histories: AttemptHistoryTables,
+    overview_tables: OverviewTables,
+    attempt_tables: AttemptAnalysisTables,
 ) -> None:
-    """Write all Batch 3 files into one staging directory."""
+    """Write all current exploration files into one staging directory."""
     audit_directory = staging_directory / _ANALYSIS_AUDIT_DIRECTORY
-    audit_directory.mkdir()
+    overview_directory = staging_directory / _OVERVIEW_DIRECTORY
+    attempts_directory = staging_directory / _ATTEMPTS_DIRECTORY
 
-    attempt_path = audit_directory / _STUDY_ATTEMPT_AUTHOR_HISTORY_FILENAME
-    study_path = audit_directory / _STUDY_ATTEMPT_HISTORY_FILENAME
-    author_path = audit_directory / _AUTHOR_HISTORY_FILENAME
+    for directory in (
+        audit_directory,
+        overview_directory,
+        attempts_directory,
+    ):
+        directory.mkdir()
+
+    output_frames = _output_frames(
+        histories=histories,
+        overview_tables=overview_tables,
+        attempt_tables=attempt_tables,
+        audit_directory=audit_directory,
+        overview_directory=overview_directory,
+        attempts_directory=attempts_directory,
+    )
     manifest_path = staging_directory / manifest_filename()
 
-    _write_frame(
-        histories.study_attempt_author_history,
-        attempt_path,
-    )
-    _write_frame(
-        histories.study_attempt_history,
-        study_path,
-    )
-    _write_frame(
-        histories.author_history,
-        author_path,
-    )
+    for frame, path in output_frames:
+        _write_frame(
+            frame,
+            path,
+        )
+
     write_manifest(
         manifest_path,
         config=config,
         report=report,
         histories=histories,
+        overview_tables=overview_tables,
+        attempt_tables=attempt_tables,
         output_file_count=_OUTPUT_FILE_COUNT,
         warning_count=0,
     )
 
-    for path in (
-        attempt_path,
-        study_path,
-        author_path,
-        manifest_path,
-    ):
+    for _, path in output_frames:
         _sync_file(path)
+
+    _sync_file(manifest_path)
 
 
 def publish_exploration(
@@ -100,8 +172,10 @@ def publish_exploration(
     config: ExplorationRunConfig,
     report: LoadedAuditReport,
     histories: AttemptHistoryTables,
+    overview_tables: OverviewTables,
+    attempt_tables: AttemptAnalysisTables,
 ) -> ExplorationPublication:
-    """Atomically publish Batch 3 exploration outputs."""
+    """Atomically publish current exploration outputs."""
     destination = config.output_directory
 
     if destination.exists():
@@ -134,6 +208,8 @@ def publish_exploration(
                 config=config,
                 report=report,
                 histories=histories,
+                overview_tables=overview_tables,
+                attempt_tables=attempt_tables,
             )
             staging_directory.replace(destination)
         except OSError as error:
@@ -148,6 +224,8 @@ def publish_exploration(
         raise
 
     audit_directory = destination / _ANALYSIS_AUDIT_DIRECTORY
+    overview_directory = destination / _OVERVIEW_DIRECTORY
+    attempts_directory = destination / _ATTEMPTS_DIRECTORY
 
     return ExplorationPublication(
         output_directory=destination,
@@ -157,5 +235,21 @@ def publish_exploration(
         ),
         study_attempt_history_path=(audit_directory / _STUDY_ATTEMPT_HISTORY_FILENAME),
         author_history_path=audit_directory / _AUTHOR_HISTORY_FILENAME,
+        overview_summary_path=(overview_directory / _OVERVIEW_SUMMARY_FILENAME),
+        study_attempt_history_summary_path=(
+            overview_directory / _STUDY_ATTEMPT_HISTORY_SUMMARY_FILENAME
+        ),
+        author_handoff_summary_path=(
+            overview_directory / _AUTHOR_HANDOFF_SUMMARY_FILENAME
+        ),
+        grouped_attempt_summary_path=(
+            attempts_directory / _GROUPED_ATTEMPT_SUMMARY_FILENAME
+        ),
+        content_source_concordance_summary_path=(
+            attempts_directory / _CONTENT_SOURCE_CONCORDANCE_SUMMARY_FILENAME
+        ),
+        content_source_concordance_matrix_path=(
+            attempts_directory / _CONTENT_SOURCE_CONCORDANCE_MATRIX_FILENAME
+        ),
         output_file_count=_OUTPUT_FILE_COUNT,
     )

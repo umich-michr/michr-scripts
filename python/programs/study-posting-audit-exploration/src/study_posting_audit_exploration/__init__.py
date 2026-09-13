@@ -1,7 +1,11 @@
 """Exploratory analysis of normalized study-posting audit reports."""
 
 from study_posting_audit_exploration.aggregation import (
+    build_attempt_analysis_tables,
     build_author_handoff_summary,
+    build_content_source_concordance_matrix,
+    build_content_source_concordance_summary,
+    build_grouped_attempt_summary,
     build_overview_summary,
     build_overview_tables,
     build_study_attempt_history_summary,
@@ -27,6 +31,7 @@ from study_posting_audit_exploration.errors import (
 )
 from study_posting_audit_exploration.loading import load_audit_report
 from study_posting_audit_exploration.models import (
+    AttemptAnalysisTables,
     AttemptHistoryTables,
     DescriptiveStatistics,
     ExplorationPublication,
@@ -42,6 +47,7 @@ __version__ = "0.1.0"
 
 __all__ = [
     "AppointmentQualityFinding",
+    "AttemptAnalysisTables",
     "AttemptHistoryTables",
     "AuditExplorationError",
     "DescriptiveStatistics",
@@ -56,7 +62,11 @@ __all__ = [
     "ValidationSummary",
     "__version__",
     "author_changed",
+    "build_attempt_analysis_tables",
     "build_author_handoff_summary",
+    "build_content_source_concordance_matrix",
+    "build_content_source_concordance_summary",
+    "build_grouped_attempt_summary",
     "build_overview_summary",
     "build_overview_tables",
     "build_study_attempt_history_summary",

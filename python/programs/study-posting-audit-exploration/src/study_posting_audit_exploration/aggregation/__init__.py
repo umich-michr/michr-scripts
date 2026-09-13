@@ -6,10 +6,20 @@ from study_posting_audit_exploration.aggregation.attempt_histories import (
     build_author_handoff_summary,
     build_study_attempt_history_summary,
 )
+from study_posting_audit_exploration.aggregation.attempts import (
+    build_grouped_attempt_summary,
+)
+from study_posting_audit_exploration.aggregation.content_sources import (
+    build_content_source_concordance_matrix,
+    build_content_source_concordance_summary,
+)
 from study_posting_audit_exploration.aggregation.overview import (
     build_overview_summary,
 )
-from study_posting_audit_exploration.models import OverviewTables
+from study_posting_audit_exploration.models import (
+    AttemptAnalysisTables,
+    OverviewTables,
+)
 
 
 def build_overview_tables(
@@ -18,7 +28,7 @@ def build_overview_tables(
     studies: pd.DataFrame,
     authors: pd.DataFrame,
 ) -> OverviewTables:
-    """Build all Batch 4A aggregate tables."""
+    """Build all overview aggregate tables."""
     return OverviewTables(
         overview_summary=build_overview_summary(
             attempts=attempts,
@@ -33,9 +43,29 @@ def build_overview_tables(
     )
 
 
+def build_attempt_analysis_tables(
+    attempts: pd.DataFrame,
+) -> AttemptAnalysisTables:
+    """Build grouped attempt and content-source aggregate tables."""
+    return AttemptAnalysisTables(
+        grouped_attempt_summary=build_grouped_attempt_summary(attempts),
+        content_source_concordance_summary=(
+            build_content_source_concordance_summary(attempts)
+        ),
+        content_source_concordance_matrix=(
+            build_content_source_concordance_matrix(attempts)
+        ),
+    )
+
+
 __all__ = [
+    "AttemptAnalysisTables",
     "OverviewTables",
+    "build_attempt_analysis_tables",
     "build_author_handoff_summary",
+    "build_content_source_concordance_matrix",
+    "build_content_source_concordance_summary",
+    "build_grouped_attempt_summary",
     "build_overview_summary",
     "build_overview_tables",
     "build_study_attempt_history_summary",

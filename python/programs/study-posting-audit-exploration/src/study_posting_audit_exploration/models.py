@@ -72,6 +72,15 @@ class OverviewTables:
 
 
 @dataclass(frozen=True, slots=True)
+class AttemptAnalysisTables:
+    """Attempt timing and content-source aggregate tables."""
+
+    grouped_attempt_summary: pd.DataFrame
+    content_source_concordance_summary: pd.DataFrame
+    content_source_concordance_matrix: pd.DataFrame
+
+
+@dataclass(frozen=True, slots=True)
 class ExplorationPublication:
     """Successfully published exploration output."""
 
@@ -80,4 +89,10 @@ class ExplorationPublication:
     study_attempt_author_history_path: Path
     study_attempt_history_path: Path
     author_history_path: Path
+    overview_summary_path: Path
+    study_attempt_history_summary_path: Path
+    author_handoff_summary_path: Path
+    grouped_attempt_summary_path: Path
+    content_source_concordance_summary_path: Path
+    content_source_concordance_matrix_path: Path
     output_file_count: int
