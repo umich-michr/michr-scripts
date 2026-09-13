@@ -45,9 +45,9 @@ def test_attempt_history_orders_and_marks_author_handoff(
         True,
         False,
     ]
-    assert attempts[
-        "prior_studies_created_before_attempt_completion_count"
-    ].tolist() == [pd.NA, 0]
+    assert attempts["prior_studies_created_before_attempt_start_count"].astype(
+        "Int64"
+    ).tolist() == [0, 0]
 
     study = studies.iloc[0]
 

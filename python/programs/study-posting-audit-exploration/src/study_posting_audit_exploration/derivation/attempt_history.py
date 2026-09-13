@@ -41,7 +41,7 @@ _ATTEMPT_HISTORY_COLUMNS: tuple[str, ...] = (
     "author_changed_from_previous_attempt",
     "author_appointments_raw",
     "pi_appointments_raw",
-    "prior_studies_created_before_attempt_completion_count",
+    "prior_studies_created_before_attempt_start_count",
     "total_studies_created_as_of_report_query_count",
     "other_study_memberships_as_of_report_query_count",
     "distinct_login_days_as_of_report_query_count",
@@ -281,10 +281,7 @@ def _derive_attempt_history(records: pd.DataFrame) -> pd.DataFrame:
         & ~enriched["is_completed_attempt"]
     ).astype("boolean")
 
-    prior_created = enriched["PRIOR_CREATED_COUNT"].where(
-        enriched["is_completed_attempt"],
-        pd.NA,
-    )
+    prior_created = enriched["PRIOR_CREATED_COUNT"]
 
     output = pd.DataFrame(
         {
@@ -321,7 +318,7 @@ def _derive_attempt_history(records: pd.DataFrame) -> pd.DataFrame:
             ],
             "author_appointments_raw": enriched["AUTHOR_APPOINTMENTS"],
             "pi_appointments_raw": enriched["PI_APPOINTMENTS"],
-            "prior_studies_created_before_attempt_completion_count": prior_created,
+            "prior_studies_created_before_attempt_start_count": prior_created,
             "total_studies_created_as_of_report_query_count": enriched[
                 "TOTAL_CREATED_COUNT"
             ],

@@ -44,6 +44,11 @@ It prints counts only. It does not print usernames, study numbers, payloads, or 
 - `CREATED_BY_ID` is the created study's creator ID, not the author identity for preceding attempts.
 - A study can have no more than one `COMPLETE` attempt.
 
+`PRIOR_CREATED_COUNT` is interpreted as the number of studies created by the
+attempt author before `START_TIME`. It is available for complete and incomplete
+attempts and is analyzed as
+`prior_studies_created_before_attempt_start_count`.
+
 ## Boundary
 
 This program owns exploratory derivation, aggregation, and publication.

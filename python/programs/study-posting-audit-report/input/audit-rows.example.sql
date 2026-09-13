@@ -298,7 +298,7 @@ WITH
               SELECT COUNT(*)
               FROM study s
               WHERE s.created_by_id = au.id
-                AND s.created_date  < spa.end_time
+                AND s.created_date  < spa.start_time
                 AND s.study_num    <> spa.study_num
             ) AS prior_created_count,
             /* Total studies ever created by this user */
