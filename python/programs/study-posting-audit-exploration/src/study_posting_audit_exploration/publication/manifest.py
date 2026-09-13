@@ -10,6 +10,7 @@ from study_posting_audit_exploration.models import (
     AttemptHistoryTables,
     LoadedAuditReport,
     OverviewTables,
+    StudyAnalysisTables,
 )
 
 _MANIFEST_FILENAME = "analysis_manifest.json"
@@ -29,8 +30,8 @@ def write_manifest(
     histories: AttemptHistoryTables,
     overview_tables: OverviewTables,
     attempt_tables: AttemptAnalysisTables,
+    study_tables: StudyAnalysisTables,
     output_file_count: int,
-    warning_count: int,
 ) -> None:
     """Write the minimal deterministic-shape analysis manifest."""
     content = {
@@ -68,10 +69,13 @@ def write_manifest(
                 attempt_tables.content_source_concordance_matrix
             ),
         },
+        "study_analysis_row_counts": {
+            "grouped_study_summary": len(study_tables.grouped_study_summary),
+        },
         "output_file_count": output_file_count,
         "edit_intensity_threshold_scheme": (config.edit_intensity_threshold_scheme),
         "readability_unchanged_tolerance": (config.readability_unchanged_tolerance),
-        "warning_count": warning_count,
+        "warning_count": len(study_tables.appointment_quality_findings),
     }
     path.write_text(
         json.dumps(

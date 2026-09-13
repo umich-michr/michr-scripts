@@ -20,6 +20,7 @@ from study_posting_audit_exploration.aggregation.studies import (
     build_grouped_study_summary,
 )
 from study_posting_audit_exploration.models import (
+    AppointmentQualityFinding,
     AttemptAnalysisTables,
     OverviewTables,
     StudyAnalysisTables,
@@ -64,10 +65,20 @@ def build_attempt_analysis_tables(
 
 def build_study_analysis_tables(
     studies: pd.DataFrame,
+    *,
+    appointments: pd.DataFrame | None = None,
+    appointment_quality_findings: tuple[
+        AppointmentQualityFinding,
+        ...,
+    ] = (),
 ) -> StudyAnalysisTables:
     """Build grouped study aggregate tables."""
     return StudyAnalysisTables(
-        grouped_study_summary=build_grouped_study_summary(studies),
+        grouped_study_summary=build_grouped_study_summary(
+            studies,
+            appointments=appointments,
+        ),
+        appointment_quality_findings=appointment_quality_findings,
     )
 
 

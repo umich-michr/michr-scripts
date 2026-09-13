@@ -63,10 +63,7 @@ class _StudyGroupLabels:
     values_are_mutually_exclusive: bool = True
 
 
-def _percentage(
-    numerator: int,
-    denominator: int,
-) -> float | None:
+def _percentage(numerator: int, denominator: int) -> float | None:
     """Return a percentage or ``None`` for an empty denominator."""
     if denominator == 0:
         return None
@@ -203,11 +200,11 @@ def _summary_row(
     }
 
 
-def _base_rows(
+def _population_modes(
     studies: pd.DataFrame,
-) -> list[dict[str, object]]:
-    """Return ungrouped rows for every population and mode."""
-    rows: list[dict[str, object]] = []
+) -> list[tuple[str, str, pd.DataFrame, int]]:
+    """Return every nonempty population/mode combination."""
+    combinations: list[tuple[str, str, pd.DataFrame, int]] = []
 
     for population_name in (
         "ALL_STUDIES_WITH_ATTEMPTS",
@@ -234,26 +231,44 @@ def _base_rows(
             if mode_population.empty and completion_mode != _ALL:
                 continue
 
-            rows.append(
-                _summary_row(
+            combinations.append(
+                (
+                    population_name,
+                    completion_mode,
                     mode_population,
-                    population_count=population_count,
-                    labels=_StudyGroupLabels(
-                        population_name=population_name,
-                        completion_mode=completion_mode,
-                        dimension_1_name="ALL",
-                        dimension_1_value="ALL",
-                    ),
+                    population_count,
                 )
             )
 
-    return rows
+    return combinations
+
+
+def _base_rows(studies: pd.DataFrame) -> list[dict[str, object]]:
+    """Return ungrouped rows for every population and mode."""
+    return [
+        _summary_row(
+            mode_population,
+            population_count=population_count,
+            labels=_StudyGroupLabels(
+                population_name=population_name,
+                completion_mode=completion_mode,
+                dimension_1_name="ALL",
+                dimension_1_value="ALL",
+            ),
+        )
+        for (
+            population_name,
+            completion_mode,
+            mode_population,
+            population_count,
+        ) in _population_modes(studies)
+    ]
 
 
 def _single_dimension_rows(
     studies: pd.DataFrame,
 ) -> list[dict[str, object]]:
-    """Return one-dimensional study groups."""
+    """Return one-dimensional mutually exclusive study groups."""
     rows: list[dict[str, object]] = []
     grouping_specs = (
         ("study_participant_type", "STUDY_PARTICIPANT_TYPE"),
@@ -262,49 +277,33 @@ def _single_dimension_rows(
         ("study_content_source", "STUDY_CONTENT_SOURCE"),
     )
 
-    for population_name in (
-        "ALL_STUDIES_WITH_ATTEMPTS",
-        "COMPLETED_STUDIES",
-        "STUDIES_WITHOUT_COMPLETION",
-    ):
-        population = _population(
-            studies,
-            population_name=population_name,
-        )
-        population_count = int(population["study_num"].nunique())
+    for (
+        population_name,
+        completion_mode,
+        mode_population,
+        population_count,
+    ) in _population_modes(studies):
+        if mode_population.empty:
+            continue
 
-        for completion_mode in (
-            _ALL,
-            _AI,
-            _MANUAL,
-            _NOT_COMPLETED,
-        ):
-            mode_population = _completion_mode_population(
-                population,
-                completion_mode=completion_mode,
-            )
-
-            if mode_population.empty:
-                continue
-
-            for column_name, dimension_name in grouping_specs:
-                for value, group in mode_population.groupby(
-                    column_name,
-                    sort=True,
-                    dropna=False,
-                ):
-                    rows.append(
-                        _summary_row(
-                            group,
-                            population_count=population_count,
-                            labels=_StudyGroupLabels(
-                                population_name=population_name,
-                                completion_mode=completion_mode,
-                                dimension_1_name=dimension_name,
-                                dimension_1_value=_group_value(value),
-                            ),
-                        )
+        for column_name, dimension_name in grouping_specs:
+            for value, group in mode_population.groupby(
+                column_name,
+                sort=True,
+                dropna=False,
+            ):
+                rows.append(
+                    _summary_row(
+                        group,
+                        population_count=population_count,
+                        labels=_StudyGroupLabels(
+                            population_name=population_name,
+                            completion_mode=completion_mode,
+                            dimension_1_name=dimension_name,
+                            dimension_1_value=_group_value(value),
+                        ),
                     )
+                )
 
     return rows
 
@@ -312,7 +311,7 @@ def _single_dimension_rows(
 def _two_dimension_rows(
     studies: pd.DataFrame,
 ) -> list[dict[str, object]]:
-    """Return approved two-dimensional study groups."""
+    """Return approved mutually exclusive two-dimensional study groups."""
     rows: list[dict[str, object]] = []
     grouping_specs = (
         (
@@ -329,63 +328,115 @@ def _two_dimension_rows(
         ),
     )
 
-    for population_name in (
-        "ALL_STUDIES_WITH_ATTEMPTS",
-        "COMPLETED_STUDIES",
-        "STUDIES_WITHOUT_COMPLETION",
-    ):
-        population = _population(
-            studies,
-            population_name=population_name,
-        )
-        population_count = int(population["study_num"].nunique())
+    for (
+        population_name,
+        completion_mode,
+        mode_population,
+        population_count,
+    ) in _population_modes(studies):
+        if mode_population.empty:
+            continue
 
-        for completion_mode in (
-            _ALL,
-            _AI,
-            _MANUAL,
-            _NOT_COMPLETED,
-        ):
-            mode_population = _completion_mode_population(
-                population,
-                completion_mode=completion_mode,
+        for (
+            column_1,
+            dimension_1,
+            column_2,
+            dimension_2,
+        ) in grouping_specs:
+            for keys, group in mode_population.groupby(
+                [column_1, column_2],
+                sort=True,
+                dropna=False,
+            ):
+                value_1, value_2 = keys
+                rows.append(
+                    _summary_row(
+                        group,
+                        population_count=population_count,
+                        labels=_StudyGroupLabels(
+                            population_name=population_name,
+                            completion_mode=completion_mode,
+                            dimension_1_name=dimension_1,
+                            dimension_1_value=_group_value(value_1),
+                            dimension_2_name=dimension_2,
+                            dimension_2_value=_group_value(value_2),
+                        ),
+                    )
+                )
+
+    return rows
+
+
+def _appointment_rows(
+    studies: pd.DataFrame,
+    appointments: pd.DataFrame,
+) -> list[dict[str, object]]:
+    """Return non-mutually-exclusive appointment groups."""
+    rows: list[dict[str, object]] = []
+    appointment_specs = (
+        ("AUTHOR", "appointment_title", "AUTHOR_APPOINTMENT_TITLE"),
+        (
+            "AUTHOR",
+            "appointment_department",
+            "AUTHOR_APPOINTMENT_DEPARTMENT",
+        ),
+        ("AUTHOR", "appointment_school", "AUTHOR_APPOINTMENT_SCHOOL"),
+        ("PI", "appointment_title", "PI_APPOINTMENT_TITLE"),
+        ("PI", "appointment_department", "PI_APPOINTMENT_DEPARTMENT"),
+        ("PI", "appointment_school", "PI_APPOINTMENT_SCHOOL"),
+    )
+
+    for (
+        population_name,
+        completion_mode,
+        mode_population,
+        population_count,
+    ) in _population_modes(studies):
+        if mode_population.empty:
+            continue
+
+        for source, column_name, dimension_name in appointment_specs:
+            selected_appointments = appointments.loc[
+                appointments["appointment_source"].eq(source)
+            ]
+            joined = mode_population.merge(
+                selected_appointments[
+                    [
+                        "study_num",
+                        column_name,
+                    ]
+                ],
+                on="study_num",
+                how="inner",
+                validate="one_to_many",
             )
 
-            if mode_population.empty:
-                continue
-
-            for (
-                column_1,
-                dimension_1,
-                column_2,
-                dimension_2,
-            ) in grouping_specs:
-                for keys, group in mode_population.groupby(
-                    [column_1, column_2],
-                    sort=True,
-                    dropna=False,
-                ):
-                    value_1, value_2 = keys
-                    rows.append(
-                        _summary_row(
-                            group,
-                            population_count=population_count,
-                            labels=_StudyGroupLabels(
-                                population_name=population_name,
-                                completion_mode=completion_mode,
-                                dimension_1_name=dimension_1,
-                                dimension_1_value=_group_value(value_1),
-                                dimension_2_name=dimension_2,
-                                dimension_2_value=_group_value(value_2),
-                            ),
-                        )
+            for value, group in joined.groupby(
+                column_name,
+                sort=True,
+                dropna=False,
+            ):
+                rows.append(
+                    _summary_row(
+                        group.drop_duplicates(subset=["study_num"]),
+                        population_count=population_count,
+                        labels=_StudyGroupLabels(
+                            population_name=population_name,
+                            completion_mode=completion_mode,
+                            dimension_1_name=dimension_name,
+                            dimension_1_value=_group_value(value),
+                            values_are_mutually_exclusive=False,
+                        ),
                     )
+                )
 
     return rows
 
 
 def build_grouped_study_summary(
     studies: pd.DataFrame,
+    *,
+    appointments: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """Return grouped study counts and completion-history distributions."""
     rows = [
@@ -393,6 +444,14 @@ def build_grouped_study_summary(
         *_single_dimension_rows(studies),
         *_two_dimension_rows(studies),
     ]
+
+    if appointments is not None and not appointments.empty:
+        rows.extend(
+            _appointment_rows(
+                studies,
+                appointments,
+            )
+        )
 
     return pd.DataFrame.from_records(
         rows,

@@ -82,9 +82,10 @@ class AttemptAnalysisTables:
 
 @dataclass(frozen=True, slots=True)
 class StudyAnalysisTables:
-    """Grouped study aggregate tables."""
+    """Grouped study aggregate tables and appointment quality findings."""
 
     grouped_study_summary: pd.DataFrame
+    appointment_quality_findings: tuple[AppointmentQualityFinding, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -102,4 +103,5 @@ class ExplorationPublication:
     grouped_attempt_summary_path: Path
     content_source_concordance_summary_path: Path
     content_source_concordance_matrix_path: Path
+    grouped_study_summary_path: Path
     output_file_count: int

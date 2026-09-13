@@ -18,6 +18,7 @@ from study_posting_audit_exploration.models import (
     ExplorationPublication,
     LoadedAuditReport,
     OverviewTables,
+    StudyAnalysisTables,
 )
 from study_posting_audit_exploration.publication.manifest import (
     manifest_filename,
@@ -27,6 +28,7 @@ from study_posting_audit_exploration.publication.manifest import (
 _ANALYSIS_AUDIT_DIRECTORY = "analysis-audit-records"
 _OVERVIEW_DIRECTORY = "overview"
 _ATTEMPTS_DIRECTORY = "attempts"
+_STUDIES_DIRECTORY = "studies"
 
 _STUDY_ATTEMPT_AUTHOR_HISTORY_FILENAME = "study_attempt_author_history.csv"
 _STUDY_ATTEMPT_HISTORY_FILENAME = "study_attempt_history.csv"
@@ -40,7 +42,9 @@ _GROUPED_ATTEMPT_SUMMARY_FILENAME = "grouped_attempt_summary.csv"
 _CONTENT_SOURCE_CONCORDANCE_SUMMARY_FILENAME = "content_source_concordance_summary.csv"
 _CONTENT_SOURCE_CONCORDANCE_MATRIX_FILENAME = "content_source_concordance_matrix.csv"
 
-_OUTPUT_FILE_COUNT = 10
+_GROUPED_STUDY_SUMMARY_FILENAME = "grouped_study_summary.csv"
+
+_OUTPUT_FILE_COUNT = 11
 
 
 def _write_frame(
@@ -68,9 +72,11 @@ def _output_frames(
     histories: AttemptHistoryTables,
     overview_tables: OverviewTables,
     attempt_tables: AttemptAnalysisTables,
+    study_tables: StudyAnalysisTables,
     audit_directory: Path,
     overview_directory: Path,
     attempts_directory: Path,
+    studies_directory: Path,
 ) -> tuple[tuple[pd.DataFrame, Path], ...]:
     """Return every DataFrame and stable staging path."""
     return (
@@ -110,6 +116,10 @@ def _output_frames(
             attempt_tables.content_source_concordance_matrix,
             attempts_directory / _CONTENT_SOURCE_CONCORDANCE_MATRIX_FILENAME,
         ),
+        (
+            study_tables.grouped_study_summary,
+            studies_directory / _GROUPED_STUDY_SUMMARY_FILENAME,
+        ),
     )
 
 
@@ -121,16 +131,19 @@ def _write_staging_output(
     histories: AttemptHistoryTables,
     overview_tables: OverviewTables,
     attempt_tables: AttemptAnalysisTables,
+    study_tables: StudyAnalysisTables,
 ) -> None:
     """Write all current exploration files into one staging directory."""
     audit_directory = staging_directory / _ANALYSIS_AUDIT_DIRECTORY
     overview_directory = staging_directory / _OVERVIEW_DIRECTORY
     attempts_directory = staging_directory / _ATTEMPTS_DIRECTORY
+    studies_directory = staging_directory / _STUDIES_DIRECTORY
 
     for directory in (
         audit_directory,
         overview_directory,
         attempts_directory,
+        studies_directory,
     ):
         directory.mkdir()
 
@@ -138,9 +151,11 @@ def _write_staging_output(
         histories=histories,
         overview_tables=overview_tables,
         attempt_tables=attempt_tables,
+        study_tables=study_tables,
         audit_directory=audit_directory,
         overview_directory=overview_directory,
         attempts_directory=attempts_directory,
+        studies_directory=studies_directory,
     )
     manifest_path = staging_directory / manifest_filename()
 
@@ -157,8 +172,8 @@ def _write_staging_output(
         histories=histories,
         overview_tables=overview_tables,
         attempt_tables=attempt_tables,
+        study_tables=study_tables,
         output_file_count=_OUTPUT_FILE_COUNT,
-        warning_count=0,
     )
 
     for _, path in output_frames:
@@ -174,6 +189,7 @@ def publish_exploration(
     histories: AttemptHistoryTables,
     overview_tables: OverviewTables,
     attempt_tables: AttemptAnalysisTables,
+    study_tables: StudyAnalysisTables,
 ) -> ExplorationPublication:
     """Atomically publish current exploration outputs."""
     destination = config.output_directory
@@ -210,6 +226,7 @@ def publish_exploration(
                 histories=histories,
                 overview_tables=overview_tables,
                 attempt_tables=attempt_tables,
+                study_tables=study_tables,
             )
             staging_directory.replace(destination)
         except OSError as error:
@@ -226,6 +243,7 @@ def publish_exploration(
     audit_directory = destination / _ANALYSIS_AUDIT_DIRECTORY
     overview_directory = destination / _OVERVIEW_DIRECTORY
     attempts_directory = destination / _ATTEMPTS_DIRECTORY
+    studies_directory = destination / _STUDIES_DIRECTORY
 
     return ExplorationPublication(
         output_directory=destination,
@@ -250,6 +268,9 @@ def publish_exploration(
         ),
         content_source_concordance_matrix_path=(
             attempts_directory / _CONTENT_SOURCE_CONCORDANCE_MATRIX_FILENAME
+        ),
+        grouped_study_summary_path=(
+            studies_directory / _GROUPED_STUDY_SUMMARY_FILENAME
         ),
         output_file_count=_OUTPUT_FILE_COUNT,
     )

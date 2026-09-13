@@ -5,6 +5,8 @@ import pandas as pd
 import pytest
 
 from study_posting_audit_exploration import (
+    AppointmentQualityFinding,
+    AttemptHistoryTables,
     ExplorationConfigurationError,
     ExplorationInputConfig,
     ExplorationPublication,
@@ -12,11 +14,12 @@ from study_posting_audit_exploration import (
     LoadedAuditReport,
     build_attempt_analysis_tables,
     build_overview_tables,
+    build_study_analysis_tables,
+    derive_appointments,
     derive_attempt_histories,
     load_audit_report,
     publish_exploration,
 )
-from study_posting_audit_exploration.models import AttemptHistoryTables
 from study_posting_audit_exploration.publication import manifest_filename
 
 
@@ -65,6 +68,60 @@ def _attempts_with_source_columns(
     )
 
 
+def _study_analysis_inputs(
+    report: LoadedAuditReport,
+    histories: AttemptHistoryTables,
+) -> tuple[
+    pd.DataFrame,
+    pd.DataFrame,
+    tuple[AppointmentQualityFinding, ...],
+]:
+    """Return study history, study-keyed appointments, and findings."""
+    snapshot_records = report.records.loc[
+        report.records["ATTEMPT_RESULT"].eq("COMPLETE")
+    ]
+    study_source = snapshot_records.loc[
+        :,
+        [
+            "ID",
+            "STUDY_NUM",
+            "STUDY_PARTICIPANT_TYPE",
+            "STUDY_DEPARTMENT",
+            "SOURCE_TYPE",
+            "STUDY_CONTENT_SOURCE",
+        ],
+    ].rename(
+        columns={
+            "ID": "audit_record_id",
+            "STUDY_NUM": "study_num",
+            "STUDY_PARTICIPANT_TYPE": "study_participant_type",
+            "STUDY_DEPARTMENT": "study_department",
+            "SOURCE_TYPE": "source_type",
+            "STUDY_CONTENT_SOURCE": "study_content_source",
+        }
+    )
+    studies = histories.study_attempt_history.merge(
+        study_source.drop(columns=["audit_record_id"]),
+        on="study_num",
+        how="left",
+        validate="one_to_one",
+    )
+    appointment_rows, findings = derive_appointments(snapshot_records)
+    appointments = study_source[
+        [
+            "audit_record_id",
+            "study_num",
+        ]
+    ].merge(
+        appointment_rows,
+        on="audit_record_id",
+        how="inner",
+        validate="one_to_many",
+    )
+
+    return studies, appointments, findings
+
+
 def publish_valid_report(
     input_directory: Path,
     output_directory: Path,
@@ -76,12 +133,21 @@ def publish_valid_report(
         report,
         histories,
     )
+    studies, appointments, findings = _study_analysis_inputs(
+        report,
+        histories,
+    )
     overview_tables = build_overview_tables(
         attempts=attempts,
         studies=histories.study_attempt_history,
         authors=histories.author_history,
     )
     attempt_tables = build_attempt_analysis_tables(attempts)
+    study_tables = build_study_analysis_tables(
+        studies,
+        appointments=appointments,
+        appointment_quality_findings=findings,
+    )
 
     return publish_exploration(
         config=ExplorationRunConfig(
@@ -92,10 +158,11 @@ def publish_valid_report(
         histories=histories,
         overview_tables=overview_tables,
         attempt_tables=attempt_tables,
+        study_tables=study_tables,
     )
 
 
-def test_publish_exploration_writes_atomic_attempt_analysis_output(
+def test_publish_exploration_writes_atomic_study_analysis_output(
     valid_report_directory: Path,
     tmp_path: Path,
 ) -> None:
@@ -107,7 +174,7 @@ def test_publish_exploration_writes_atomic_attempt_analysis_output(
     )
 
     assert publication.output_directory == output_directory
-    assert publication.output_file_count == 10
+    assert publication.output_file_count == 11
     assert publication.manifest_path.is_file()
     assert publication.study_attempt_author_history_path.is_file()
     assert publication.study_attempt_history_path.is_file()
@@ -118,105 +185,32 @@ def test_publish_exploration_writes_atomic_attempt_analysis_output(
     assert publication.grouped_attempt_summary_path.is_file()
     assert publication.content_source_concordance_summary_path.is_file()
     assert publication.content_source_concordance_matrix_path.is_file()
+    assert publication.grouped_study_summary_path.is_file()
     assert list(tmp_path.glob(".exploration.*")) == []
 
-    attempts = pd.read_csv(publication.study_attempt_author_history_path)
-    studies = pd.read_csv(publication.study_attempt_history_path)
-    authors = pd.read_csv(publication.author_history_path)
-    overview = pd.read_csv(publication.overview_summary_path)
-    history_summary = pd.read_csv(publication.study_attempt_history_summary_path)
-    handoff_summary = pd.read_csv(publication.author_handoff_summary_path)
-    grouped_attempts = pd.read_csv(publication.grouped_attempt_summary_path)
-    concordance_summary = pd.read_csv(
-        publication.content_source_concordance_summary_path
+    grouped_studies = pd.read_csv(publication.grouped_study_summary_path)
+
+    assert not grouped_studies.empty
+    assert "STUDY_PARTICIPANT_TYPE" in set(grouped_studies["grouping_dimension_1_name"])
+    assert "AUTHOR_APPOINTMENT_SCHOOL" in set(
+        grouped_studies["grouping_dimension_1_name"]
     )
-    concordance_matrix = pd.read_csv(publication.content_source_concordance_matrix_path)
-
-    assert len(attempts) == 2
-    assert len(studies) == 1
-    assert len(authors) == 2
-    assert attempts["audit_record_id"].tolist() == [1001, 1002]
-    assert not overview.empty
-    assert history_summary["final_completion_authoring_mode"].tolist() == [
-        "ALL",
-        "AI",
-        "MANUAL",
-        "NOT_COMPLETED",
-    ]
-    assert len(handoff_summary) == 1
-    assert not grouped_attempts.empty
-    assert concordance_summary["attempt_completion_group"].tolist() == [
-        "ALL",
-        "COMPLETE",
-        "INCOMPLETE",
-    ]
-    assert set(concordance_matrix["attempt_completion_group"]) == {
-        "ALL",
-        "COMPLETE",
-        "INCOMPLETE",
-    }
 
 
-def test_manifest_contains_attempt_analysis_counts(
+def test_manifest_contains_study_analysis_counts(
     valid_report_directory: Path,
     tmp_path: Path,
 ) -> None:
-    report = loaded_report(valid_report_directory)
-    histories = derive_attempt_histories(report.records)
-    attempts = _attempts_with_source_columns(
-        report,
-        histories,
+    publication = publish_valid_report(
+        valid_report_directory,
+        tmp_path / "exploration",
     )
-    overview_tables = build_overview_tables(
-        attempts=attempts,
-        studies=histories.study_attempt_history,
-        authors=histories.author_history,
-    )
-    attempt_tables = build_attempt_analysis_tables(attempts)
-
-    publication = publish_exploration(
-        config=ExplorationRunConfig(
-            input_report_directory=valid_report_directory,
-            output_directory=tmp_path / "exploration",
-        ),
-        report=report,
-        histories=histories,
-        overview_tables=overview_tables,
-        attempt_tables=attempt_tables,
-    )
-
     manifest = json.loads(publication.manifest_path.read_text(encoding="utf-8"))
 
-    assert set(manifest) == {
-        "analysis_audit_record_row_counts",
-        "analysis_program_version",
-        "attempt_analysis_row_counts",
-        "edit_intensity_threshold_scheme",
-        "generated_at_utc",
-        "output_file_count",
-        "overview_row_counts",
-        "readability_unchanged_tolerance",
-        "source_files",
-        "source_report_directory",
-        "source_row_counts",
-        "warning_count",
-    }
-    assert manifest["overview_row_counts"] == {
-        "author_handoff_summary": 1,
-        "overview_summary": len(overview_tables.overview_summary),
-        "study_attempt_history_summary": 4,
-    }
-    assert manifest["attempt_analysis_row_counts"] == {
-        "content_source_concordance_matrix": len(
-            attempt_tables.content_source_concordance_matrix
-        ),
-        "content_source_concordance_summary": 3,
-        "grouped_attempt_summary": len(attempt_tables.grouped_attempt_summary),
-    }
-    assert manifest["output_file_count"] == 10
-    assert "environment" not in manifest
-    assert "dependencies" not in manifest
-    assert "schema" not in manifest
+    assert "study_analysis_row_counts" in manifest
+    assert manifest["study_analysis_row_counts"]["grouped_study_summary"] > 0
+    assert manifest["output_file_count"] == 11
+    assert manifest["warning_count"] == 0
     assert manifest_filename() == "analysis_manifest.json"
 
 

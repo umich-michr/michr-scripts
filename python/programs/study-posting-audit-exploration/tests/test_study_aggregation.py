@@ -6,13 +6,16 @@ import pytest
 from study_posting_audit_exploration import (
     ExplorationInputConfig,
     build_grouped_study_summary,
+    derive_appointments,
     derive_attempt_histories,
     load_audit_report,
 )
 
 
-def studies_for(path: Path) -> pd.DataFrame:
-    """Return study history enriched with grouping dimensions."""
+def study_inputs(
+    path: Path,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Return enriched study history and study-keyed appointments."""
     report = load_audit_report(
         ExplorationInputConfig(
             report_directory=path,
@@ -22,6 +25,7 @@ def studies_for(path: Path) -> pd.DataFrame:
     completed_source = report.records.loc[
         report.records["ATTEMPT_RESULT"].eq("COMPLETE"),
         [
+            "ID",
             "STUDY_NUM",
             "STUDY_PARTICIPANT_TYPE",
             "STUDY_DEPARTMENT",
@@ -30,6 +34,7 @@ def studies_for(path: Path) -> pd.DataFrame:
         ],
     ].rename(
         columns={
+            "ID": "audit_record_id",
             "STUDY_NUM": "study_num",
             "STUDY_PARTICIPANT_TYPE": "study_participant_type",
             "STUDY_DEPARTMENT": "study_department",
@@ -37,13 +42,31 @@ def studies_for(path: Path) -> pd.DataFrame:
             "STUDY_CONTENT_SOURCE": "study_content_source",
         }
     )
-
-    return histories.study_attempt_history.merge(
-        completed_source,
+    studies = histories.study_attempt_history.merge(
+        completed_source.drop(columns=["audit_record_id"]),
         on="study_num",
         how="left",
         validate="one_to_one",
     )
+    appointment_rows, findings = derive_appointments(report.records)
+
+    assert findings == ()
+
+    selected_attempts = completed_source.loc[
+        :,
+        [
+            "audit_record_id",
+            "study_num",
+        ],
+    ]
+    appointments = selected_attempts.merge(
+        appointment_rows,
+        on="audit_record_id",
+        how="inner",
+        validate="one_to_many",
+    )
+
+    return studies, appointments
 
 
 def summary_row(
@@ -70,9 +93,12 @@ def summary_row(
 def test_grouped_study_summary_reports_base_population(
     valid_report_directory: Path,
 ) -> None:
-    studies = studies_for(valid_report_directory)
+    studies, appointments = study_inputs(valid_report_directory)
 
-    summary = build_grouped_study_summary(studies)
+    summary = build_grouped_study_summary(
+        studies,
+        appointments=appointments,
+    )
 
     all_studies = summary_row(
         summary,
@@ -98,9 +124,12 @@ def test_grouped_study_summary_reports_base_population(
 def test_grouped_study_summary_breaks_down_participant_and_department(
     valid_report_directory: Path,
 ) -> None:
-    studies = studies_for(valid_report_directory)
+    studies, appointments = study_inputs(valid_report_directory)
 
-    summary = build_grouped_study_summary(studies)
+    summary = build_grouped_study_summary(
+        studies,
+        appointments=appointments,
+    )
 
     participant = summary_row(
         summary,
@@ -132,14 +161,77 @@ def test_grouped_study_summary_breaks_down_participant_and_department(
     assert combined["distinct_study_count"] == 1
 
 
+def test_grouped_study_summary_includes_appointment_dimensions(
+    valid_report_directory: Path,
+) -> None:
+    studies, appointments = study_inputs(valid_report_directory)
+
+    summary = build_grouped_study_summary(
+        studies,
+        appointments=appointments,
+    )
+
+    author_school = summary_row(
+        summary,
+        population_name="COMPLETED_STUDIES",
+        completion_mode="AI",
+        dimension_1_name="AUTHOR_APPOINTMENT_SCHOOL",
+        dimension_1_value="Synthetic School",
+    )
+    assert author_school["distinct_study_count"] == 1
+    assert bool(author_school["group_values_are_mutually_exclusive"]) is False
+
+    pi_department = summary_row(
+        summary,
+        population_name="COMPLETED_STUDIES",
+        completion_mode="AI",
+        dimension_1_name="PI_APPOINTMENT_DEPARTMENT",
+        dimension_1_value="Synthetic Department",
+    )
+    assert pi_department["distinct_study_count"] == 1
+    assert bool(pi_department["group_values_are_mutually_exclusive"]) is False
+
+
+def test_appointment_groups_do_not_double_count_one_study(
+    valid_report_directory: Path,
+) -> None:
+    studies, appointments = study_inputs(valid_report_directory)
+    duplicate = appointments.iloc[[0]].copy()
+    duplicate["appointment_index"] = 99
+    appointments = pd.concat(
+        [
+            appointments,
+            duplicate,
+        ],
+        ignore_index=True,
+    )
+
+    summary = build_grouped_study_summary(
+        studies,
+        appointments=appointments,
+    )
+
+    author_school = summary_row(
+        summary,
+        population_name="COMPLETED_STUDIES",
+        completion_mode="AI",
+        dimension_1_name="AUTHOR_APPOINTMENT_SCHOOL",
+        dimension_1_value="Synthetic School",
+    )
+    assert author_school["distinct_study_count"] == 1
+
+
 def test_grouped_study_summary_preserves_missing_source_group(
     valid_report_directory: Path,
 ) -> None:
-    studies = studies_for(valid_report_directory)
+    studies, appointments = study_inputs(valid_report_directory)
     studies["source_type"] = pd.Series([pd.NA], dtype="string")
     studies["study_content_source"] = pd.Series([pd.NA], dtype="string")
 
-    summary = build_grouped_study_summary(studies)
+    summary = build_grouped_study_summary(
+        studies,
+        appointments=appointments,
+    )
 
     missing_source = summary_row(
         summary,
@@ -154,7 +246,7 @@ def test_grouped_study_summary_preserves_missing_source_group(
 def test_grouped_study_summary_uses_noncompleted_population(
     valid_report_directory: Path,
 ) -> None:
-    studies = studies_for(valid_report_directory)
+    studies, _ = study_inputs(valid_report_directory)
     studies.loc[:, "study_is_completed"] = False
     studies.loc[:, "completed_attempt_authoring_mode"] = pd.NA
 

@@ -5,23 +5,66 @@ from collections.abc import Sequence
 import sys
 from typing import TextIO
 
+import pandas as pd
+
 from study_posting_audit_exploration.aggregation import (
     build_attempt_analysis_tables,
     build_overview_tables,
+    build_study_analysis_tables,
 )
 from study_posting_audit_exploration.config import (
     ExplorationInputConfig,
     ExplorationRunConfig,
 )
-from study_posting_audit_exploration.derivation import derive_attempt_histories
+from study_posting_audit_exploration.derivation import (
+    derive_appointments,
+    derive_attempt_histories,
+)
 from study_posting_audit_exploration.errors import AuditExplorationError
 from study_posting_audit_exploration.loading import load_audit_report
 from study_posting_audit_exploration.models import (
+    AppointmentQualityFinding,
+    AttemptHistoryTables,
     LoadedAuditReport,
     ValidationSummary,
 )
 from study_posting_audit_exploration.publication import publish_exploration
 from study_posting_audit_exploration.validation import validate_audit_report
+
+_SOURCE_COLUMNS: tuple[str, ...] = (
+    "ID",
+    "SOURCE_TYPE",
+    "STUDY_CONTENT_SOURCE",
+    "LLM_INFERRED_STUDY_CONTENT_SOURCE",
+    "STUDY_CONTENT_SOURCE_OTHER_VALUE",
+    "LLM_INFERRED_STUDY_CONTENT_SOURCE_OTHER_VALUE",
+)
+_SOURCE_COLUMN_RENAMES: dict[str, str] = {
+    "ID": "audit_record_id",
+    "SOURCE_TYPE": "source_type",
+    "STUDY_CONTENT_SOURCE": "study_content_source",
+    "LLM_INFERRED_STUDY_CONTENT_SOURCE": ("llm_inferred_study_content_source"),
+    "STUDY_CONTENT_SOURCE_OTHER_VALUE": ("study_content_source_other_value"),
+    "LLM_INFERRED_STUDY_CONTENT_SOURCE_OTHER_VALUE": (
+        "llm_inferred_study_content_source_other_value"
+    ),
+}
+_STUDY_SNAPSHOT_COLUMNS: tuple[str, ...] = (
+    "ID",
+    "STUDY_NUM",
+    "STUDY_PARTICIPANT_TYPE",
+    "STUDY_DEPARTMENT",
+    "SOURCE_TYPE",
+    "STUDY_CONTENT_SOURCE",
+)
+_STUDY_SNAPSHOT_RENAMES: dict[str, str] = {
+    "ID": "audit_record_id",
+    "STUDY_NUM": "study_num",
+    "STUDY_PARTICIPANT_TYPE": "study_participant_type",
+    "STUDY_DEPARTMENT": "study_department",
+    "SOURCE_TYPE": "source_type",
+    "STUDY_CONTENT_SOURCE": "study_content_source",
+}
 
 
 def _add_input_argument(parser: argparse.ArgumentParser) -> None:
@@ -80,6 +123,93 @@ def _load_and_validate(
     return report, summary
 
 
+def _attempts_with_source_columns(
+    report: LoadedAuditReport,
+    histories: AttemptHistoryTables,
+) -> pd.DataFrame:
+    """Join attempt histories to source and inferred content columns."""
+    source_columns = report.records.loc[
+        :,
+        list(_SOURCE_COLUMNS),
+    ].rename(columns=_SOURCE_COLUMN_RENAMES)
+
+    return histories.study_attempt_author_history.merge(
+        source_columns,
+        on="audit_record_id",
+        how="left",
+        validate="one_to_one",
+    )
+
+
+def _study_snapshot_records(
+    report: LoadedAuditReport,
+) -> pd.DataFrame:
+    """Return one selected source-attempt snapshot per study.
+
+    Completed studies use their unique completed attempt. Studies without a
+    completion use the latest attempt by START_TIME and then audit ID.
+    """
+    ordered = report.records.sort_values(
+        by=["STUDY_NUM", "START_TIME", "ID"],
+        kind="stable",
+        na_position="last",
+    )
+    completed = ordered.loc[ordered["ATTEMPT_RESULT"].eq("COMPLETE")]
+    completed_studies = frozenset(str(value) for value in completed["STUDY_NUM"])
+    not_completed = ordered.loc[~ordered["STUDY_NUM"].isin(completed_studies)]
+    latest_not_completed = not_completed.drop_duplicates(
+        subset=["STUDY_NUM"],
+        keep="last",
+    )
+
+    return pd.concat(
+        [
+            completed,
+            latest_not_completed,
+        ],
+        ignore_index=True,
+    )
+
+
+def _studies_with_grouping_columns(
+    report: LoadedAuditReport,
+    histories: AttemptHistoryTables,
+) -> tuple[
+    pd.DataFrame,
+    pd.DataFrame,
+    tuple[AppointmentQualityFinding, ...],
+]:
+    """Return enriched studies, study-keyed appointments, and findings."""
+    snapshot_records = _study_snapshot_records(report)
+    study_source = snapshot_records.loc[
+        :,
+        list(_STUDY_SNAPSHOT_COLUMNS),
+    ].rename(columns=_STUDY_SNAPSHOT_RENAMES)
+    studies = histories.study_attempt_history.merge(
+        study_source.drop(columns=["audit_record_id"]),
+        on="study_num",
+        how="left",
+        validate="one_to_one",
+    )
+
+    appointment_rows, findings = derive_appointments(snapshot_records)
+    study_keys = study_source.loc[
+        :,
+        [
+            "audit_record_id",
+            "study_num",
+        ],
+    ]
+    appointments = study_keys.merge(
+        appointment_rows,
+        on="audit_record_id",
+        how="inner",
+        validate="one_to_many",
+    )
+
+    return studies, appointments, findings
+
+
 def _run_validate(
     namespace: argparse.Namespace,
     *,
@@ -111,35 +241,13 @@ def _run_analyze(
     """Derive and publish current exploration output."""
     report, _ = _load_and_validate(namespace.input_report)
     histories = derive_attempt_histories(report.records)
-    attempts = histories.study_attempt_author_history.copy()
-
-    source_columns = report.records.loc[
-        :,
-        [
-            "ID",
-            "SOURCE_TYPE",
-            "STUDY_CONTENT_SOURCE",
-            "LLM_INFERRED_STUDY_CONTENT_SOURCE",
-            "STUDY_CONTENT_SOURCE_OTHER_VALUE",
-            "LLM_INFERRED_STUDY_CONTENT_SOURCE_OTHER_VALUE",
-        ],
-    ].rename(
-        columns={
-            "ID": "audit_record_id",
-            "SOURCE_TYPE": "source_type",
-            "STUDY_CONTENT_SOURCE": "study_content_source",
-            "LLM_INFERRED_STUDY_CONTENT_SOURCE": ("llm_inferred_study_content_source"),
-            "STUDY_CONTENT_SOURCE_OTHER_VALUE": ("study_content_source_other_value"),
-            "LLM_INFERRED_STUDY_CONTENT_SOURCE_OTHER_VALUE": (
-                "llm_inferred_study_content_source_other_value"
-            ),
-        }
+    attempts = _attempts_with_source_columns(
+        report,
+        histories,
     )
-    attempts = attempts.merge(
-        source_columns,
-        on="audit_record_id",
-        how="left",
-        validate="one_to_one",
+    studies, appointments, appointment_findings = _studies_with_grouping_columns(
+        report,
+        histories,
     )
 
     overview_tables = build_overview_tables(
@@ -148,6 +256,11 @@ def _run_analyze(
         authors=histories.author_history,
     )
     attempt_tables = build_attempt_analysis_tables(attempts)
+    study_tables = build_study_analysis_tables(
+        studies,
+        appointments=appointments,
+        appointment_quality_findings=appointment_findings,
+    )
 
     publication = publish_exploration(
         config=ExplorationRunConfig(
@@ -158,6 +271,7 @@ def _run_analyze(
         histories=histories,
         overview_tables=overview_tables,
         attempt_tables=attempt_tables,
+        study_tables=study_tables,
     )
 
     print(
@@ -182,7 +296,7 @@ def _run_analyze(
         file=output,
     )
     print(
-        f"Study-attempt history summary CSV: "
+        "Study-attempt history summary CSV: "
         f"{publication.study_attempt_history_summary_path}",
         file=output,
     )
@@ -195,13 +309,17 @@ def _run_analyze(
         file=output,
     )
     print(
-        f"Content-source concordance summary CSV: "
+        "Content-source concordance summary CSV: "
         f"{publication.content_source_concordance_summary_path}",
         file=output,
     )
     print(
-        f"Content-source concordance matrix CSV: "
+        "Content-source concordance matrix CSV: "
         f"{publication.content_source_concordance_matrix_path}",
+        file=output,
+    )
+    print(
+        f"Grouped study summary CSV: {publication.grouped_study_summary_path}",
         file=output,
     )
     print(
