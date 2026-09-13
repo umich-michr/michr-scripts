@@ -6,8 +6,10 @@ from study_posting_audit_exploration.aggregation import (
     build_content_source_concordance_matrix,
     build_content_source_concordance_summary,
     build_grouped_attempt_summary,
+    build_grouped_study_summary,
     build_overview_summary,
     build_overview_tables,
+    build_study_analysis_tables,
     build_study_attempt_history_summary,
 )
 from study_posting_audit_exploration.config import (
@@ -37,6 +39,7 @@ from study_posting_audit_exploration.models import (
     ExplorationPublication,
     LoadedAuditReport,
     OverviewTables,
+    StudyAnalysisTables,
     ValidationSummary,
 )
 from study_posting_audit_exploration.publication import publish_exploration
@@ -59,6 +62,7 @@ __all__ = [
     "ExplorationValidationError",
     "LoadedAuditReport",
     "OverviewTables",
+    "StudyAnalysisTables",
     "ValidationSummary",
     "__version__",
     "author_changed",
@@ -67,8 +71,10 @@ __all__ = [
     "build_content_source_concordance_matrix",
     "build_content_source_concordance_summary",
     "build_grouped_attempt_summary",
+    "build_grouped_study_summary",
     "build_overview_summary",
     "build_overview_tables",
+    "build_study_analysis_tables",
     "build_study_attempt_history_summary",
     "derive_appointments",
     "derive_attempt_histories",

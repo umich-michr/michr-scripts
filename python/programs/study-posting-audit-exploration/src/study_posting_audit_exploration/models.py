@@ -81,6 +81,13 @@ class AttemptAnalysisTables:
 
 
 @dataclass(frozen=True, slots=True)
+class StudyAnalysisTables:
+    """Grouped study aggregate tables."""
+
+    grouped_study_summary: pd.DataFrame
+
+
+@dataclass(frozen=True, slots=True)
 class ExplorationPublication:
     """Successfully published exploration output."""
 

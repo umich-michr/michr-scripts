@@ -16,9 +16,13 @@ from study_posting_audit_exploration.aggregation.content_sources import (
 from study_posting_audit_exploration.aggregation.overview import (
     build_overview_summary,
 )
+from study_posting_audit_exploration.aggregation.studies import (
+    build_grouped_study_summary,
+)
 from study_posting_audit_exploration.models import (
     AttemptAnalysisTables,
     OverviewTables,
+    StudyAnalysisTables,
 )
 
 
@@ -58,15 +62,27 @@ def build_attempt_analysis_tables(
     )
 
 
+def build_study_analysis_tables(
+    studies: pd.DataFrame,
+) -> StudyAnalysisTables:
+    """Build grouped study aggregate tables."""
+    return StudyAnalysisTables(
+        grouped_study_summary=build_grouped_study_summary(studies),
+    )
+
+
 __all__ = [
     "AttemptAnalysisTables",
     "OverviewTables",
+    "StudyAnalysisTables",
     "build_attempt_analysis_tables",
     "build_author_handoff_summary",
     "build_content_source_concordance_matrix",
     "build_content_source_concordance_summary",
     "build_grouped_attempt_summary",
+    "build_grouped_study_summary",
     "build_overview_summary",
     "build_overview_tables",
+    "build_study_analysis_tables",
     "build_study_attempt_history_summary",
 ]
