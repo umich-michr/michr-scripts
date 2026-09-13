@@ -5,6 +5,7 @@ from study_posting_audit_exploration.derivation import (
     AppointmentQualityFinding,
     author_changed,
     derive_appointments,
+    derive_attempt_histories,
     derive_role_columns,
     effective_author_role,
     same_author_within_study,
@@ -17,6 +18,7 @@ from study_posting_audit_exploration.errors import (
 )
 from study_posting_audit_exploration.loading import load_audit_report
 from study_posting_audit_exploration.models import (
+    AttemptHistoryTables,
     DescriptiveStatistics,
     LoadedAuditReport,
     ValidationSummary,
@@ -28,6 +30,7 @@ __version__ = "0.1.0"
 
 __all__ = [
     "AppointmentQualityFinding",
+    "AttemptHistoryTables",
     "AuditExplorationError",
     "DescriptiveStatistics",
     "ExplorationConfigurationError",
@@ -39,6 +42,7 @@ __all__ = [
     "__version__",
     "author_changed",
     "derive_appointments",
+    "derive_attempt_histories",
     "derive_role_columns",
     "describe_numeric",
     "effective_author_role",

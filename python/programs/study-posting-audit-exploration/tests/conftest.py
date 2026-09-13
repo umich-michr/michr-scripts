@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import pandas as pd
 import pytest
 
 from study_posting_audit_exploration.input_contracts import (
@@ -13,6 +14,8 @@ from study_posting_audit_exploration.input_contracts import (
     READABILITY_COLUMNS,
     READABILITY_METRICS_FILENAME,
     RECORD_COLUMNS,
+    RECORD_DATETIME_COLUMNS,
+    RECORD_INTEGER_COLUMNS,
     RECORDS_FILENAME,
 )
 
@@ -195,6 +198,35 @@ def readability_rows(
     ]
 
 
+def loaded_record_frame(
+    rows: list[dict[str, object]],
+) -> pd.DataFrame:
+    """Return synthetic record rows with loader-compatible dtypes."""
+    frame = pd.DataFrame(rows)
+
+    for column_name in RECORD_INTEGER_COLUMNS:
+        frame[column_name] = pd.to_numeric(
+            frame[column_name],
+            errors="coerce",
+        ).astype("Int64")
+
+    for column_name in RECORD_DATETIME_COLUMNS:
+        frame[column_name] = pd.to_datetime(
+            frame[column_name],
+            errors="coerce",
+            format="ISO8601",
+        )
+
+    for column_name in RECORD_COLUMNS:
+        if (
+            column_name not in RECORD_INTEGER_COLUMNS
+            and column_name not in RECORD_DATETIME_COLUMNS
+        ):
+            frame[column_name] = frame[column_name].astype("string")
+
+    return frame.loc[:, list(RECORD_COLUMNS)]
+
+
 @pytest.fixture
 def valid_report_directory(tmp_path: Path) -> Path:
     """Write one valid synthetic normalized report directory."""
@@ -262,4 +294,5 @@ def report_rows() -> dict[str, Any]:
         "readability_rows": readability_rows,
         "write_csv": write_csv,
         "RecordRowOptions": RecordRowOptions,
+        "loaded_record_frame": loaded_record_frame,
     }

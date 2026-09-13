@@ -50,3 +50,12 @@ class AppointmentQualityFinding:
     appointment_source: str
     appointment_index: int
     issue_name: str
+
+
+@dataclass(frozen=True, slots=True)
+class AttemptHistoryTables:
+    """Derived audit tables with explicit attempt, study, and author grains."""
+
+    study_attempt_author_history: pd.DataFrame
+    study_attempt_history: pd.DataFrame
+    author_history: pd.DataFrame
