@@ -26,7 +26,12 @@ keywords = [
     "pandas",
 ]
 
-dependencies = ["pandas>=2.3,<4.0", "pandas-stubs>=2.3,<4.0"]
+dependencies = [
+    "jinja2>=3.1,<4.0",
+    "pandas>=2.3,<4.0",
+    "pandas-stubs>=2.3,<4.0",
+    "plotly>=6.0,<7.0",
+]
 
 [project.scripts]
 study-posting-audit-exploration = "study_posting_audit_exploration.cli:main"
