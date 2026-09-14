@@ -153,6 +153,17 @@ _TEMPLATE = """<!doctype html>
     <div class="chart">{{ author_handoffs_html | safe }}</div>
   </section>
 
+  <section aria-labelledby="author-experience-heading">
+    <h2 id="author-experience-heading">Author experience and activity</h2>
+    <p class="caution">
+      These author-grain medians describe values available when the report
+      query ran. They are not attempt-time snapshots and must not be
+      interpreted as causes of authoring-mode choice or study outcomes.
+    </p>
+    <div class="chart">{{ author_experience_studies_html | safe }}</div>
+    <div class="chart">{{ author_experience_days_html | safe }}</div>
+  </section>
+
   <section aria-labelledby="attempts-heading">
     <h2 id="attempts-heading">Attempts and workflow timing</h2>
     <div class="chart">{{ attempt_outcomes_html | safe }}</div>
@@ -312,6 +323,14 @@ def render_html_report(
         ),
         author_handoffs_html=_figure_html(
             charts.author_handoff_categories,
+            include_plotlyjs=False,
+        ),
+        author_experience_studies_html=_figure_html(
+            charts.author_experience_studies,
+            include_plotlyjs=False,
+        ),
+        author_experience_days_html=_figure_html(
+            charts.author_experience_days,
             include_plotlyjs=False,
         ),
         attempt_outcomes_html=_figure_html(

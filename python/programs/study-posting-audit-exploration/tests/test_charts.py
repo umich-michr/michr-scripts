@@ -11,6 +11,7 @@ from study_posting_audit_exploration.publication import (
     ExplorationCharts,
     build_attempt_outcomes_chart,
     build_attempt_timing_chart,
+    build_author_experience_chart,
     build_author_handoff_chart,
     build_content_source_concordance_chart,
     build_exploration_charts,
@@ -128,6 +129,57 @@ def author_handoff_rows() -> pd.DataFrame:
     )
 
 
+def current_author_experience_rows() -> pd.DataFrame:
+    """Return synthetic aggregate-only query-time author experience rows."""
+    metric_specs = (
+        (
+            "total_studies_created_as_of_report_query_count",
+            "studies",
+            (12.0, 8.0, 15.0, 11.0),
+        ),
+        (
+            "other_study_memberships_as_of_report_query_count",
+            "studies",
+            (5.0, 3.0, 7.0, 4.0),
+        ),
+        (
+            "distinct_login_days_as_of_report_query_count",
+            "days",
+            (30.0, 20.0, 45.0, 35.0),
+        ),
+        (
+            "login_history_span_days_as_of_report_query",
+            "days",
+            (300.0, 180.0, 420.0, 360.0),
+        ),
+    )
+    adoption_groups = (
+        "ALL_AUTHORS",
+        "AI_ONLY",
+        "MANUAL_ONLY",
+        "BOTH_AI_AND_MANUAL",
+    )
+    rows: list[dict[str, object]] = []
+
+    for metric_name, metric_unit, medians in metric_specs:
+        for adoption_group, median in zip(
+            adoption_groups,
+            medians,
+            strict=True,
+        ):
+            rows.append(
+                {
+                    "author_adoption_group": adoption_group,
+                    "experience_metric_name": metric_name,
+                    "experience_metric_unit": metric_unit,
+                    "author_count_with_nonmissing_metric": 4,
+                    "median_author_value": median,
+                }
+            )
+
+    return pd.DataFrame.from_records(rows)
+
+
 def content_source_rows() -> pd.DataFrame:
     """Return synthetic aggregate-only concordance rows."""
     return pd.DataFrame.from_records(
@@ -195,6 +247,40 @@ def test_author_handoff_chart_aggregates_categories_by_mode() -> None:
     assert list(figure.data[3].y) == [0, 3]
 
 
+def test_author_experience_chart_separates_units() -> None:
+    studies_figure = build_author_experience_chart(
+        current_author_experience_rows(),
+        metric_unit="studies",
+    )
+    days_figure = build_author_experience_chart(
+        current_author_experience_rows(),
+        metric_unit="days",
+    )
+
+    assert (
+        studies_figure.layout.title.text
+        == "Median author experience at report query time: studies"
+    )
+    assert studies_figure.layout.barmode == "group"
+    assert len(studies_figure.data) == 2
+    assert list(studies_figure.data[0].x) == [
+        "All authors",
+        "AI only",
+        "Manual only",
+        "Both AI and manual",
+    ]
+    assert list(studies_figure.data[0].y) == [12.0, 8.0, 15.0, 11.0]
+    assert list(studies_figure.data[1].y) == [5.0, 3.0, 7.0, 4.0]
+
+    assert (
+        days_figure.layout.title.text
+        == "Median author experience at report query time: days"
+    )
+    assert len(days_figure.data) == 2
+    assert list(days_figure.data[0].y) == [30.0, 20.0, 45.0, 35.0]
+    assert list(days_figure.data[1].y) == [300.0, 180.0, 420.0, 360.0]
+
+
 def test_content_source_chart_uses_all_attempt_population() -> None:
     figure = build_content_source_concordance_chart(content_source_rows())
     heatmap = figure.data[0]
@@ -210,6 +296,7 @@ def test_chart_bundle_contains_all_figures() -> None:
         grouped_attempt_summary=grouped_attempt_rows(),
         study_attempt_history_summary=study_history_rows(),
         author_handoff_summary=author_handoff_rows(),
+        current_author_experience_summary=current_author_experience_rows(),
         content_source_matrix=content_source_rows(),
     )
 
@@ -218,6 +305,8 @@ def test_chart_bundle_contains_all_figures() -> None:
     assert charts.median_attempt_time_by_mode.data
     assert charts.study_completion_pathways.data
     assert charts.author_handoff_categories.data
+    assert charts.author_experience_studies.data
+    assert charts.author_experience_days.data
     assert charts.content_source_concordance.data
 
 
@@ -225,6 +314,7 @@ def test_charts_return_accessible_empty_states() -> None:
     attempt_columns = grouped_attempt_rows().columns
     study_columns = study_history_rows().columns
     handoff_columns = author_handoff_rows().columns
+    experience_columns = current_author_experience_rows().columns
     content_columns = content_source_rows().columns
 
     attempt_figure = build_attempt_outcomes_chart(pd.DataFrame(columns=attempt_columns))
@@ -232,6 +322,10 @@ def test_charts_return_accessible_empty_states() -> None:
         pd.DataFrame(columns=study_columns)
     )
     handoff_figure = build_author_handoff_chart(pd.DataFrame(columns=handoff_columns))
+    experience_figure = build_author_experience_chart(
+        pd.DataFrame(columns=experience_columns),
+        metric_unit="studies",
+    )
     content_figure = build_content_source_concordance_chart(
         pd.DataFrame(columns=content_columns)
     )
@@ -239,6 +333,7 @@ def test_charts_return_accessible_empty_states() -> None:
     assert attempt_figure.layout.annotations[0].text
     assert study_figure.layout.annotations[0].text
     assert handoff_figure.layout.annotations[0].text
+    assert experience_figure.layout.annotations[0].text
     assert content_figure.layout.annotations[0].text
 
 
@@ -266,6 +361,17 @@ def test_charts_return_accessible_empty_states() -> None:
             pd.DataFrame(
                 {
                     "completed_attempt_authoring_mode": ["AI"],
+                }
+            ),
+        ),
+        (
+            lambda frame: build_author_experience_chart(
+                frame,
+                metric_unit="studies",
+            ),
+            pd.DataFrame(
+                {
+                    "author_adoption_group": ["ALL_AUTHORS"],
                 }
             ),
         ),

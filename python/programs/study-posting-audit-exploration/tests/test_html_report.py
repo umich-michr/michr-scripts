@@ -105,6 +105,46 @@ def author_handoff_rows() -> pd.DataFrame:
     )
 
 
+def current_author_experience_rows() -> pd.DataFrame:
+    """Return aggregate-only query-time author experience rows."""
+    rows: list[dict[str, object]] = [
+        {
+            "author_adoption_group": "ALL_AUTHORS",
+            "experience_metric_name": (
+                "total_studies_created_as_of_report_query_count"
+            ),
+            "experience_metric_unit": "studies",
+            "author_count_with_nonmissing_metric": 4,
+            "median_author_value": 10.0,
+        },
+        {
+            "author_adoption_group": "AI_ONLY",
+            "experience_metric_name": (
+                "total_studies_created_as_of_report_query_count"
+            ),
+            "experience_metric_unit": "studies",
+            "author_count_with_nonmissing_metric": 2,
+            "median_author_value": 8.0,
+        },
+        {
+            "author_adoption_group": "ALL_AUTHORS",
+            "experience_metric_name": ("distinct_login_days_as_of_report_query_count"),
+            "experience_metric_unit": "days",
+            "author_count_with_nonmissing_metric": 4,
+            "median_author_value": 30.0,
+        },
+        {
+            "author_adoption_group": "AI_ONLY",
+            "experience_metric_name": ("distinct_login_days_as_of_report_query_count"),
+            "experience_metric_unit": "days",
+            "author_count_with_nonmissing_metric": 2,
+            "median_author_value": 20.0,
+        },
+    ]
+
+    return pd.DataFrame.from_records(rows)
+
+
 def content_rows() -> pd.DataFrame:
     """Return aggregate-only content-source rows."""
     return pd.DataFrame.from_records(
@@ -126,6 +166,7 @@ def charts() -> ExplorationCharts:
         study_attempt_history_summary=study_history_rows(),
         author_handoff_summary=author_handoff_rows(),
         content_source_matrix=content_rows(),
+        current_author_experience_summary=current_author_experience_rows(),
     )
 
 
@@ -151,6 +192,12 @@ def test_html_report_is_self_contained_and_accessible() -> None:
     assert "These descriptive results do not" in normalized_html
     assert "establish causality and must not be" in normalized_html
     assert "Readability formulas are indicators only" in normalized_html
+
+    assert 'id="author-experience-heading"' in html
+    assert "Author experience and activity" in html
+    assert "Median author experience at report query time: studies" in html
+    assert "Median author experience at report query time: days" in html
+    assert "They are not attempt-time snapshots" in normalized_html
 
 
 def test_html_report_excludes_identifier_and_payload_values() -> None:

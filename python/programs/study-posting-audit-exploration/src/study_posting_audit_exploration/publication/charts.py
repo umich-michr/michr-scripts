@@ -39,6 +39,14 @@ _REQUIRED_AUTHOR_HANDOFF_COLUMNS: tuple[str, ...] = (
     "distinct_completed_study_count",
 )
 
+_REQUIRED_CURRENT_AUTHOR_EXPERIENCE_COLUMNS: tuple[str, ...] = (
+    "author_adoption_group",
+    "experience_metric_name",
+    "experience_metric_unit",
+    "author_count_with_nonmissing_metric",
+    "median_author_value",
+)
+
 _ATTEMPT_RESULT_ORDER: tuple[str, ...] = (
     "COMPLETE",
     "AI_ERROR",
@@ -67,7 +75,28 @@ _AUTHOR_HANDOFF_LABELS: Mapping[str, str] = {
     "ALL_PRECEDING_ATTEMPTS_BY_OTHER_AUTHORS": (
         "All preceding attempts by other authors"
     ),
-    "MIXED_COMPLETION_AND_OTHER_AUTHORS": ("Mixed completion and other authors"),
+    "MIXED_COMPLETION_AND_OTHER_AUTHORS": "Mixed completion and other authors",
+}
+
+_AUTHOR_ADOPTION_GROUP_ORDER: tuple[str, ...] = (
+    "ALL_AUTHORS",
+    "AI_ONLY",
+    "MANUAL_ONLY",
+    "BOTH_AI_AND_MANUAL",
+)
+
+_AUTHOR_ADOPTION_GROUP_LABELS: Mapping[str, str] = {
+    "ALL_AUTHORS": "All authors",
+    "AI_ONLY": "AI only",
+    "MANUAL_ONLY": "Manual only",
+    "BOTH_AI_AND_MANUAL": "Both AI and manual",
+}
+
+_AUTHOR_EXPERIENCE_METRIC_LABELS: Mapping[str, str] = {
+    "total_studies_created_as_of_report_query_count": "Total studies created",
+    "other_study_memberships_as_of_report_query_count": ("Other study memberships"),
+    "distinct_login_days_as_of_report_query_count": "Distinct login days",
+    "login_history_span_days_as_of_report_query": "Login-history span",
 }
 
 
@@ -79,6 +108,8 @@ class ExplorationCharts:
     median_attempt_time_by_mode: go.Figure
     study_completion_pathways: go.Figure
     author_handoff_categories: go.Figure
+    author_experience_studies: go.Figure
+    author_experience_days: go.Figure
     content_source_concordance: go.Figure
 
 
@@ -343,6 +374,90 @@ def build_author_handoff_chart(
     return figure
 
 
+def build_author_experience_chart(
+    current_author_experience_summary: pd.DataFrame,
+    *,
+    metric_unit: str,
+) -> go.Figure:
+    """Return query-time median author experience for one measurement unit."""
+    _require_columns(
+        current_author_experience_summary,
+        required=_REQUIRED_CURRENT_AUTHOR_EXPERIENCE_COLUMNS,
+        frame_name="current_author_experience_summary",
+    )
+    rows = current_author_experience_summary.loc[
+        current_author_experience_summary["experience_metric_unit"].eq(metric_unit)
+        & current_author_experience_summary["experience_metric_name"].isin(
+            _AUTHOR_EXPERIENCE_METRIC_LABELS
+        )
+        & current_author_experience_summary["author_adoption_group"].isin(
+            _AUTHOR_ADOPTION_GROUP_ORDER
+        )
+    ].dropna(subset=["median_author_value"])
+
+    unit_label = "Studies" if metric_unit == "studies" else "Days"
+    title = f"Median author experience at report query time: {unit_label.lower()}"
+
+    if rows.empty:
+        return _empty_figure(
+            title=title,
+            message=(
+                f"No query-time author experience aggregates in {unit_label.lower()} "
+                "are available."
+            ),
+        )
+
+    figure = go.Figure()
+
+    metric_names = tuple(
+        str(value) for value in rows["experience_metric_name"].unique()
+    )
+
+    for metric_name in metric_names:
+        metric_rows = rows.loc[rows["experience_metric_name"].eq(metric_name)]
+        medians_by_group: Mapping[str, float] = {
+            str(row["author_adoption_group"]): float(row["median_author_value"])
+            for row in metric_rows.to_dict(orient="records")
+        }
+        counts_by_group: Mapping[str, int] = {
+            str(row["author_adoption_group"]): int(
+                row["author_count_with_nonmissing_metric"]
+            )
+            for row in metric_rows.to_dict(orient="records")
+        }
+        figure.add_bar(
+            name=_AUTHOR_EXPERIENCE_METRIC_LABELS[metric_name],
+            x=[
+                _AUTHOR_ADOPTION_GROUP_LABELS[group]
+                for group in _AUTHOR_ADOPTION_GROUP_ORDER
+            ],
+            y=[
+                medians_by_group.get(group, 0.0)
+                for group in _AUTHOR_ADOPTION_GROUP_ORDER
+            ],
+            customdata=[
+                counts_by_group.get(group, 0) for group in _AUTHOR_ADOPTION_GROUP_ORDER
+            ],
+            hovertemplate=(
+                "Adoption group: %{x}<br>"
+                "Median: %{y:.2f}<br>"
+                "Authors with value: %{customdata}"
+                "<extra>%{fullData.name}</extra>"
+            ),
+        )
+
+    figure.update_layout(
+        title=title,
+        template="plotly_white",
+        barmode="group",
+        xaxis_title="Author adoption group",
+        yaxis_title=f"Median {unit_label.lower()}",
+        legend_title_text="Query-time experience metric",
+    )
+
+    return figure
+
+
 def build_content_source_concordance_chart(
     content_source_matrix: pd.DataFrame,
 ) -> go.Figure:
@@ -418,6 +533,7 @@ def build_exploration_charts(
     grouped_attempt_summary: pd.DataFrame,
     study_attempt_history_summary: pd.DataFrame,
     author_handoff_summary: pd.DataFrame,
+    current_author_experience_summary: pd.DataFrame,
     content_source_matrix: pd.DataFrame,
 ) -> ExplorationCharts:
     """Return all aggregate-only exploration figures."""
@@ -428,6 +544,14 @@ def build_exploration_charts(
             study_attempt_history_summary
         ),
         author_handoff_categories=build_author_handoff_chart(author_handoff_summary),
+        author_experience_studies=build_author_experience_chart(
+            current_author_experience_summary,
+            metric_unit="studies",
+        ),
+        author_experience_days=build_author_experience_chart(
+            current_author_experience_summary,
+            metric_unit="days",
+        ),
         content_source_concordance=(
             build_content_source_concordance_chart(content_source_matrix)
         ),
