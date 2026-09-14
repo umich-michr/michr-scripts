@@ -142,6 +142,17 @@ _TEMPLATE = """<!doctype html>
     </div>
   </section>
 
+  <section aria-labelledby="study-pathways-heading">
+    <h2 id="study-pathways-heading">Study pathways and author handoffs</h2>
+    <p class="caution">
+      A preceding attempt is an incomplete attempt ordered before the unique
+      completed attempt for the same study. Author comparisons are made only
+      within a study.
+    </p>
+    <div class="chart">{{ study_pathways_html | safe }}</div>
+    <div class="chart">{{ author_handoffs_html | safe }}</div>
+  </section>
+
   <section aria-labelledby="attempts-heading">
     <h2 id="attempts-heading">Attempts and workflow timing</h2>
     <div class="chart">{{ attempt_outcomes_html | safe }}</div>
@@ -295,9 +306,17 @@ def render_html_report(
     return template.render(
         title=_REPORT_TITLE,
         kpi_cards=_kpi_cards(overview_summary),
+        study_pathways_html=_figure_html(
+            charts.study_completion_pathways,
+            include_plotlyjs=True,
+        ),
+        author_handoffs_html=_figure_html(
+            charts.author_handoff_categories,
+            include_plotlyjs=False,
+        ),
         attempt_outcomes_html=_figure_html(
             charts.attempt_outcomes_by_mode,
-            include_plotlyjs=True,
+            include_plotlyjs=False,
         ),
         attempt_timing_html=_figure_html(
             charts.median_attempt_time_by_mode,

@@ -5,6 +5,7 @@ import pytest
 
 from study_posting_audit_exploration import ExplorationInputError
 from study_posting_audit_exploration.publication import (
+    ExplorationCharts,
     build_exploration_charts,
 )
 from study_posting_audit_exploration.publication.html_report import (
@@ -59,6 +60,51 @@ def attempt_rows() -> pd.DataFrame:
     )
 
 
+def study_history_rows() -> pd.DataFrame:
+    """Return aggregate-only study-pathway rows."""
+    return pd.DataFrame.from_records(
+        [
+            {
+                "final_completion_authoring_mode": "AI",
+                "distinct_study_count": 4,
+                "study_count_with_preceding_incomplete_attempts": 1,
+                "median_minutes_first_attempt_to_completion": 12.0,
+            },
+            {
+                "final_completion_authoring_mode": "MANUAL",
+                "distinct_study_count": 3,
+                "study_count_with_preceding_incomplete_attempts": 2,
+                "median_minutes_first_attempt_to_completion": 18.0,
+            },
+        ]
+    )
+
+
+def author_handoff_rows() -> pd.DataFrame:
+    """Return aggregate-only handoff rows."""
+    return pd.DataFrame.from_records(
+        [
+            {
+                "completed_attempt_authoring_mode": "AI",
+                "author_handoff_category": "NO_PRECEDING_ATTEMPT",
+                "distinct_completed_study_count": 3,
+            },
+            {
+                "completed_attempt_authoring_mode": "AI",
+                "author_handoff_category": ("ALL_PRECEDING_ATTEMPTS_BY_OTHER_AUTHORS"),
+                "distinct_completed_study_count": 1,
+            },
+            {
+                "completed_attempt_authoring_mode": "MANUAL",
+                "author_handoff_category": (
+                    "ALL_PRECEDING_ATTEMPTS_BY_COMPLETION_AUTHOR"
+                ),
+                "distinct_completed_study_count": 3,
+            },
+        ]
+    )
+
+
 def content_rows() -> pd.DataFrame:
     """Return aggregate-only content-source rows."""
     return pd.DataFrame.from_records(
@@ -73,10 +119,12 @@ def content_rows() -> pd.DataFrame:
     )
 
 
-def charts() -> object:
+def charts() -> ExplorationCharts:
     """Return synthetic aggregate-only chart bundle."""
     return build_exploration_charts(
         grouped_attempt_summary=attempt_rows(),
+        study_attempt_history_summary=study_history_rows(),
+        author_handoff_summary=author_handoff_rows(),
         content_source_matrix=content_rows(),
     )
 
@@ -84,7 +132,7 @@ def charts() -> object:
 def test_html_report_is_self_contained_and_accessible() -> None:
     html = render_html_report(
         overview_summary=overview_rows(),
-        charts=charts(),  # type: ignore[arg-type]
+        charts=charts(),
     )
     normalized_html = " ".join(html.split())
 
@@ -92,6 +140,10 @@ def test_html_report_is_self_contained_and_accessible() -> None:
     assert '<html lang="en">' in html
     assert "<h1>Study Posting Audit Exploration</h1>" in html
     assert 'id="executive-overview-heading"' in html
+    assert 'id="study-pathways-heading"' in html
+    assert "Study pathways and author handoffs" in html
+    assert "Completed-study pathways by final authoring mode" in html
+    assert "Author handoffs before study completion" in html
     assert "Distinct studies" in html
     assert "10" in html
     assert "plotly.js" in html.lower()
@@ -104,7 +156,7 @@ def test_html_report_is_self_contained_and_accessible() -> None:
 def test_html_report_excludes_identifier_and_payload_values() -> None:
     html = render_html_report(
         overview_summary=overview_rows(),
-        charts=charts(),  # type: ignore[arg-type]
+        charts=charts(),
     )
 
     forbidden_values = (
@@ -128,7 +180,7 @@ def test_write_html_report_creates_utf8_file(
     write_html_report(
         path,
         overview_summary=overview_rows(),
-        charts=charts(),  # type: ignore[arg-type]
+        charts=charts(),
     )
 
     assert path.is_file()
@@ -157,5 +209,5 @@ def test_write_html_report_wraps_io_failure(
         write_html_report(
             path,
             overview_summary=overview_rows(),
-            charts=charts(),  # type: ignore[arg-type]
+            charts=charts(),
         )

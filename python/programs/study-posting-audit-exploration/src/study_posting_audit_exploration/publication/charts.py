@@ -26,6 +26,19 @@ _REQUIRED_CONTENT_SOURCE_COLUMNS: tuple[str, ...] = (
     "ai_attempt_count",
 )
 
+_REQUIRED_STUDY_HISTORY_COLUMNS: tuple[str, ...] = (
+    "final_completion_authoring_mode",
+    "distinct_study_count",
+    "study_count_with_preceding_incomplete_attempts",
+    "median_minutes_first_attempt_to_completion",
+)
+
+_REQUIRED_AUTHOR_HANDOFF_COLUMNS: tuple[str, ...] = (
+    "completed_attempt_authoring_mode",
+    "author_handoff_category",
+    "distinct_completed_study_count",
+)
+
 _ATTEMPT_RESULT_ORDER: tuple[str, ...] = (
     "COMPLETE",
     "AI_ERROR",
@@ -39,13 +52,33 @@ _AUTHORING_MODE_ORDER: tuple[str, ...] = (
     "MANUAL",
 )
 
+_AUTHOR_HANDOFF_ORDER: tuple[str, ...] = (
+    "NO_PRECEDING_ATTEMPT",
+    "ALL_PRECEDING_ATTEMPTS_BY_COMPLETION_AUTHOR",
+    "ALL_PRECEDING_ATTEMPTS_BY_OTHER_AUTHORS",
+    "MIXED_COMPLETION_AND_OTHER_AUTHORS",
+)
+
+_AUTHOR_HANDOFF_LABELS: Mapping[str, str] = {
+    "NO_PRECEDING_ATTEMPT": "No preceding attempt",
+    "ALL_PRECEDING_ATTEMPTS_BY_COMPLETION_AUTHOR": (
+        "All preceding attempts by completion author"
+    ),
+    "ALL_PRECEDING_ATTEMPTS_BY_OTHER_AUTHORS": (
+        "All preceding attempts by other authors"
+    ),
+    "MIXED_COMPLETION_AND_OTHER_AUTHORS": ("Mixed completion and other authors"),
+}
+
 
 @dataclass(frozen=True, slots=True)
 class ExplorationCharts:
-    """Initial aggregate-only figures for the HTML report."""
+    """Aggregate-only figures for the HTML report."""
 
     attempt_outcomes_by_mode: go.Figure
     median_attempt_time_by_mode: go.Figure
+    study_completion_pathways: go.Figure
+    author_handoff_categories: go.Figure
     content_source_concordance: go.Figure
 
 
@@ -186,6 +219,130 @@ def build_attempt_timing_chart(
     return figure
 
 
+def build_study_completion_pathways_chart(
+    study_attempt_history_summary: pd.DataFrame,
+) -> go.Figure:
+    """Return completed-study pathway counts by final authoring mode."""
+    _require_columns(
+        study_attempt_history_summary,
+        required=_REQUIRED_STUDY_HISTORY_COLUMNS,
+        frame_name="study_attempt_history_summary",
+    )
+    rows = study_attempt_history_summary.loc[
+        study_attempt_history_summary["final_completion_authoring_mode"].isin(
+            _AUTHORING_MODE_ORDER
+        )
+    ]
+
+    if rows.empty:
+        return _empty_figure(
+            title="Completed-study pathways by final authoring mode",
+            message="No completed-study pathway aggregates are available.",
+        )
+
+    study_counts: Mapping[str, int] = {
+        str(row["final_completion_authoring_mode"]): int(row["distinct_study_count"])
+        for row in rows.to_dict(orient="records")
+    }
+    preceding_counts: Mapping[str, int] = {
+        str(row["final_completion_authoring_mode"]): int(
+            row["study_count_with_preceding_incomplete_attempts"]
+        )
+        for row in rows.to_dict(orient="records")
+    }
+    no_preceding_counts = {
+        mode: max(study_counts.get(mode, 0) - preceding_counts.get(mode, 0), 0)
+        for mode in _AUTHORING_MODE_ORDER
+    }
+    figure = go.Figure()
+    figure.add_bar(
+        name="No preceding incomplete attempt",
+        x=list(_AUTHORING_MODE_ORDER),
+        y=[no_preceding_counts[mode] for mode in _AUTHORING_MODE_ORDER],
+        hovertemplate=(
+            "Final mode: %{x}<br>Completed studies: %{y}<extra>%{fullData.name}</extra>"
+        ),
+    )
+    figure.add_bar(
+        name="One or more preceding incomplete attempts",
+        x=list(_AUTHORING_MODE_ORDER),
+        y=[preceding_counts.get(mode, 0) for mode in _AUTHORING_MODE_ORDER],
+        hovertemplate=(
+            "Final mode: %{x}<br>Completed studies: %{y}<extra>%{fullData.name}</extra>"
+        ),
+    )
+    figure.update_layout(
+        title="Completed-study pathways by final authoring mode",
+        template="plotly_white",
+        barmode="stack",
+        xaxis_title="Final completion authoring mode",
+        yaxis_title="Completed study count",
+        legend_title_text="Attempt pathway",
+    )
+
+    return figure
+
+
+def build_author_handoff_chart(
+    author_handoff_summary: pd.DataFrame,
+) -> go.Figure:
+    """Return completed-study author-handoff categories by final mode."""
+    _require_columns(
+        author_handoff_summary,
+        required=_REQUIRED_AUTHOR_HANDOFF_COLUMNS,
+        frame_name="author_handoff_summary",
+    )
+
+    if author_handoff_summary.empty:
+        return _empty_figure(
+            title="Author handoffs before study completion",
+            message="No completed-study author-handoff aggregates are available.",
+        )
+
+    grouped = (
+        author_handoff_summary.groupby(
+            [
+                "completed_attempt_authoring_mode",
+                "author_handoff_category",
+            ],
+            sort=True,
+            dropna=False,
+        )["distinct_completed_study_count"]
+        .sum()
+        .reset_index()
+    )
+    figure = go.Figure()
+
+    for category in _AUTHOR_HANDOFF_ORDER:
+        category_rows = grouped.loc[grouped["author_handoff_category"].eq(category)]
+        values_by_mode: Mapping[str, int] = {
+            str(row["completed_attempt_authoring_mode"]): int(
+                row["distinct_completed_study_count"]
+            )
+            for row in category_rows.to_dict(orient="records")
+        }
+        figure.add_bar(
+            name=_AUTHOR_HANDOFF_LABELS[category],
+            x=list(_AUTHORING_MODE_ORDER),
+            y=[values_by_mode.get(mode, 0) for mode in _AUTHORING_MODE_ORDER],
+            hovertemplate=(
+                "Final mode: %{x}<br>Completed studies: %{y}"
+                "<extra>%{fullData.name}</extra>"
+            ),
+        )
+
+    figure.update_layout(
+        title="Author handoffs before study completion",
+        template="plotly_white",
+        barmode="stack",
+        xaxis_title="Final completion authoring mode",
+        yaxis_title="Completed study count",
+        legend_title_text="Author pathway",
+    )
+
+    return figure
+
+
 def build_content_source_concordance_chart(
     content_source_matrix: pd.DataFrame,
 ) -> go.Figure:
@@ -259,12 +416,18 @@ def build_content_source_concordance_chart(
 def build_exploration_charts(
     *,
     grouped_attempt_summary: pd.DataFrame,
+    study_attempt_history_summary: pd.DataFrame,
+    author_handoff_summary: pd.DataFrame,
     content_source_matrix: pd.DataFrame,
 ) -> ExplorationCharts:
-    """Return all initial aggregate-only exploration figures."""
+    """Return all aggregate-only exploration figures."""
     return ExplorationCharts(
         attempt_outcomes_by_mode=build_attempt_outcomes_chart(grouped_attempt_summary),
         median_attempt_time_by_mode=build_attempt_timing_chart(grouped_attempt_summary),
+        study_completion_pathways=build_study_completion_pathways_chart(
+            study_attempt_history_summary
+        ),
+        author_handoff_categories=build_author_handoff_chart(author_handoff_summary),
         content_source_concordance=(
             build_content_source_concordance_chart(content_source_matrix)
         ),
