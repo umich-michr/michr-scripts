@@ -72,19 +72,26 @@ def test_field_adoption_summary_counts_each_outcome() -> None:
             field_row(
                 audit_record_id=6,
                 field_name="title",
-                category="REPLACED",
+                category="EDITED_UNCLASSIFIED",
                 ratio=None,
                 ter_rate=None,
             ),
             field_row(
                 audit_record_id=7,
                 field_name="title",
-                category="CLEARED",
+                category="REPLACED",
                 ratio=None,
                 ter_rate=None,
             ),
             field_row(
                 audit_record_id=8,
+                field_name="title",
+                category="CLEARED",
+                ratio=None,
+                ter_rate=None,
+            ),
+            field_row(
+                audit_record_id=9,
                 field_name="title",
                 category="UNASSISTED",
                 suggestion_count=1,
@@ -98,26 +105,30 @@ def test_field_adoption_summary_counts_each_outcome() -> None:
     summary = build_field_adoption_editing_summary(fields)
     row = summary.iloc[0]
 
-    assert row["completed_ai_attempt_count"] == 8
-    assert row["completed_ai_attempt_count_with_suggestion_offered"] == 8
-    assert row["completed_ai_attempt_count_with_suggestion_selected"] == 7
+    assert row["completed_ai_attempt_count"] == 9
+    assert row["completed_ai_attempt_count_with_suggestion_offered"] == 9
+    assert row["completed_ai_attempt_count_with_suggestion_selected"] == 8
     assert row["completed_ai_attempt_count_selected_and_exactly_retained"] == 1
     assert row["completed_ai_attempt_count_selected_and_cosmetically_changed"] == 1
     assert row["completed_ai_attempt_count_selected_and_lightly_edited"] == 1
     assert row["completed_ai_attempt_count_selected_and_moderately_edited"] == 1
     assert row["completed_ai_attempt_count_selected_and_heavily_edited"] == 1
+    assert row["completed_ai_attempt_count_selected_and_unclassified_edit"] == 1
     assert row["completed_ai_attempt_count_selected_and_replaced"] == 1
     assert row["completed_ai_attempt_count_selected_then_cleared"] == 1
     assert row["completed_ai_attempt_count_unassisted"] == 1
     assert row[
         "suggestion_selection_percentage_among_attempts_with_offer"
-    ] == pytest.approx(87.5)
-    assert row["exact_retention_percentage_among_selected_attempts"] == pytest.approx(
-        100.0 / 7.0
+    ] == pytest.approx(100.0 * 8.0 / 9.0)
+    assert row["exact_retention_percentage_among_selected_attempts"] == (
+        pytest.approx(12.5)
+    )
+    assert row["unclassified_edit_percentage_among_selected_attempts"] == (
+        pytest.approx(12.5)
     )
 
 
-def test_field_adoption_summary_describes_edited_rows() -> None:
+def test_field_adoption_summary_describes_only_edits_with_usable_metrics() -> None:
     fields = pd.DataFrame.from_records(
         [
             field_row(
@@ -134,11 +145,19 @@ def test_field_adoption_summary_describes_edited_rows() -> None:
                 ratio=0.50,
                 ter_rate=0.60,
             ),
+            field_row(
+                audit_record_id=3,
+                field_name="description",
+                category="EDITED_UNCLASSIFIED",
+                ratio=None,
+                ter_rate=None,
+            ),
         ]
     )
 
     row = build_field_adoption_editing_summary(fields).iloc[0]
 
+    assert row["completed_ai_attempt_count_selected_and_unclassified_edit"] == 1
     assert row["median_character_edit_ratio_among_edited_attempts"] == (
         pytest.approx(0.30)
     )
@@ -205,3 +224,7 @@ def test_field_adoption_summary_handles_empty_input() -> None:
     assert summary.empty
     assert "field_name" in summary.columns
     assert "completed_ai_attempt_count" in summary.columns
+    assert (
+        "completed_ai_attempt_count_selected_and_unclassified_edit" in summary.columns
+    )
+    assert "unclassified_edit_percentage_among_selected_attempts" in summary.columns

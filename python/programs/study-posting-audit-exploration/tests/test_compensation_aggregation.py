@@ -45,7 +45,7 @@ def test_compensation_summary_reports_kind_selection_and_editing() -> None:
         [
             compensation_row(
                 audit_record_id=1,
-                counts=('{"genericCompensation": 2, "specificCompensation": 1}'),
+                counts='{"genericCompensation": 2, "specificCompensation": 1}',
                 picked_kind="genericCompensation",
                 picked_index=0,
                 category="EXACT",
@@ -53,7 +53,7 @@ def test_compensation_summary_reports_kind_selection_and_editing() -> None:
             ),
             compensation_row(
                 audit_record_id=2,
-                counts=('{"genericCompensation": 1, "specificCompensation": 2}'),
+                counts='{"genericCompensation": 1, "specificCompensation": 2}',
                 picked_kind="specificCompensation",
                 picked_index=1,
                 category="MODERATE_EDIT",
@@ -61,10 +61,18 @@ def test_compensation_summary_reports_kind_selection_and_editing() -> None:
             ),
             compensation_row(
                 audit_record_id=3,
-                counts=('{"genericCompensation": 1, "specificCompensation": 0}'),
+                counts='{"genericCompensation": 1, "specificCompensation": 0}',
                 picked_kind=None,
                 picked_index=None,
                 category="UNASSISTED",
+                ratio=None,
+            ),
+            compensation_row(
+                audit_record_id=4,
+                counts='{"genericCompensation": 1, "specificCompensation": 1}',
+                picked_kind="specificCompensation",
+                picked_index=0,
+                category="EDITED_UNCLASSIFIED",
                 ratio=None,
             ),
         ]
@@ -74,20 +82,49 @@ def test_compensation_summary_reports_kind_selection_and_editing() -> None:
     generic = summary_row(summary, "genericCompensation")
     specific = summary_row(summary, "specificCompensation")
 
-    assert generic["completed_ai_attempt_count_with_suggestion"] == 3
-    assert generic["offered_suggestion_count"] == 4
+    assert generic["completed_ai_attempt_count_with_suggestion"] == 4
+    assert generic["offered_suggestion_count"] == 5
     assert generic["selected_suggestion_count"] == 1
-    assert generic["suggestion_selection_percentage"] == pytest.approx(25.0)
+    assert generic["suggestion_selection_percentage"] == pytest.approx(20.0)
     assert generic["selected_suggestion_count_exactly_retained"] == 1
     assert generic["selected_suggestion_count_moderately_edited"] == 0
+    assert generic["selected_suggestion_count_unclassified_edit"] == 0
 
-    assert specific["completed_ai_attempt_count_with_suggestion"] == 2
-    assert specific["offered_suggestion_count"] == 3
-    assert specific["selected_suggestion_count"] == 1
-    assert specific["suggestion_selection_percentage"] == pytest.approx(100.0 / 3.0)
+    assert specific["completed_ai_attempt_count_with_suggestion"] == 3
+    assert specific["offered_suggestion_count"] == 4
+    assert specific["selected_suggestion_count"] == 2
+    assert specific["suggestion_selection_percentage"] == pytest.approx(50.0)
     assert specific["selected_suggestion_count_moderately_edited"] == 1
+    assert specific["selected_suggestion_count_unclassified_edit"] == 1
     assert specific["median_character_edit_ratio"] == pytest.approx(0.20)
     assert specific["average_character_edit_ratio"] == pytest.approx(0.20)
+
+
+def test_compensation_summary_excludes_unclassified_edit_from_ratio_statistics() -> (
+    None
+):
+    fields = pd.DataFrame.from_records(
+        [
+            compensation_row(
+                audit_record_id=1,
+                counts='{"genericCompensation": 1}',
+                picked_kind="genericCompensation",
+                picked_index=0,
+                category="EDITED_UNCLASSIFIED",
+                ratio=None,
+            )
+        ]
+    )
+
+    row = summary_row(
+        build_compensation_analysis_summary(fields),
+        "genericCompensation",
+    )
+
+    assert row["selected_suggestion_count"] == 1
+    assert row["selected_suggestion_count_unclassified_edit"] == 1
+    assert pd.isna(row["median_character_edit_ratio"])
+    assert pd.isna(row["average_character_edit_ratio"])
 
 
 def test_compensation_summary_reports_zero_without_readability_pairs() -> None:
@@ -140,6 +177,7 @@ def test_compensation_summary_returns_canonical_empty_frame() -> None:
 
     assert summary.empty
     assert "compensation_suggestion_kind" in summary.columns
+    assert "selected_suggestion_count_unclassified_edit" in summary.columns
     assert "paired_selected_final_readability_count" in summary.columns
 
 

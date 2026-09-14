@@ -3,8 +3,9 @@
 Validates and explores normalized output from `study-posting-audit-report`.
 
 The program reads an existing normalized report without modifying it. It can
-validate the report contract or atomically publish derived audit and aggregate
-CSV files for exploratory analysis.
+validate the report contract or atomically publish derived audit records,
+aggregate CSV files, a JSON manifest, and a self-contained faculty-facing HTML
+report.
 
 ## Input
 
@@ -65,9 +66,12 @@ The current validation contract checks:
 - agreement between readability and record authoring modes;
 - no more than one selected suggestion and final readability row per audit
   field;
-- agreement between selected readability rows and AI-assistance picks;
-- selected and final readability components required for assisted AI text
-  outcomes.
+- agreement between existing selected readability rows and AI-assistance picks.
+
+`readability_metrics.csv` intentionally omits blank text. A completed assisted
+field is therefore not required to have selected and final readability rows.
+Readability pairs are derived only where both components exist. Missing pair
+components reduce the paired sample rather than invalidating the report.
 
 Validation errors must not expose usernames, study numbers, source payloads, or
 free text.
@@ -97,10 +101,12 @@ days, and login-history span as of the report query.
 
 ## Current output
 
-A successful `analyze` run publishes 24 CSV files and one JSON manifest:
+A successful `analyze` run publishes 26 files: `report.html`, one JSON
+manifest, and 24 CSV files.
 
 ~~~~text
 exploration/
+├── report.html
 ├── analysis_manifest.json
 ├── analysis-audit-records/
 │   ├── study_attempt_author_history.csv
@@ -134,6 +140,21 @@ exploration/
     ├── field_edit_readability_cross_summary.csv
     └── final_text_metric_summary.csv
 ~~~~
+
+### HTML report
+
+`report.html` is a self-contained faculty-facing report generated only from
+aggregate analysis tables. It currently includes:
+
+- executive key performance indicator cards;
+- attempt outcomes by authoring mode;
+- median attempt timing by authoring mode;
+- reported-versus-inferred content-source concordance;
+- privacy and interpretation cautions.
+
+The report embeds its Plotly JavaScript and does not require an external script
+service. It does not contain usernames, audit IDs, study numbers, source
+payloads, selected text, or final text.
 
 ### Analysis audit records
 
@@ -204,14 +225,17 @@ author details remain in `analysis-audit-records/author_history.csv`.
 
 - `field_adoption_editing_summary.csv` reports text and compensation-field
   suggestion offers, selections, retention, edit-intensity categories, and
-  continuous edit distributions.
+  continuous edit distributions. It includes explicit count and percentage
+  columns for selected edits that could not be classified because usable
+  character metrics were unavailable.
 - `nontext_field_adoption_summary.csv` reports lookup-set and compensation
   Boolean outcomes separately from text-edit metrics.
 - `suggestion_selection_summary.csv` reports offers and selections by field,
   suggestion kind, and zero-based suggestion index.
 - `compensation_analysis_summary.csv` separates generic and specific
   compensation suggestions and includes selection, editing, and paired
-  readability outcomes.
+  readability outcomes. It includes an explicit count for selected
+  unclassified edits.
 
 The operational edit-intensity scheme is
 `EXPLORATORY_CHARACTER_RATIO_10_30`:
@@ -221,9 +245,16 @@ The operational edit-intensity scheme is
 - `LIGHT_EDIT`, with a character edit ratio at or below 0.10;
 - `MODERATE_EDIT`, above 0.10 and at or below 0.30;
 - `HEAVY_EDIT`, above 0.30;
+- `EDITED_UNCLASSIFIED`, when the upstream result is `EDITED` but usable
+  character lengths or a character edit ratio are unavailable;
 - `REPLACED`;
 - `CLEARED`;
 - `UNASSISTED`.
+
+`EDITED_UNCLASSIFIED` is reported explicitly. It is not treated as `REPLACED`
+and is excluded from character-ratio and Translation Edit Rate (TER)
+distributions because no usable ratio is available. No edit ratio is inferred
+or fabricated.
 
 These are exploratory operational cutoffs, not literature-standard categories.
 
@@ -308,10 +339,10 @@ produce missing percentages rather than misleading zero percentages.
 
 ## Privacy and interpretation
 
-The aggregate outputs are intended for exploratory analysis. Counts,
-percentages, timing distributions, experience measures, post-edit measures, and
-readability indicators must not be interpreted as causal findings or
-evaluations of an individual author.
+The aggregate outputs and HTML report are intended for exploratory analysis.
+Counts, percentages, timing distributions, experience measures, post-edit
+measures, and readability indicators must not be interpreted as causal findings
+or evaluations of an individual author.
 
 Do not place real audit records, source payload text, credentials, connection
 values, or operational SQL in tests, documentation, commits, or issue reports.

@@ -10,7 +10,7 @@ _TEXT_ANALYSIS_TYPES = frozenset(
         "COMPENSATION",
     }
 )
-_EDITED_CATEGORIES = frozenset(
+_EDITED_CATEGORIES_WITH_USABLE_METRICS = frozenset(
     {
         "COSMETIC",
         "LIGHT_EDIT",
@@ -31,6 +31,7 @@ _FIELD_ADOPTION_EDITING_COLUMNS: tuple[str, ...] = (
     "completed_ai_attempt_count_selected_and_lightly_edited",
     "completed_ai_attempt_count_selected_and_moderately_edited",
     "completed_ai_attempt_count_selected_and_heavily_edited",
+    "completed_ai_attempt_count_selected_and_unclassified_edit",
     "completed_ai_attempt_count_selected_and_replaced",
     "completed_ai_attempt_count_selected_then_cleared",
     "completed_ai_attempt_count_unassisted",
@@ -40,6 +41,7 @@ _FIELD_ADOPTION_EDITING_COLUMNS: tuple[str, ...] = (
     "light_edit_percentage_among_selected_attempts",
     "moderate_edit_percentage_among_selected_attempts",
     "heavy_edit_percentage_among_selected_attempts",
+    "unclassified_edit_percentage_among_selected_attempts",
     "replacement_percentage_among_selected_attempts",
     "cleared_percentage_among_selected_attempts",
     "median_character_edit_ratio_among_edited_attempts",
@@ -95,17 +97,20 @@ def _field_summary_row(
     light_count = _category_attempt_count(fields, "LIGHT_EDIT")
     moderate_count = _category_attempt_count(fields, "MODERATE_EDIT")
     heavy_count = _category_attempt_count(fields, "HEAVY_EDIT")
+    unclassified_count = _category_attempt_count(fields, "EDITED_UNCLASSIFIED")
     replaced_count = _category_attempt_count(fields, "REPLACED")
     cleared_count = _category_attempt_count(fields, "CLEARED")
     unassisted_count = _category_attempt_count(fields, "UNASSISTED")
 
-    edited = fields.loc[fields["edit_intensity_category"].isin(_EDITED_CATEGORIES)]
+    edited_with_usable_metrics = fields.loc[
+        fields["edit_intensity_category"].isin(_EDITED_CATEGORIES_WITH_USABLE_METRICS)
+    ]
     character_statistics = describe_numeric(
-        edited["character_edit_ratio"],
+        edited_with_usable_metrics["character_edit_ratio"],
         metric_name="character_edit_ratio",
     )
     ter_statistics = describe_numeric(
-        edited["ter_rate"],
+        edited_with_usable_metrics["ter_rate"],
         metric_name="ter_rate",
     )
     scheme_values = (
@@ -126,6 +131,9 @@ def _field_summary_row(
         "completed_ai_attempt_count_selected_and_lightly_edited": light_count,
         "completed_ai_attempt_count_selected_and_moderately_edited": (moderate_count),
         "completed_ai_attempt_count_selected_and_heavily_edited": heavy_count,
+        "completed_ai_attempt_count_selected_and_unclassified_edit": (
+            unclassified_count
+        ),
         "completed_ai_attempt_count_selected_and_replaced": replaced_count,
         "completed_ai_attempt_count_selected_then_cleared": cleared_count,
         "completed_ai_attempt_count_unassisted": unassisted_count,
@@ -153,6 +161,10 @@ def _field_summary_row(
         ),
         "heavy_edit_percentage_among_selected_attempts": _percentage(
             heavy_count,
+            selected_count,
+        ),
+        "unclassified_edit_percentage_among_selected_attempts": _percentage(
+            unclassified_count,
             selected_count,
         ),
         "replacement_percentage_among_selected_attempts": _percentage(

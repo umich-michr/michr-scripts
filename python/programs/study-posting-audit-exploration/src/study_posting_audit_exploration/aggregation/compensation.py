@@ -27,6 +27,7 @@ _COMPENSATION_ANALYSIS_COLUMNS: tuple[str, ...] = (
     "selected_suggestion_count_lightly_edited",
     "selected_suggestion_count_moderately_edited",
     "selected_suggestion_count_heavily_edited",
+    "selected_suggestion_count_unclassified_edit",
     "selected_suggestion_count_replaced",
     "median_character_edit_ratio",
     "average_character_edit_ratio",
@@ -40,7 +41,7 @@ _COMPENSATION_ANALYSIS_COLUMNS: tuple[str, ...] = (
     "edit_intensity_threshold_scheme_name",
 )
 
-_EDITED_CATEGORIES = frozenset(
+_EDITED_CATEGORIES_WITH_USABLE_METRICS = frozenset(
     {
         "COSMETIC",
         "LIGHT_EDIT",
@@ -186,9 +187,11 @@ def _compensation_summary_row(
     picked_indices = fields["picked_index"].map(_optional_nonnegative_index)
     selected_mask = fields["picked_kind"].eq(suggestion_kind) & picked_indices.notna()
     selected = fields.loc[selected_mask]
-    edited = selected.loc[selected["edit_intensity_category"].isin(_EDITED_CATEGORIES)]
+    edited_with_usable_metrics = selected.loc[
+        selected["edit_intensity_category"].isin(_EDITED_CATEGORIES_WITH_USABLE_METRICS)
+    ]
     character_statistics = describe_numeric(
-        edited["character_edit_ratio"],
+        edited_with_usable_metrics["character_edit_ratio"],
         metric_name=f"{suggestion_kind}_character_edit_ratio",
     )
     grade_pairs, grade_statistics = _readability_values(
@@ -232,6 +235,10 @@ def _compensation_summary_row(
         "selected_suggestion_count_heavily_edited": _category_count(
             selected,
             "HEAVY_EDIT",
+        ),
+        "selected_suggestion_count_unclassified_edit": _category_count(
+            selected,
+            "EDITED_UNCLASSIFIED",
         ),
         "selected_suggestion_count_replaced": _category_count(
             selected,
