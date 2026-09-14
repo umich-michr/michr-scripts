@@ -17,10 +17,18 @@ from study_posting_audit_exploration.models import (
     ExplorationPublication,
     LoadedAuditReport,
 )
+from study_posting_audit_exploration.publication.charts import (
+    build_exploration_charts,
+)
+from study_posting_audit_exploration.publication.html_report import (
+    write_html_report,
+)
 from study_posting_audit_exploration.publication.manifest import (
     manifest_filename,
     write_manifest,
 )
+
+_REPORT_FILENAME = "report.html"
 
 _ANALYSIS_AUDIT_DIRECTORY = "analysis-audit-records"
 _OVERVIEW_DIRECTORY = "overview"
@@ -65,7 +73,7 @@ _FIELD_EDIT_READABILITY_CROSS_SUMMARY_FILENAME = (
 )
 _FINAL_TEXT_METRIC_SUMMARY_FILENAME = "final_text_metric_summary.csv"
 
-_OUTPUT_FILE_COUNT = 25
+_OUTPUT_FILE_COUNT = 26
 
 
 def _write_frame(
@@ -227,6 +235,7 @@ def _write_staging_output(
         staging_directory=staging_directory,
     )
     manifest_path = staging_directory / manifest_filename()
+    report_path = staging_directory / _REPORT_FILENAME
 
     for frame, path in output_frames:
         _write_frame(
@@ -234,6 +243,15 @@ def _write_staging_output(
             path,
         )
 
+    charts = build_exploration_charts(
+        grouped_attempt_summary=tables.attempts.grouped_attempt_summary,
+        content_source_matrix=(tables.attempts.content_source_concordance_matrix),
+    )
+    write_html_report(
+        report_path,
+        overview_summary=tables.overview.overview_summary,
+        charts=charts,
+    )
     write_manifest(
         manifest_path,
         config=config,
@@ -245,6 +263,7 @@ def _write_staging_output(
     for _, path in output_frames:
         _sync_file(path)
 
+    _sync_file(report_path)
     _sync_file(manifest_path)
 
 
@@ -263,6 +282,7 @@ def _publication_result(
     return ExplorationPublication(
         output_directory=destination,
         manifest_path=destination / manifest_filename(),
+        report_path=destination / _REPORT_FILENAME,
         study_attempt_author_history_path=(
             audit_directory / _STUDY_ATTEMPT_AUTHOR_HISTORY_FILENAME
         ),

@@ -594,41 +594,37 @@ def test_selected_readability_index_must_match_ai_pick(
         validate_audit_report(report)
 
 
-def test_assisted_ai_text_requires_selected_readability(
+def test_assisted_ai_text_may_lack_selected_readability(
     valid_report_directory: Path,
 ) -> None:
     report = load_valid(valid_report_directory)
     readability = report.readability_metrics.loc[
         ~report.readability_metrics["text_role"].eq("SUGGESTED")
     ].copy()
-    invalid_report = LoadedAuditReport(
+    valid_report = LoadedAuditReport(
         records=report.records,
         ai_assistance_metrics=report.ai_assistance_metrics,
         readability_metrics=readability,
     )
 
-    with pytest.raises(
-        ExplorationValidationError,
-        match="lack selected readability rows",
-    ):
-        validate_audit_report(invalid_report)
+    summary = validate_audit_report(valid_report)
+
+    assert summary.readability_metric_row_count == 1
 
 
-def test_assisted_ai_text_requires_final_readability(
+def test_assisted_ai_text_may_lack_final_readability(
     valid_report_directory: Path,
 ) -> None:
     report = load_valid(valid_report_directory)
     readability = report.readability_metrics.loc[
         ~report.readability_metrics["text_role"].eq("FINAL")
     ].copy()
-    invalid_report = LoadedAuditReport(
+    valid_report = LoadedAuditReport(
         records=report.records,
         ai_assistance_metrics=report.ai_assistance_metrics,
         readability_metrics=readability,
     )
 
-    with pytest.raises(
-        ExplorationValidationError,
-        match="lack final readability rows",
-    ):
-        validate_audit_report(invalid_report)
+    summary = validate_audit_report(valid_report)
+
+    assert summary.readability_metric_row_count == 1

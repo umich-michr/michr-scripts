@@ -7,8 +7,6 @@ from study_posting_audit_exploration.errors import ExplorationValidationError
 _COMPLETE = "COMPLETE"
 _AI = "AI"
 _SELECTED_TRUE = "true"
-_CLEARED_MATCH_TYPE = "REMOVED"
-_UNASSISTED_MATCH_TYPE = "UNASSISTED"
 
 
 def _selected_suggestions(readability: pd.DataFrame) -> pd.DataFrame:
@@ -107,7 +105,7 @@ def _require_selected_suggestion_matches_pick(
     ai_assistance: pd.DataFrame,
     readability: pd.DataFrame,
 ) -> None:
-    """Require selected readability identities to match AI field picks."""
+    """Require existing selected readability rows to match AI field picks."""
     selected = _selected_suggestions(readability)
     ai_context = ai_assistance.loc[
         :,
@@ -170,83 +168,18 @@ def _require_selected_suggestion_matches_pick(
         )
 
 
-def _require_assisted_pair_components(
-    ai_assistance: pd.DataFrame,
-    readability: pd.DataFrame,
-) -> None:
-    """Require pair rows for selected, retained AI text outcomes."""
-    assisted = ai_assistance.loc[
-        ai_assistance["analysis_type"].isin(
-            {
-                "TEXT",
-                "COMPENSATION",
-            }
-        )
-        & ~ai_assistance["match_type"].isin(
-            {
-                _CLEARED_MATCH_TYPE,
-                _UNASSISTED_MATCH_TYPE,
-            }
-        )
-    ]
-    selected = (
-        _selected_suggestions(readability)
-        .loc[
-            :,
-            [
-                "record_id",
-                "field_name",
-            ],
-        ]
-        .assign(has_selected_readability=True)
-    )
-    final = readability.loc[
-        readability["text_role"].eq("FINAL"),
-        [
-            "record_id",
-            "field_name",
-        ],
-    ].assign(has_final_readability=True)
-    joined = assisted.merge(
-        selected,
-        on=[
-            "record_id",
-            "field_name",
-        ],
-        how="left",
-        validate="one_to_one",
-    ).merge(
-        final,
-        on=[
-            "record_id",
-            "field_name",
-        ],
-        how="left",
-        validate="one_to_one",
-    )
-    missing_selected_count = int(joined["has_selected_readability"].isna().sum())
-
-    if missing_selected_count:
-        raise ExplorationValidationError(
-            "assisted AI text fields lack selected readability rows: "
-            f"{missing_selected_count} affected rows"
-        )
-
-    missing_final_count = int(joined["has_final_readability"].isna().sum())
-
-    if missing_final_count:
-        raise ExplorationValidationError(
-            "assisted AI text fields lack final readability rows: "
-            f"{missing_final_count} affected rows"
-        )
-
-
 def validate_readability_pairing_contract(
     records: pd.DataFrame,
     ai_assistance: pd.DataFrame,
     readability: pd.DataFrame,
 ) -> None:
-    """Validate cross-file relationships required for readability pairing."""
+    """Validate existing rows used for optional readability pairing.
+
+    The normalized report emits readability rows only for nonblank text.
+    Therefore, an assisted AI field is not required to have selected and final
+    readability rows. Pair derivation uses only fields where both components
+    exist.
+    """
     _require_completed_ownership(
         records,
         readability,
@@ -254,10 +187,6 @@ def validate_readability_pairing_contract(
     _require_unique_pair_components(readability)
     _require_selected_suggestion_matches_pick(
         records,
-        ai_assistance,
-        readability,
-    )
-    _require_assisted_pair_components(
         ai_assistance,
         readability,
     )

@@ -210,54 +210,44 @@ def publish_valid_report(
     )
 
 
-def test_publish_exploration_writes_atomic_readability_output(
-    valid_report_directory: Path,
-    tmp_path: Path,
-) -> None:
-    output_directory = tmp_path / "nested" / "exploration"
-
-    publication = publish_valid_report(
-        valid_report_directory,
-        output_directory,
+def _publication_paths(
+    publication: ExplorationPublication,
+) -> tuple[Path, ...]:
+    """Return every current published output path."""
+    return (
+        publication.manifest_path,
+        publication.report_path,
+        publication.study_attempt_author_history_path,
+        publication.study_attempt_history_path,
+        publication.author_history_path,
+        publication.completed_ai_field_analysis_path,
+        publication.completed_ai_readability_pairs_path,
+        publication.overview_summary_path,
+        publication.study_attempt_history_summary_path,
+        publication.author_handoff_summary_path,
+        publication.grouped_attempt_summary_path,
+        publication.content_source_concordance_summary_path,
+        publication.content_source_concordance_matrix_path,
+        publication.grouped_study_summary_path,
+        publication.grouped_author_summary_path,
+        publication.attempt_start_experience_summary_path,
+        publication.current_author_experience_summary_path,
+        publication.field_adoption_editing_summary_path,
+        publication.nontext_field_adoption_summary_path,
+        publication.suggestion_selection_summary_path,
+        publication.compensation_analysis_summary_path,
+        publication.selected_vs_unselected_readability_summary_path,
+        publication.field_readability_change_summary_path,
+        publication.field_readability_target_summary_path,
+        publication.field_edit_readability_cross_summary_path,
+        publication.final_text_metric_summary_path,
     )
 
-    assert publication.output_directory == output_directory
-    assert publication.output_file_count == 25
-    assert publication.manifest_path.is_file()
 
-    assert publication.study_attempt_author_history_path.is_file()
-    assert publication.study_attempt_history_path.is_file()
-    assert publication.author_history_path.is_file()
-    assert publication.completed_ai_field_analysis_path.is_file()
-    assert publication.completed_ai_readability_pairs_path.is_file()
-
-    assert publication.overview_summary_path.is_file()
-    assert publication.study_attempt_history_summary_path.is_file()
-    assert publication.author_handoff_summary_path.is_file()
-
-    assert publication.grouped_attempt_summary_path.is_file()
-    assert publication.content_source_concordance_summary_path.is_file()
-    assert publication.content_source_concordance_matrix_path.is_file()
-
-    assert publication.grouped_study_summary_path.is_file()
-
-    assert publication.grouped_author_summary_path.is_file()
-    assert publication.attempt_start_experience_summary_path.is_file()
-    assert publication.current_author_experience_summary_path.is_file()
-
-    assert publication.field_adoption_editing_summary_path.is_file()
-    assert publication.nontext_field_adoption_summary_path.is_file()
-    assert publication.suggestion_selection_summary_path.is_file()
-    assert publication.compensation_analysis_summary_path.is_file()
-
-    assert publication.selected_vs_unselected_readability_summary_path.is_file()
-    assert publication.field_readability_change_summary_path.is_file()
-    assert publication.field_readability_target_summary_path.is_file()
-    assert publication.field_edit_readability_cross_summary_path.is_file()
-    assert publication.final_text_metric_summary_path.is_file()
-
-    assert list(tmp_path.glob(".exploration.*")) == []
-
+def _assert_derived_outputs(
+    publication: ExplorationPublication,
+) -> None:
+    """Assert derived CSV content and privacy boundaries."""
     completed_fields = read_published_csv(publication.completed_ai_field_analysis_path)
     readability_pairs = read_published_csv(
         publication.completed_ai_readability_pairs_path
@@ -271,19 +261,63 @@ def test_publish_exploration_writes_atomic_readability_output(
     )
     final_metrics = read_published_csv(publication.final_text_metric_summary_path)
 
-    assert not completed_fields.empty
-    assert not readability_pairs.empty
-    assert not field_summary.empty
-    assert not readability_change.empty
-    assert not readability_target.empty
-    assert not final_metrics.empty
+    for frame in (
+        completed_fields,
+        readability_pairs,
+        field_summary,
+        readability_change,
+        readability_target,
+        final_metrics,
+    ):
+        assert not frame.empty
 
-    assert "selected_text" not in completed_fields.columns
-    assert "final_text" not in completed_fields.columns
-    assert "selected_text" not in readability_pairs.columns
-    assert "final_text" not in readability_pairs.columns
+    for forbidden_column in (
+        "selected_text",
+        "final_text",
+    ):
+        assert forbidden_column not in completed_fields.columns
+        assert forbidden_column not in readability_pairs.columns
 
     assert final_metrics["final_text_attempt_count_missing_or_blank"].isna().all()
+
+
+def _assert_html_privacy(
+    publication: ExplorationPublication,
+) -> None:
+    """Assert the faculty report excludes identifiers and source text."""
+    report_html = publication.report_path.read_text(encoding="utf-8")
+
+    assert "<h1>Study Posting Audit Exploration</h1>" in report_html
+
+    for forbidden_value in (
+        "SYNTHETIC-STUDY-1",
+        "completion-author@example.edu",
+        "selected_text",
+        "final_text",
+    ):
+        assert forbidden_value not in report_html
+
+
+def test_publish_exploration_writes_atomic_html_output(
+    valid_report_directory: Path,
+    tmp_path: Path,
+) -> None:
+    output_directory = tmp_path / "nested" / "exploration"
+    publication = publish_valid_report(
+        valid_report_directory,
+        output_directory,
+    )
+
+    assert publication.output_directory == output_directory
+    assert publication.output_file_count == 26
+
+    for path in _publication_paths(publication):
+        assert path.is_file()
+
+    assert list(tmp_path.glob(".exploration.*")) == []
+
+    _assert_derived_outputs(publication)
+    _assert_html_privacy(publication)
 
 
 def test_manifest_contains_readability_analysis_counts(
@@ -314,7 +348,7 @@ def test_manifest_contains_readability_analysis_counts(
         > 0
     )
     assert manifest["readability_analysis_row_counts"]["final_text_metric_summary"] > 0
-    assert manifest["output_file_count"] == 25
+    assert manifest["output_file_count"] == 26
     assert manifest["warning_count"] == 0
     assert manifest_filename() == "analysis_manifest.json"
 

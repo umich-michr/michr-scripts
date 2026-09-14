@@ -96,7 +96,7 @@ def _run_analyze(
     return status, output.getvalue(), error_output.getvalue()
 
 
-def _expected_readability_paths(
+def _expected_paths(
     output_directory: Path,
 ) -> dict[str, Path]:
     """Return the published paths checked by the CLI integration test."""
@@ -106,6 +106,7 @@ def _expected_readability_paths(
 
     return {
         "manifest": output_directory / "analysis_manifest.json",
+        "report": output_directory / "report.html",
         "field_audit": (audit_directory / "completed_ai_field_analysis.csv"),
         "readability_pairs": (audit_directory / "completed_ai_readability_pairs.csv"),
         "field_adoption": (fields_directory / "field_adoption_editing_summary.csv"),
@@ -122,24 +123,20 @@ def _expected_readability_paths(
     }
 
 
-def _assert_readability_manifest(manifest: dict[str, object]) -> None:
+def _assert_manifest(manifest: dict[str, object]) -> None:
     """Assert current field and readability manifest counts."""
     audit_counts = manifest["analysis_audit_record_row_counts"]
-    field_counts = manifest["field_analysis_row_counts"]
     readability_counts = manifest["readability_analysis_row_counts"]
 
     assert isinstance(audit_counts, dict)
-    assert isinstance(field_counts, dict)
     assert isinstance(readability_counts, dict)
 
     assert audit_counts["completed_ai_field_analysis"] > 0
     assert audit_counts["completed_ai_readability_pairs"] > 0
-    assert field_counts["field_adoption_editing_summary"] > 0
-    assert field_counts["suggestion_selection_summary"] > 0
     assert readability_counts["field_readability_change_summary"] > 0
     assert readability_counts["field_readability_target_summary"] > 0
     assert readability_counts["final_text_metric_summary"] > 0
-    assert manifest["output_file_count"] == 25
+    assert manifest["output_file_count"] == 26
     assert manifest["warning_count"] == 0
 
 
@@ -149,10 +146,11 @@ def _assert_cli_paths_printed(
     output_directory: Path,
     paths: dict[str, Path],
 ) -> None:
-    """Assert the CLI prints every new readability path."""
+    """Assert the CLI prints every new HTML and readability path."""
     expected_lines = (
         f"Exploration directory: {output_directory}",
         f"Manifest: {paths['manifest']}",
+        f"HTML report: {paths['report']}",
         f"Completed AI field analysis CSV: {paths['field_audit']}",
         (f"Completed AI readability pairs CSV: {paths['readability_pairs']}"),
         (f"Field adoption and editing summary CSV: {paths['field_adoption']}"),
@@ -167,14 +165,14 @@ def _assert_cli_paths_printed(
         f"Field readability target summary CSV: {paths['target']}",
         f"Field edit/readability cross summary CSV: {paths['cross']}",
         f"Final text metric summary CSV: {paths['final_metric']}",
-        "Published files: 25",
+        "Published files: 26",
     )
 
     for expected_line in expected_lines:
         assert expected_line in text
 
 
-def test_analyze_command_publishes_readability_analysis_output(
+def test_analyze_command_publishes_html_report(
     valid_report_directory: Path,
     tmp_path: Path,
 ) -> None:
@@ -183,7 +181,7 @@ def test_analyze_command_publishes_readability_analysis_output(
         valid_report_directory,
         output_directory,
     )
-    paths = _expected_readability_paths(output_directory)
+    paths = _expected_paths(output_directory)
 
     assert status == 0
     assert error_text == ""
@@ -192,12 +190,17 @@ def test_analyze_command_publishes_readability_analysis_output(
         assert path.is_file()
 
     manifest = json.loads(paths["manifest"].read_text(encoding="utf-8"))
-    _assert_readability_manifest(manifest)
+    _assert_manifest(manifest)
     _assert_cli_paths_printed(
         text,
         output_directory=output_directory,
         paths=paths,
     )
+
+    report_html = paths["report"].read_text(encoding="utf-8")
+    assert "<h1>Study Posting Audit Exploration</h1>" in report_html
+    assert "SYNTHETIC-STUDY-1" not in report_html
+    assert "completion-author@example.edu" not in report_html
 
     assert "SYNTHETIC-STUDY-1" not in text
     assert "completion-author@example.edu" not in text

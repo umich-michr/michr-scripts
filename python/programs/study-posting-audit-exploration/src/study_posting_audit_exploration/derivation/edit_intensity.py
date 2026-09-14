@@ -11,6 +11,7 @@ EDIT_INTENSITY_THRESHOLD_SCHEME = "EXPLORATORY_CHARACTER_RATIO_10_30"
 
 _LIGHT_EDIT_MAXIMUM = 0.10
 _MODERATE_EDIT_MAXIMUM = 0.30
+_EDITED_UNCLASSIFIED = "EDITED_UNCLASSIFIED"
 
 _EDIT_INTENSITY_COLUMNS: tuple[str, ...] = (
     "audit_record_id",
@@ -180,18 +181,15 @@ def _classify_edited(
     final_character_count: int | None,
 ) -> str:
     """Return the category for one upstream EDITED result."""
-    if suggestion_character_count is None or suggestion_character_count <= 0:
-        if final_character_count is not None and final_character_count > 0:
-            return "REPLACED"
+    has_usable_lengths = (
+        suggestion_character_count is not None
+        and suggestion_character_count > 0
+        and final_character_count is not None
+        and final_character_count >= 0
+    )
 
-        raise ExplorationValidationError(
-            "edited AI-assistance row lacks usable character lengths"
-        )
-
-    if character_edit_ratio is None:
-        raise ExplorationValidationError(
-            "edited AI-assistance row lacks a character edit ratio"
-        )
+    if not has_usable_lengths or character_edit_ratio is None:
+        return _EDITED_UNCLASSIFIED
 
     if character_edit_ratio <= _LIGHT_EDIT_MAXIMUM:
         return "LIGHT_EDIT"

@@ -27,7 +27,7 @@ from study_posting_audit_exploration.input_contracts import (
         ("EDITED", 0.100001, 100, 100, "MODERATE_EDIT"),
         ("EDITED", 0.30, 100, 100, "MODERATE_EDIT"),
         ("EDITED", 0.300001, 100, 100, "HEAVY_EDIT"),
-        ("EDITED", None, None, 100, "REPLACED"),
+        ("EDITED", None, None, 100, "EDITED_UNCLASSIFIED"),
         ("REMOVED", None, None, None, "CLEARED"),
         ("UNASSISTED", None, None, None, "UNASSISTED"),
     ],
@@ -63,17 +63,16 @@ def test_classify_edit_intensity_rejects_unknown_match_type() -> None:
         )
 
 
-def test_edited_row_requires_usable_metrics() -> None:
-    with pytest.raises(
-        ExplorationValidationError,
-        match="lacks usable character lengths",
-    ):
+def test_edited_row_without_metrics_is_unclassified() -> None:
+    assert (
         classify_edit_intensity(
             match_type="EDITED",
             character_edit_ratio=None,
             suggestion_character_count=None,
             final_character_count=None,
         )
+        == "EDITED_UNCLASSIFIED"
+    )
 
 
 def _metric_row(

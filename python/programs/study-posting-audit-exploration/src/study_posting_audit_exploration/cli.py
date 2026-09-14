@@ -31,6 +31,7 @@ from study_posting_audit_exploration.models import (
     AppointmentQualityFinding,
     AttemptHistoryTables,
     ExplorationAnalysisTables,
+    ExplorationPublication,
     LoadedAuditReport,
     ValidationSummary,
 )
@@ -212,6 +213,64 @@ def _studies_with_grouping_columns(
     return studies, appointments, findings
 
 
+def _analysis_tables(
+    report: LoadedAuditReport,
+) -> ExplorationAnalysisTables:
+    """Build all current exploration tables."""
+    histories = derive_attempt_histories(report.records)
+    attempts = _attempts_with_source_columns(
+        report,
+        histories,
+    )
+    studies, study_appointments, appointment_findings = _studies_with_grouping_columns(
+        report,
+        histories,
+    )
+    attempt_appointments, attempt_appointment_findings = derive_appointments(
+        report.records
+    )
+    completed_ai_fields = derive_completed_ai_field_analysis(
+        report.ai_assistance_metrics,
+        report.records,
+    )
+    readability_pairs = derive_completed_ai_readability_pairs(
+        report.readability_metrics,
+        completed_ai_fields,
+    )
+
+    return ExplorationAnalysisTables(
+        histories=histories,
+        overview=build_overview_tables(
+            attempts=attempts,
+            studies=histories.study_attempt_history,
+            authors=histories.author_history,
+        ),
+        attempts=build_attempt_analysis_tables(attempts),
+        studies=build_study_analysis_tables(
+            studies,
+            appointments=study_appointments,
+            appointment_quality_findings=(
+                *appointment_findings,
+                *attempt_appointment_findings,
+            ),
+        ),
+        authors=build_author_analysis_tables(
+            attempts=attempts,
+            authors=histories.author_history,
+            appointments=attempt_appointments,
+        ),
+        fields=build_field_analysis_tables(
+            completed_ai_fields,
+            readability_pairs,
+        ),
+        readability=build_readability_analysis_tables(
+            readability=report.readability_metrics,
+            readability_pairs=readability_pairs,
+            completed_ai_fields=completed_ai_fields,
+        ),
+    )
+
+
 def _run_validate(
     namespace: argparse.Namespace,
     *,
@@ -235,6 +294,71 @@ def _run_validate(
     )
 
 
+def _print_publication(
+    publication: ExplorationPublication,
+    *,
+    output: TextIO,
+) -> None:
+    """Print the publication paths without source identifiers."""
+    published = publication
+
+    for label, value in (
+        ("Exploration directory", published.output_directory),
+        ("Manifest", published.manifest_path),
+        ("HTML report", published.report_path),
+        (
+            "Completed AI field analysis CSV",
+            published.completed_ai_field_analysis_path,
+        ),
+        (
+            "Completed AI readability pairs CSV",
+            published.completed_ai_readability_pairs_path,
+        ),
+        (
+            "Field adoption and editing summary CSV",
+            published.field_adoption_editing_summary_path,
+        ),
+        (
+            "Nontext field adoption summary CSV",
+            published.nontext_field_adoption_summary_path,
+        ),
+        (
+            "Suggestion selection summary CSV",
+            published.suggestion_selection_summary_path,
+        ),
+        (
+            "Compensation analysis summary CSV",
+            published.compensation_analysis_summary_path,
+        ),
+        (
+            "Selected versus unselected readability summary CSV",
+            published.selected_vs_unselected_readability_summary_path,
+        ),
+        (
+            "Field readability change summary CSV",
+            published.field_readability_change_summary_path,
+        ),
+        (
+            "Field readability target summary CSV",
+            published.field_readability_target_summary_path,
+        ),
+        (
+            "Field edit/readability cross summary CSV",
+            published.field_edit_readability_cross_summary_path,
+        ),
+        (
+            "Final text metric summary CSV",
+            published.final_text_metric_summary_path,
+        ),
+    ):
+        print(f"{label}: {value}", file=output)
+
+    print(
+        f"Published files: {published.output_file_count}",
+        file=output,
+    )
+
+
 def _run_analyze(
     namespace: argparse.Namespace,
     *,
@@ -242,194 +366,17 @@ def _run_analyze(
 ) -> None:
     """Derive and publish current exploration output."""
     report, _ = _load_and_validate(namespace.input_report)
-    histories = derive_attempt_histories(report.records)
-    attempts = _attempts_with_source_columns(
-        report,
-        histories,
-    )
-    studies, study_appointments, appointment_findings = _studies_with_grouping_columns(
-        report,
-        histories,
-    )
-    attempt_appointments, attempt_appointment_findings = derive_appointments(
-        report.records
-    )
-    all_appointment_findings = (
-        *appointment_findings,
-        *attempt_appointment_findings,
-    )
-    completed_ai_fields = derive_completed_ai_field_analysis(
-        report.ai_assistance_metrics,
-        report.records,
-    )
-    readability_pairs = derive_completed_ai_readability_pairs(
-        report.readability_metrics,
-        completed_ai_fields,
-    )
-
-    overview_tables = build_overview_tables(
-        attempts=attempts,
-        studies=histories.study_attempt_history,
-        authors=histories.author_history,
-    )
-    attempt_tables = build_attempt_analysis_tables(attempts)
-    study_tables = build_study_analysis_tables(
-        studies,
-        appointments=study_appointments,
-        appointment_quality_findings=all_appointment_findings,
-    )
-    author_tables = build_author_analysis_tables(
-        attempts=attempts,
-        authors=histories.author_history,
-        appointments=attempt_appointments,
-    )
-    field_tables = build_field_analysis_tables(
-        completed_ai_fields,
-        readability_pairs,
-    )
-    readability_tables = build_readability_analysis_tables(
-        readability=report.readability_metrics,
-        readability_pairs=readability_pairs,
-        completed_ai_fields=completed_ai_fields,
-    )
-    tables = ExplorationAnalysisTables(
-        histories=histories,
-        overview=overview_tables,
-        attempts=attempt_tables,
-        studies=study_tables,
-        authors=author_tables,
-        fields=field_tables,
-        readability=readability_tables,
-    )
-
     publication = publish_exploration(
         config=ExplorationRunConfig(
             input_report_directory=namespace.input_report,
             output_directory=namespace.output,
         ),
         report=report,
-        tables=tables,
+        tables=_analysis_tables(report),
     )
-
-    print(
-        f"Exploration directory: {publication.output_directory}",
-        file=output,
-    )
-    print(f"Manifest: {publication.manifest_path}", file=output)
-    print(
-        f"Attempt history CSV: {publication.study_attempt_author_history_path}",
-        file=output,
-    )
-    print(
-        f"Study history CSV: {publication.study_attempt_history_path}",
-        file=output,
-    )
-    print(
-        f"Author history CSV: {publication.author_history_path}",
-        file=output,
-    )
-    print(
-        f"Completed AI field analysis CSV: "
-        f"{publication.completed_ai_field_analysis_path}",
-        file=output,
-    )
-    print(
-        f"Completed AI readability pairs CSV: "
-        f"{publication.completed_ai_readability_pairs_path}",
-        file=output,
-    )
-    print(
-        f"Overview summary CSV: {publication.overview_summary_path}",
-        file=output,
-    )
-    print(
-        f"Study-attempt history summary CSV: "
-        f"{publication.study_attempt_history_summary_path}",
-        file=output,
-    )
-    print(
-        f"Author handoff summary CSV: {publication.author_handoff_summary_path}",
-        file=output,
-    )
-    print(
-        f"Grouped attempt summary CSV: {publication.grouped_attempt_summary_path}",
-        file=output,
-    )
-    print(
-        f"Content-source concordance summary CSV: "
-        f"{publication.content_source_concordance_summary_path}",
-        file=output,
-    )
-    print(
-        f"Content-source concordance matrix CSV: "
-        f"{publication.content_source_concordance_matrix_path}",
-        file=output,
-    )
-    print(
-        f"Grouped study summary CSV: {publication.grouped_study_summary_path}",
-        file=output,
-    )
-    print(
-        f"Grouped author summary CSV: {publication.grouped_author_summary_path}",
-        file=output,
-    )
-    print(
-        f"Attempt-start experience summary CSV: "
-        f"{publication.attempt_start_experience_summary_path}",
-        file=output,
-    )
-    print(
-        f"Current author experience summary CSV: "
-        f"{publication.current_author_experience_summary_path}",
-        file=output,
-    )
-    print(
-        f"Field adoption and editing summary CSV: "
-        f"{publication.field_adoption_editing_summary_path}",
-        file=output,
-    )
-    print(
-        f"Nontext field adoption summary CSV: "
-        f"{publication.nontext_field_adoption_summary_path}",
-        file=output,
-    )
-    print(
-        f"Suggestion selection summary CSV: "
-        f"{publication.suggestion_selection_summary_path}",
-        file=output,
-    )
-    print(
-        f"Compensation analysis summary CSV: "
-        f"{publication.compensation_analysis_summary_path}",
-        file=output,
-    )
-    print(
-        f"Selected versus unselected readability summary CSV: "
-        f"{publication.selected_vs_unselected_readability_summary_path}",
-        file=output,
-    )
-    print(
-        f"Field readability change summary CSV: "
-        f"{publication.field_readability_change_summary_path}",
-        file=output,
-    )
-    print(
-        f"Field readability target summary CSV: "
-        f"{publication.field_readability_target_summary_path}",
-        file=output,
-    )
-    print(
-        f"Field edit/readability cross summary CSV: "
-        f"{publication.field_edit_readability_cross_summary_path}",
-        file=output,
-    )
-    print(
-        f"Final text metric summary CSV: {publication.final_text_metric_summary_path}",
-        file=output,
-    )
-    print(
-        f"Published files: {publication.output_file_count}",
-        file=output,
+    _print_publication(
+        publication,
+        output=output,
     )
 
 
