@@ -30,6 +30,9 @@ from study_posting_audit_exploration.aggregation.overview import (
 from study_posting_audit_exploration.aggregation.studies import (
     build_grouped_study_summary,
 )
+from study_posting_audit_exploration.aggregation.suggestions import (
+    build_suggestion_selection_summary,
+)
 from study_posting_audit_exploration.models import (
     AppointmentQualityFinding,
     AttemptAnalysisTables,
@@ -139,4 +142,5 @@ __all__ = [
     "build_overview_tables",
     "build_study_analysis_tables",
     "build_study_attempt_history_summary",
+    "build_suggestion_selection_summary",
 ]

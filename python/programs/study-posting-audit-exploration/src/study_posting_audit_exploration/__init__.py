@@ -17,6 +17,7 @@ from study_posting_audit_exploration.aggregation import (
     build_overview_tables,
     build_study_analysis_tables,
     build_study_attempt_history_summary,
+    build_suggestion_selection_summary,
 )
 from study_posting_audit_exploration.config import (
     ExplorationInputConfig,
@@ -94,6 +95,7 @@ __all__ = [
     "build_overview_tables",
     "build_study_analysis_tables",
     "build_study_attempt_history_summary",
+    "build_suggestion_selection_summary",
     "classify_edit_intensity",
     "derive_appointments",
     "derive_attempt_histories",
