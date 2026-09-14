@@ -13,6 +13,9 @@ from study_posting_audit_exploration.models import (
     LoadedAuditReport,
     ValidationSummary,
 )
+from study_posting_audit_exploration.readability_validation import (
+    validate_readability_pairing_contract,
+)
 
 _COMPLETE = "COMPLETE"
 _AI = "AI"
@@ -530,6 +533,12 @@ def validate_audit_report(
         ai_assistance,
     )
     _require_readability_contract(readability)
+
+    validate_readability_pairing_contract(
+        records,
+        ai_assistance,
+        readability,
+    )
 
     completed_count = int(records["ATTEMPT_RESULT"].eq(_COMPLETE).sum())
 

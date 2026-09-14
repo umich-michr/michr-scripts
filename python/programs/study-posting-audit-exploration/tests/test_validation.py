@@ -472,3 +472,163 @@ def test_duplicate_readability_identity_is_rejected(
         match="duplicate text-instance identities",
     ):
         validate_audit_report(invalid_report)
+
+
+def test_readability_rows_require_completed_attempts(
+    valid_report_directory: Path,
+) -> None:
+    report = load_valid(valid_report_directory)
+    incomplete_id = report.records.loc[
+        report.records["ATTEMPT_RESULT"].ne("COMPLETE"),
+        "ID",
+    ].iloc[0]
+    report.readability_metrics.loc[:, "record_id"] = incomplete_id
+
+    with pytest.raises(
+        ExplorationValidationError,
+        match="must belong to completed attempts",
+    ):
+        validate_audit_report(report)
+
+
+def test_readability_attempt_type_must_match_record(
+    valid_report_directory: Path,
+) -> None:
+    report = load_valid(valid_report_directory)
+    report.readability_metrics.loc[:, "attempt_type"] = "MANUAL"
+
+    with pytest.raises(
+        ExplorationValidationError,
+        match="attempt_type values do not match",
+    ):
+        validate_audit_report(report)
+
+
+def test_multiple_final_readability_rows_are_rejected(
+    valid_report_directory: Path,
+) -> None:
+    report = load_valid(valid_report_directory)
+    final = report.readability_metrics.loc[
+        report.readability_metrics["text_role"].eq("FINAL")
+    ].copy()
+    final.loc[:, "suggestion_kind"] = "synthetic-duplicate"
+    duplicated = pd.concat(
+        [
+            report.readability_metrics,
+            final,
+        ],
+        ignore_index=True,
+    )
+    invalid_report = LoadedAuditReport(
+        records=report.records,
+        ai_assistance_metrics=report.ai_assistance_metrics,
+        readability_metrics=duplicated,
+    )
+
+    with pytest.raises(
+        ExplorationValidationError,
+        match="multiple final rows per audit field",
+    ):
+        validate_audit_report(invalid_report)
+
+
+def test_multiple_selected_readability_suggestions_are_rejected(
+    valid_report_directory: Path,
+) -> None:
+    report = load_valid(valid_report_directory)
+    selected = report.readability_metrics.loc[
+        report.readability_metrics["text_role"].eq("SUGGESTED")
+    ].copy()
+    selected.loc[:, "suggestion_index"] = 1
+    duplicated = pd.concat(
+        [
+            report.readability_metrics,
+            selected,
+        ],
+        ignore_index=True,
+    )
+    invalid_report = LoadedAuditReport(
+        records=report.records,
+        ai_assistance_metrics=report.ai_assistance_metrics,
+        readability_metrics=duplicated,
+    )
+
+    with pytest.raises(
+        ExplorationValidationError,
+        match="multiple selected suggestions per audit field",
+    ):
+        validate_audit_report(invalid_report)
+
+
+def test_selected_readability_kind_must_match_ai_pick(
+    valid_report_directory: Path,
+) -> None:
+    report = load_valid(valid_report_directory)
+    selected = report.readability_metrics["text_role"].eq("SUGGESTED")
+    report.readability_metrics.loc[
+        selected,
+        "suggestion_kind",
+    ] = "synthetic-mismatch"
+
+    with pytest.raises(
+        ExplorationValidationError,
+        match="do not match AI-assistance picks",
+    ):
+        validate_audit_report(report)
+
+
+def test_selected_readability_index_must_match_ai_pick(
+    valid_report_directory: Path,
+) -> None:
+    report = load_valid(valid_report_directory)
+    selected = report.readability_metrics["text_role"].eq("SUGGESTED")
+    report.readability_metrics.loc[
+        selected,
+        "suggestion_index",
+    ] = 99
+
+    with pytest.raises(
+        ExplorationValidationError,
+        match="do not match AI-assistance picks",
+    ):
+        validate_audit_report(report)
+
+
+def test_assisted_ai_text_requires_selected_readability(
+    valid_report_directory: Path,
+) -> None:
+    report = load_valid(valid_report_directory)
+    readability = report.readability_metrics.loc[
+        ~report.readability_metrics["text_role"].eq("SUGGESTED")
+    ].copy()
+    invalid_report = LoadedAuditReport(
+        records=report.records,
+        ai_assistance_metrics=report.ai_assistance_metrics,
+        readability_metrics=readability,
+    )
+
+    with pytest.raises(
+        ExplorationValidationError,
+        match="lack selected readability rows",
+    ):
+        validate_audit_report(invalid_report)
+
+
+def test_assisted_ai_text_requires_final_readability(
+    valid_report_directory: Path,
+) -> None:
+    report = load_valid(valid_report_directory)
+    readability = report.readability_metrics.loc[
+        ~report.readability_metrics["text_role"].eq("FINAL")
+    ].copy()
+    invalid_report = LoadedAuditReport(
+        records=report.records,
+        ai_assistance_metrics=report.ai_assistance_metrics,
+        readability_metrics=readability,
+    )
+
+    with pytest.raises(
+        ExplorationValidationError,
+        match="lack final readability rows",
+    ):
+        validate_audit_report(invalid_report)
