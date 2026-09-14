@@ -98,6 +98,17 @@ class AuthorAnalysisTables:
 
 
 @dataclass(frozen=True, slots=True)
+class FieldAnalysisTables:
+    """Completed-AI field audit rows and faculty-facing field summaries."""
+
+    completed_ai_field_analysis: pd.DataFrame
+    field_adoption_editing_summary: pd.DataFrame
+    nontext_field_adoption_summary: pd.DataFrame
+    suggestion_selection_summary: pd.DataFrame
+    compensation_analysis_summary: pd.DataFrame
+
+
+@dataclass(frozen=True, slots=True)
 class ExplorationAnalysisTables:
     """All derived and aggregate tables published by one analysis run."""
 
@@ -106,6 +117,7 @@ class ExplorationAnalysisTables:
     attempts: AttemptAnalysisTables
     studies: StudyAnalysisTables
     authors: AuthorAnalysisTables
+    fields: FieldAnalysisTables
 
 
 @dataclass(frozen=True, slots=True)
@@ -127,4 +139,9 @@ class ExplorationPublication:
     grouped_author_summary_path: Path
     attempt_start_experience_summary_path: Path
     current_author_experience_summary_path: Path
+    completed_ai_field_analysis_path: Path
+    field_adoption_editing_summary_path: Path
+    nontext_field_adoption_summary_path: Path
+    suggestion_selection_summary_path: Path
+    compensation_analysis_summary_path: Path
     output_file_count: int

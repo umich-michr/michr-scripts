@@ -14,10 +14,12 @@ from study_posting_audit_exploration import (
     LoadedAuditReport,
     build_attempt_analysis_tables,
     build_author_analysis_tables,
+    build_field_analysis_tables,
     build_overview_tables,
     build_study_analysis_tables,
     derive_appointments,
     derive_attempt_histories,
+    derive_completed_ai_field_analysis,
     load_audit_report,
     publish_exploration,
 )
@@ -158,6 +160,12 @@ def publish_valid_report(
         authors=histories.author_history,
         appointments=attempt_appointments,
     )
+    field_tables = build_field_analysis_tables(
+        derive_completed_ai_field_analysis(
+            report.ai_assistance_metrics,
+            report.records,
+        )
+    )
 
     return publish_exploration(
         config=ExplorationRunConfig(
@@ -170,10 +178,11 @@ def publish_valid_report(
         attempt_tables=attempt_tables,
         study_tables=study_tables,
         author_tables=author_tables,
+        field_tables=field_tables,
     )
 
 
-def test_publish_exploration_writes_atomic_author_analysis_output(
+def test_publish_exploration_writes_atomic_field_analysis_output(
     valid_report_directory: Path,
     tmp_path: Path,
 ) -> None:
@@ -185,11 +194,12 @@ def test_publish_exploration_writes_atomic_author_analysis_output(
     )
 
     assert publication.output_directory == output_directory
-    assert publication.output_file_count == 14
+    assert publication.output_file_count == 19
     assert publication.manifest_path.is_file()
     assert publication.study_attempt_author_history_path.is_file()
     assert publication.study_attempt_history_path.is_file()
     assert publication.author_history_path.is_file()
+    assert publication.completed_ai_field_analysis_path.is_file()
     assert publication.overview_summary_path.is_file()
     assert publication.study_attempt_history_summary_path.is_file()
     assert publication.author_handoff_summary_path.is_file()
@@ -200,25 +210,24 @@ def test_publish_exploration_writes_atomic_author_analysis_output(
     assert publication.grouped_author_summary_path.is_file()
     assert publication.attempt_start_experience_summary_path.is_file()
     assert publication.current_author_experience_summary_path.is_file()
+    assert publication.field_adoption_editing_summary_path.is_file()
+    assert publication.nontext_field_adoption_summary_path.is_file()
+    assert publication.suggestion_selection_summary_path.is_file()
+    assert publication.compensation_analysis_summary_path.is_file()
     assert list(tmp_path.glob(".exploration.*")) == []
 
-    grouped_authors = pd.read_csv(publication.grouped_author_summary_path)
-    attempt_experience = pd.read_csv(publication.attempt_start_experience_summary_path)
-    current_experience = pd.read_csv(publication.current_author_experience_summary_path)
+    completed_fields = pd.read_csv(publication.completed_ai_field_analysis_path)
+    field_summary = pd.read_csv(publication.field_adoption_editing_summary_path)
+    suggestion_summary = pd.read_csv(publication.suggestion_selection_summary_path)
 
-    assert not grouped_authors.empty
-    assert not attempt_experience.empty
-    assert not current_experience.empty
-    assert "EFFECTIVE_AUTHOR_ROLE" in set(grouped_authors["grouping_dimension_name"])
-    assert "prior_studies_created_before_attempt_start_count" in set(
-        attempt_experience["experience_metric_name"]
-    )
-    assert "distinct_login_days_as_of_report_query_count" in set(
-        current_experience["experience_metric_name"]
-    )
+    assert not completed_fields.empty
+    assert not field_summary.empty
+    assert not suggestion_summary.empty
+    assert "selected_text" not in completed_fields.columns
+    assert "final_text" not in completed_fields.columns
 
 
-def test_manifest_contains_author_analysis_counts(
+def test_manifest_contains_field_analysis_counts(
     valid_report_directory: Path,
     tmp_path: Path,
 ) -> None:
@@ -228,15 +237,12 @@ def test_manifest_contains_author_analysis_counts(
     )
     manifest = json.loads(publication.manifest_path.read_text(encoding="utf-8"))
 
-    assert "author_analysis_row_counts" in manifest
-    assert manifest["author_analysis_row_counts"]["grouped_author_summary"] > 0
     assert (
-        manifest["author_analysis_row_counts"]["attempt_start_experience_summary"] > 0
+        manifest["analysis_audit_record_row_counts"]["completed_ai_field_analysis"] > 0
     )
-    assert (
-        manifest["author_analysis_row_counts"]["current_author_experience_summary"] > 0
-    )
-    assert manifest["output_file_count"] == 14
+    assert manifest["field_analysis_row_counts"]["field_adoption_editing_summary"] > 0
+    assert manifest["field_analysis_row_counts"]["suggestion_selection_summary"] > 0
+    assert manifest["output_file_count"] == 19
     assert manifest["warning_count"] == 0
     assert manifest_filename() == "analysis_manifest.json"
 

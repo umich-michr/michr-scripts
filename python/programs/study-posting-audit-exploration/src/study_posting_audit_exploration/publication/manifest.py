@@ -33,6 +33,7 @@ def write_manifest(
     attempt_tables = tables.attempts
     study_tables = tables.studies
     author_tables = tables.authors
+    field_tables = tables.fields
 
     content = {
         "analysis_program_version": _PROGRAM_VERSION,
@@ -52,6 +53,9 @@ def write_manifest(
             "study_attempt_author_history": len(histories.study_attempt_author_history),
             "study_attempt_history": len(histories.study_attempt_history),
             "author_history": len(histories.author_history),
+            "completed_ai_field_analysis": len(
+                field_tables.completed_ai_field_analysis
+            ),
         },
         "overview_row_counts": {
             "overview_summary": len(overview_tables.overview_summary),
@@ -81,9 +85,23 @@ def write_manifest(
                 author_tables.current_author_experience_summary
             ),
         },
+        "field_analysis_row_counts": {
+            "field_adoption_editing_summary": len(
+                field_tables.field_adoption_editing_summary
+            ),
+            "nontext_field_adoption_summary": len(
+                field_tables.nontext_field_adoption_summary
+            ),
+            "suggestion_selection_summary": len(
+                field_tables.suggestion_selection_summary
+            ),
+            "compensation_analysis_summary": len(
+                field_tables.compensation_analysis_summary
+            ),
+        },
         "output_file_count": output_file_count,
-        "edit_intensity_threshold_scheme": config.edit_intensity_threshold_scheme,
-        "readability_unchanged_tolerance": config.readability_unchanged_tolerance,
+        "edit_intensity_threshold_scheme": (config.edit_intensity_threshold_scheme),
+        "readability_unchanged_tolerance": (config.readability_unchanged_tolerance),
         "warning_count": len(study_tables.appointment_quality_findings),
     }
     path.write_text(

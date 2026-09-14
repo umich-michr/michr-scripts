@@ -74,7 +74,7 @@ def test_cli_validates_report_without_printing_identifiers(
     assert "completion-author@example.edu" not in text
 
 
-def test_analyze_command_publishes_author_analysis_output(
+def test_analyze_command_publishes_field_analysis_output(
     valid_report_directory: Path,
     tmp_path: Path,
 ) -> None:
@@ -98,38 +98,42 @@ def test_analyze_command_publishes_author_analysis_output(
     assert error_output.getvalue() == ""
 
     manifest_path = output_directory / "analysis_manifest.json"
-    authors_directory = output_directory / "authors"
-    grouped_author_path = authors_directory / "grouped_author_summary.csv"
-    attempt_experience_path = authors_directory / "attempt_start_experience_summary.csv"
-    current_experience_path = (
-        authors_directory / "current_author_experience_summary.csv"
+    audit_path = (
+        output_directory / "analysis-audit-records" / "completed_ai_field_analysis.csv"
     )
+    fields_directory = output_directory / "fields"
+    adoption_path = fields_directory / "field_adoption_editing_summary.csv"
+    nontext_path = fields_directory / "nontext_field_adoption_summary.csv"
+    selection_path = fields_directory / "suggestion_selection_summary.csv"
+    compensation_path = fields_directory / "compensation_analysis_summary.csv"
 
     assert manifest_path.is_file()
-    assert grouped_author_path.is_file()
-    assert attempt_experience_path.is_file()
-    assert current_experience_path.is_file()
+    assert audit_path.is_file()
+    assert adoption_path.is_file()
+    assert nontext_path.is_file()
+    assert selection_path.is_file()
+    assert compensation_path.is_file()
 
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
 
-    assert manifest["author_analysis_row_counts"]["grouped_author_summary"] > 0
     assert (
-        manifest["author_analysis_row_counts"]["attempt_start_experience_summary"] > 0
+        manifest["analysis_audit_record_row_counts"]["completed_ai_field_analysis"] > 0
     )
-    assert (
-        manifest["author_analysis_row_counts"]["current_author_experience_summary"] > 0
-    )
-    assert manifest["output_file_count"] == 14
+    assert manifest["field_analysis_row_counts"]["field_adoption_editing_summary"] > 0
+    assert manifest["field_analysis_row_counts"]["suggestion_selection_summary"] > 0
+    assert manifest["output_file_count"] == 19
     assert manifest["warning_count"] == 0
 
     text = output.getvalue()
 
     assert f"Exploration directory: {output_directory}" in text
     assert f"Manifest: {manifest_path}" in text
-    assert f"Grouped author summary CSV: {grouped_author_path}" in text
-    assert f"Attempt-start experience summary CSV: {attempt_experience_path}" in text
-    assert f"Current author experience summary CSV: {current_experience_path}" in text
-    assert "Published files: 14" in text
+    assert f"Completed AI field analysis CSV: {audit_path}" in text
+    assert f"Field adoption and editing summary CSV: {adoption_path}" in text
+    assert f"Nontext field adoption summary CSV: {nontext_path}" in text
+    assert f"Suggestion selection summary CSV: {selection_path}" in text
+    assert f"Compensation analysis summary CSV: {compensation_path}" in text
+    assert "Published files: 19" in text
     assert "SYNTHETIC-STUDY-1" not in text
     assert "completion-author@example.edu" not in text
 

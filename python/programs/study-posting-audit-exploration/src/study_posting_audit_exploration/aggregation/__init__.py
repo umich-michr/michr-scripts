@@ -40,6 +40,7 @@ from study_posting_audit_exploration.models import (
     AppointmentQualityFinding,
     AttemptAnalysisTables,
     AuthorAnalysisTables,
+    FieldAnalysisTables,
     OverviewTables,
     StudyAnalysisTables,
 )
@@ -124,9 +125,31 @@ def build_author_analysis_tables(
     )
 
 
+def build_field_analysis_tables(
+    completed_ai_fields: pd.DataFrame,
+) -> FieldAnalysisTables:
+    """Build completed-AI field audit rows and aggregate summaries."""
+    return FieldAnalysisTables(
+        completed_ai_field_analysis=completed_ai_fields,
+        field_adoption_editing_summary=(
+            build_field_adoption_editing_summary(completed_ai_fields)
+        ),
+        nontext_field_adoption_summary=(
+            build_nontext_field_adoption_summary(completed_ai_fields)
+        ),
+        suggestion_selection_summary=(
+            build_suggestion_selection_summary(completed_ai_fields)
+        ),
+        compensation_analysis_summary=(
+            build_compensation_analysis_summary(completed_ai_fields)
+        ),
+    )
+
+
 __all__ = [
     "AttemptAnalysisTables",
     "AuthorAnalysisTables",
+    "FieldAnalysisTables",
     "OverviewTables",
     "StudyAnalysisTables",
     "build_attempt_analysis_tables",
@@ -138,6 +161,7 @@ __all__ = [
     "build_content_source_concordance_summary",
     "build_current_author_experience_summary",
     "build_field_adoption_editing_summary",
+    "build_field_analysis_tables",
     "build_grouped_attempt_summary",
     "build_grouped_author_summary",
     "build_grouped_study_summary",

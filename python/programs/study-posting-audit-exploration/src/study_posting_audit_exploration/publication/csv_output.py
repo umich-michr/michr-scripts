@@ -18,6 +18,7 @@ from study_posting_audit_exploration.models import (
     AuthorAnalysisTables,
     ExplorationAnalysisTables,
     ExplorationPublication,
+    FieldAnalysisTables,
     LoadedAuditReport,
     OverviewTables,
     StudyAnalysisTables,
@@ -32,10 +33,12 @@ _OVERVIEW_DIRECTORY = "overview"
 _ATTEMPTS_DIRECTORY = "attempts"
 _STUDIES_DIRECTORY = "studies"
 _AUTHORS_DIRECTORY = "authors"
+_FIELDS_DIRECTORY = "fields"
 
 _STUDY_ATTEMPT_AUTHOR_HISTORY_FILENAME = "study_attempt_author_history.csv"
 _STUDY_ATTEMPT_HISTORY_FILENAME = "study_attempt_history.csv"
 _AUTHOR_HISTORY_FILENAME = "author_history.csv"
+_COMPLETED_AI_FIELD_ANALYSIS_FILENAME = "completed_ai_field_analysis.csv"
 
 _OVERVIEW_SUMMARY_FILENAME = "overview_summary.csv"
 _STUDY_ATTEMPT_HISTORY_SUMMARY_FILENAME = "study_attempt_history_summary.csv"
@@ -51,7 +54,12 @@ _GROUPED_AUTHOR_SUMMARY_FILENAME = "grouped_author_summary.csv"
 _ATTEMPT_START_EXPERIENCE_SUMMARY_FILENAME = "attempt_start_experience_summary.csv"
 _CURRENT_AUTHOR_EXPERIENCE_SUMMARY_FILENAME = "current_author_experience_summary.csv"
 
-_OUTPUT_FILE_COUNT = 14
+_FIELD_ADOPTION_EDITING_SUMMARY_FILENAME = "field_adoption_editing_summary.csv"
+_NONTEXT_FIELD_ADOPTION_SUMMARY_FILENAME = "nontext_field_adoption_summary.csv"
+_SUGGESTION_SELECTION_SUMMARY_FILENAME = "suggestion_selection_summary.csv"
+_COMPENSATION_ANALYSIS_SUMMARY_FILENAME = "compensation_analysis_summary.csv"
+
+_OUTPUT_FILE_COUNT = 19
 
 
 def _write_frame(
@@ -85,6 +93,7 @@ def _output_frames(
     attempts_directory = staging_directory / _ATTEMPTS_DIRECTORY
     studies_directory = staging_directory / _STUDIES_DIRECTORY
     authors_directory = staging_directory / _AUTHORS_DIRECTORY
+    fields_directory = staging_directory / _FIELDS_DIRECTORY
 
     return (
         (
@@ -98,6 +107,10 @@ def _output_frames(
         (
             tables.histories.author_history,
             audit_directory / _AUTHOR_HISTORY_FILENAME,
+        ),
+        (
+            tables.fields.completed_ai_field_analysis,
+            audit_directory / _COMPLETED_AI_FIELD_ANALYSIS_FILENAME,
         ),
         (
             tables.overview.overview_summary,
@@ -139,6 +152,22 @@ def _output_frames(
             tables.authors.current_author_experience_summary,
             authors_directory / _CURRENT_AUTHOR_EXPERIENCE_SUMMARY_FILENAME,
         ),
+        (
+            tables.fields.field_adoption_editing_summary,
+            fields_directory / _FIELD_ADOPTION_EDITING_SUMMARY_FILENAME,
+        ),
+        (
+            tables.fields.nontext_field_adoption_summary,
+            fields_directory / _NONTEXT_FIELD_ADOPTION_SUMMARY_FILENAME,
+        ),
+        (
+            tables.fields.suggestion_selection_summary,
+            fields_directory / _SUGGESTION_SELECTION_SUMMARY_FILENAME,
+        ),
+        (
+            tables.fields.compensation_analysis_summary,
+            fields_directory / _COMPENSATION_ANALYSIS_SUMMARY_FILENAME,
+        ),
     )
 
 
@@ -156,6 +185,7 @@ def _write_staging_output(
         _ATTEMPTS_DIRECTORY,
         _STUDIES_DIRECTORY,
         _AUTHORS_DIRECTORY,
+        _FIELDS_DIRECTORY,
     ):
         (staging_directory / directory_name).mkdir()
 
@@ -185,6 +215,72 @@ def _write_staging_output(
     _sync_file(manifest_path)
 
 
+def _publication_result(
+    destination: Path,
+) -> ExplorationPublication:
+    """Return stable paths for a successfully published exploration."""
+    audit_directory = destination / _ANALYSIS_AUDIT_DIRECTORY
+    overview_directory = destination / _OVERVIEW_DIRECTORY
+    attempts_directory = destination / _ATTEMPTS_DIRECTORY
+    studies_directory = destination / _STUDIES_DIRECTORY
+    authors_directory = destination / _AUTHORS_DIRECTORY
+    fields_directory = destination / _FIELDS_DIRECTORY
+
+    return ExplorationPublication(
+        output_directory=destination,
+        manifest_path=destination / manifest_filename(),
+        study_attempt_author_history_path=(
+            audit_directory / _STUDY_ATTEMPT_AUTHOR_HISTORY_FILENAME
+        ),
+        study_attempt_history_path=(audit_directory / _STUDY_ATTEMPT_HISTORY_FILENAME),
+        author_history_path=audit_directory / _AUTHOR_HISTORY_FILENAME,
+        overview_summary_path=overview_directory / _OVERVIEW_SUMMARY_FILENAME,
+        study_attempt_history_summary_path=(
+            overview_directory / _STUDY_ATTEMPT_HISTORY_SUMMARY_FILENAME
+        ),
+        author_handoff_summary_path=(
+            overview_directory / _AUTHOR_HANDOFF_SUMMARY_FILENAME
+        ),
+        grouped_attempt_summary_path=(
+            attempts_directory / _GROUPED_ATTEMPT_SUMMARY_FILENAME
+        ),
+        content_source_concordance_summary_path=(
+            attempts_directory / _CONTENT_SOURCE_CONCORDANCE_SUMMARY_FILENAME
+        ),
+        content_source_concordance_matrix_path=(
+            attempts_directory / _CONTENT_SOURCE_CONCORDANCE_MATRIX_FILENAME
+        ),
+        grouped_study_summary_path=(
+            studies_directory / _GROUPED_STUDY_SUMMARY_FILENAME
+        ),
+        grouped_author_summary_path=(
+            authors_directory / _GROUPED_AUTHOR_SUMMARY_FILENAME
+        ),
+        attempt_start_experience_summary_path=(
+            authors_directory / _ATTEMPT_START_EXPERIENCE_SUMMARY_FILENAME
+        ),
+        current_author_experience_summary_path=(
+            authors_directory / _CURRENT_AUTHOR_EXPERIENCE_SUMMARY_FILENAME
+        ),
+        completed_ai_field_analysis_path=(
+            audit_directory / _COMPLETED_AI_FIELD_ANALYSIS_FILENAME
+        ),
+        field_adoption_editing_summary_path=(
+            fields_directory / _FIELD_ADOPTION_EDITING_SUMMARY_FILENAME
+        ),
+        nontext_field_adoption_summary_path=(
+            fields_directory / _NONTEXT_FIELD_ADOPTION_SUMMARY_FILENAME
+        ),
+        suggestion_selection_summary_path=(
+            fields_directory / _SUGGESTION_SELECTION_SUMMARY_FILENAME
+        ),
+        compensation_analysis_summary_path=(
+            fields_directory / _COMPENSATION_ANALYSIS_SUMMARY_FILENAME
+        ),
+        output_file_count=_OUTPUT_FILE_COUNT,
+    )
+
+
 def publish_exploration(
     *,
     config: ExplorationRunConfig,
@@ -194,6 +290,7 @@ def publish_exploration(
     attempt_tables: AttemptAnalysisTables,
     study_tables: StudyAnalysisTables,
     author_tables: AuthorAnalysisTables,
+    field_tables: FieldAnalysisTables,
 ) -> ExplorationPublication:
     """Atomically publish current exploration outputs."""
     destination = config.output_directory
@@ -227,6 +324,7 @@ def publish_exploration(
         attempts=attempt_tables,
         studies=study_tables,
         authors=author_tables,
+        fields=field_tables,
     )
 
     try:
@@ -249,47 +347,4 @@ def publish_exploration(
         )
         raise
 
-    audit_directory = destination / _ANALYSIS_AUDIT_DIRECTORY
-    overview_directory = destination / _OVERVIEW_DIRECTORY
-    attempts_directory = destination / _ATTEMPTS_DIRECTORY
-    studies_directory = destination / _STUDIES_DIRECTORY
-    authors_directory = destination / _AUTHORS_DIRECTORY
-
-    return ExplorationPublication(
-        output_directory=destination,
-        manifest_path=destination / manifest_filename(),
-        study_attempt_author_history_path=(
-            audit_directory / _STUDY_ATTEMPT_AUTHOR_HISTORY_FILENAME
-        ),
-        study_attempt_history_path=(audit_directory / _STUDY_ATTEMPT_HISTORY_FILENAME),
-        author_history_path=audit_directory / _AUTHOR_HISTORY_FILENAME,
-        overview_summary_path=(overview_directory / _OVERVIEW_SUMMARY_FILENAME),
-        study_attempt_history_summary_path=(
-            overview_directory / _STUDY_ATTEMPT_HISTORY_SUMMARY_FILENAME
-        ),
-        author_handoff_summary_path=(
-            overview_directory / _AUTHOR_HANDOFF_SUMMARY_FILENAME
-        ),
-        grouped_attempt_summary_path=(
-            attempts_directory / _GROUPED_ATTEMPT_SUMMARY_FILENAME
-        ),
-        content_source_concordance_summary_path=(
-            attempts_directory / _CONTENT_SOURCE_CONCORDANCE_SUMMARY_FILENAME
-        ),
-        content_source_concordance_matrix_path=(
-            attempts_directory / _CONTENT_SOURCE_CONCORDANCE_MATRIX_FILENAME
-        ),
-        grouped_study_summary_path=(
-            studies_directory / _GROUPED_STUDY_SUMMARY_FILENAME
-        ),
-        grouped_author_summary_path=(
-            authors_directory / _GROUPED_AUTHOR_SUMMARY_FILENAME
-        ),
-        attempt_start_experience_summary_path=(
-            authors_directory / _ATTEMPT_START_EXPERIENCE_SUMMARY_FILENAME
-        ),
-        current_author_experience_summary_path=(
-            authors_directory / _CURRENT_AUTHOR_EXPERIENCE_SUMMARY_FILENAME
-        ),
-        output_file_count=_OUTPUT_FILE_COUNT,
-    )
+    return _publication_result(destination)

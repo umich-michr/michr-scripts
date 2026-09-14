@@ -10,6 +10,7 @@ import pandas as pd
 from study_posting_audit_exploration.aggregation import (
     build_attempt_analysis_tables,
     build_author_analysis_tables,
+    build_field_analysis_tables,
     build_overview_tables,
     build_study_analysis_tables,
 )
@@ -20,6 +21,7 @@ from study_posting_audit_exploration.config import (
 from study_posting_audit_exploration.derivation import (
     derive_appointments,
     derive_attempt_histories,
+    derive_completed_ai_field_analysis,
 )
 from study_posting_audit_exploration.errors import AuditExplorationError
 from study_posting_audit_exploration.loading import load_audit_report
@@ -44,8 +46,8 @@ _SOURCE_COLUMN_RENAMES: dict[str, str] = {
     "ID": "audit_record_id",
     "SOURCE_TYPE": "source_type",
     "STUDY_CONTENT_SOURCE": "study_content_source",
-    "LLM_INFERRED_STUDY_CONTENT_SOURCE": ("llm_inferred_study_content_source"),
-    "STUDY_CONTENT_SOURCE_OTHER_VALUE": ("study_content_source_other_value"),
+    "LLM_INFERRED_STUDY_CONTENT_SOURCE": "llm_inferred_study_content_source",
+    "STUDY_CONTENT_SOURCE_OTHER_VALUE": "study_content_source_other_value",
     "LLM_INFERRED_STUDY_CONTENT_SOURCE_OTHER_VALUE": (
         "llm_inferred_study_content_source_other_value"
     ),
@@ -253,6 +255,10 @@ def _run_analyze(
         *appointment_findings,
         *attempt_appointment_findings,
     )
+    completed_ai_fields = derive_completed_ai_field_analysis(
+        report.ai_assistance_metrics,
+        report.records,
+    )
 
     overview_tables = build_overview_tables(
         attempts=attempts,
@@ -270,6 +276,7 @@ def _run_analyze(
         authors=histories.author_history,
         appointments=attempt_appointments,
     )
+    field_tables = build_field_analysis_tables(completed_ai_fields)
 
     publication = publish_exploration(
         config=ExplorationRunConfig(
@@ -282,6 +289,7 @@ def _run_analyze(
         attempt_tables=attempt_tables,
         study_tables=study_tables,
         author_tables=author_tables,
+        field_tables=field_tables,
     )
 
     print(
@@ -299,6 +307,11 @@ def _run_analyze(
     )
     print(
         f"Author history CSV: {publication.author_history_path}",
+        file=output,
+    )
+    print(
+        f"Completed AI field analysis CSV: "
+        f"{publication.completed_ai_field_analysis_path}",
         file=output,
     )
     print(
@@ -344,6 +357,26 @@ def _run_analyze(
     print(
         f"Current author experience summary CSV: "
         f"{publication.current_author_experience_summary_path}",
+        file=output,
+    )
+    print(
+        f"Field adoption and editing summary CSV: "
+        f"{publication.field_adoption_editing_summary_path}",
+        file=output,
+    )
+    print(
+        f"Nontext field adoption summary CSV: "
+        f"{publication.nontext_field_adoption_summary_path}",
+        file=output,
+    )
+    print(
+        f"Suggestion selection summary CSV: "
+        f"{publication.suggestion_selection_summary_path}",
+        file=output,
+    )
+    print(
+        f"Compensation analysis summary CSV: "
+        f"{publication.compensation_analysis_summary_path}",
         file=output,
     )
     print(
