@@ -13,6 +13,7 @@ from study_posting_audit_exploration import (
     ExplorationRunConfig,
     LoadedAuditReport,
     build_attempt_analysis_tables,
+    build_author_analysis_tables,
     build_overview_tables,
     build_study_analysis_tables,
     derive_appointments,
@@ -133,10 +134,11 @@ def publish_valid_report(
         report,
         histories,
     )
-    studies, appointments, findings = _study_analysis_inputs(
+    studies, study_appointments, findings = _study_analysis_inputs(
         report,
         histories,
     )
+    attempt_appointments, attempt_findings = derive_appointments(report.records)
     overview_tables = build_overview_tables(
         attempts=attempts,
         studies=histories.study_attempt_history,
@@ -145,8 +147,16 @@ def publish_valid_report(
     attempt_tables = build_attempt_analysis_tables(attempts)
     study_tables = build_study_analysis_tables(
         studies,
-        appointments=appointments,
-        appointment_quality_findings=findings,
+        appointments=study_appointments,
+        appointment_quality_findings=(
+            *findings,
+            *attempt_findings,
+        ),
+    )
+    author_tables = build_author_analysis_tables(
+        attempts=attempts,
+        authors=histories.author_history,
+        appointments=attempt_appointments,
     )
 
     return publish_exploration(
@@ -159,10 +169,11 @@ def publish_valid_report(
         overview_tables=overview_tables,
         attempt_tables=attempt_tables,
         study_tables=study_tables,
+        author_tables=author_tables,
     )
 
 
-def test_publish_exploration_writes_atomic_study_analysis_output(
+def test_publish_exploration_writes_atomic_author_analysis_output(
     valid_report_directory: Path,
     tmp_path: Path,
 ) -> None:
@@ -174,7 +185,7 @@ def test_publish_exploration_writes_atomic_study_analysis_output(
     )
 
     assert publication.output_directory == output_directory
-    assert publication.output_file_count == 11
+    assert publication.output_file_count == 14
     assert publication.manifest_path.is_file()
     assert publication.study_attempt_author_history_path.is_file()
     assert publication.study_attempt_history_path.is_file()
@@ -186,18 +197,28 @@ def test_publish_exploration_writes_atomic_study_analysis_output(
     assert publication.content_source_concordance_summary_path.is_file()
     assert publication.content_source_concordance_matrix_path.is_file()
     assert publication.grouped_study_summary_path.is_file()
+    assert publication.grouped_author_summary_path.is_file()
+    assert publication.attempt_start_experience_summary_path.is_file()
+    assert publication.current_author_experience_summary_path.is_file()
     assert list(tmp_path.glob(".exploration.*")) == []
 
-    grouped_studies = pd.read_csv(publication.grouped_study_summary_path)
+    grouped_authors = pd.read_csv(publication.grouped_author_summary_path)
+    attempt_experience = pd.read_csv(publication.attempt_start_experience_summary_path)
+    current_experience = pd.read_csv(publication.current_author_experience_summary_path)
 
-    assert not grouped_studies.empty
-    assert "STUDY_PARTICIPANT_TYPE" in set(grouped_studies["grouping_dimension_1_name"])
-    assert "AUTHOR_APPOINTMENT_SCHOOL" in set(
-        grouped_studies["grouping_dimension_1_name"]
+    assert not grouped_authors.empty
+    assert not attempt_experience.empty
+    assert not current_experience.empty
+    assert "EFFECTIVE_AUTHOR_ROLE" in set(grouped_authors["grouping_dimension_name"])
+    assert "prior_studies_created_before_attempt_start_count" in set(
+        attempt_experience["experience_metric_name"]
+    )
+    assert "distinct_login_days_as_of_report_query_count" in set(
+        current_experience["experience_metric_name"]
     )
 
 
-def test_manifest_contains_study_analysis_counts(
+def test_manifest_contains_author_analysis_counts(
     valid_report_directory: Path,
     tmp_path: Path,
 ) -> None:
@@ -207,9 +228,15 @@ def test_manifest_contains_study_analysis_counts(
     )
     manifest = json.loads(publication.manifest_path.read_text(encoding="utf-8"))
 
-    assert "study_analysis_row_counts" in manifest
-    assert manifest["study_analysis_row_counts"]["grouped_study_summary"] > 0
-    assert manifest["output_file_count"] == 11
+    assert "author_analysis_row_counts" in manifest
+    assert manifest["author_analysis_row_counts"]["grouped_author_summary"] > 0
+    assert (
+        manifest["author_analysis_row_counts"]["attempt_start_experience_summary"] > 0
+    )
+    assert (
+        manifest["author_analysis_row_counts"]["current_author_experience_summary"] > 0
+    )
+    assert manifest["output_file_count"] == 14
     assert manifest["warning_count"] == 0
     assert manifest_filename() == "analysis_manifest.json"
 

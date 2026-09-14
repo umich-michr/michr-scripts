@@ -15,6 +15,8 @@ from study_posting_audit_exploration.errors import (
 from study_posting_audit_exploration.models import (
     AttemptAnalysisTables,
     AttemptHistoryTables,
+    AuthorAnalysisTables,
+    ExplorationAnalysisTables,
     ExplorationPublication,
     LoadedAuditReport,
     OverviewTables,
@@ -29,6 +31,7 @@ _ANALYSIS_AUDIT_DIRECTORY = "analysis-audit-records"
 _OVERVIEW_DIRECTORY = "overview"
 _ATTEMPTS_DIRECTORY = "attempts"
 _STUDIES_DIRECTORY = "studies"
+_AUTHORS_DIRECTORY = "authors"
 
 _STUDY_ATTEMPT_AUTHOR_HISTORY_FILENAME = "study_attempt_author_history.csv"
 _STUDY_ATTEMPT_HISTORY_FILENAME = "study_attempt_history.csv"
@@ -44,7 +47,11 @@ _CONTENT_SOURCE_CONCORDANCE_MATRIX_FILENAME = "content_source_concordance_matrix
 
 _GROUPED_STUDY_SUMMARY_FILENAME = "grouped_study_summary.csv"
 
-_OUTPUT_FILE_COUNT = 11
+_GROUPED_AUTHOR_SUMMARY_FILENAME = "grouped_author_summary.csv"
+_ATTEMPT_START_EXPERIENCE_SUMMARY_FILENAME = "attempt_start_experience_summary.csv"
+_CURRENT_AUTHOR_EXPERIENCE_SUMMARY_FILENAME = "current_author_experience_summary.csv"
+
+_OUTPUT_FILE_COUNT = 14
 
 
 def _write_frame(
@@ -69,56 +76,68 @@ def _sync_file(path: Path) -> None:
 
 def _output_frames(
     *,
-    histories: AttemptHistoryTables,
-    overview_tables: OverviewTables,
-    attempt_tables: AttemptAnalysisTables,
-    study_tables: StudyAnalysisTables,
-    audit_directory: Path,
-    overview_directory: Path,
-    attempts_directory: Path,
-    studies_directory: Path,
+    tables: ExplorationAnalysisTables,
+    staging_directory: Path,
 ) -> tuple[tuple[pd.DataFrame, Path], ...]:
     """Return every DataFrame and stable staging path."""
+    audit_directory = staging_directory / _ANALYSIS_AUDIT_DIRECTORY
+    overview_directory = staging_directory / _OVERVIEW_DIRECTORY
+    attempts_directory = staging_directory / _ATTEMPTS_DIRECTORY
+    studies_directory = staging_directory / _STUDIES_DIRECTORY
+    authors_directory = staging_directory / _AUTHORS_DIRECTORY
+
     return (
         (
-            histories.study_attempt_author_history,
+            tables.histories.study_attempt_author_history,
             audit_directory / _STUDY_ATTEMPT_AUTHOR_HISTORY_FILENAME,
         ),
         (
-            histories.study_attempt_history,
+            tables.histories.study_attempt_history,
             audit_directory / _STUDY_ATTEMPT_HISTORY_FILENAME,
         ),
         (
-            histories.author_history,
+            tables.histories.author_history,
             audit_directory / _AUTHOR_HISTORY_FILENAME,
         ),
         (
-            overview_tables.overview_summary,
+            tables.overview.overview_summary,
             overview_directory / _OVERVIEW_SUMMARY_FILENAME,
         ),
         (
-            overview_tables.study_attempt_history_summary,
+            tables.overview.study_attempt_history_summary,
             overview_directory / _STUDY_ATTEMPT_HISTORY_SUMMARY_FILENAME,
         ),
         (
-            overview_tables.author_handoff_summary,
+            tables.overview.author_handoff_summary,
             overview_directory / _AUTHOR_HANDOFF_SUMMARY_FILENAME,
         ),
         (
-            attempt_tables.grouped_attempt_summary,
+            tables.attempts.grouped_attempt_summary,
             attempts_directory / _GROUPED_ATTEMPT_SUMMARY_FILENAME,
         ),
         (
-            attempt_tables.content_source_concordance_summary,
+            tables.attempts.content_source_concordance_summary,
             attempts_directory / _CONTENT_SOURCE_CONCORDANCE_SUMMARY_FILENAME,
         ),
         (
-            attempt_tables.content_source_concordance_matrix,
+            tables.attempts.content_source_concordance_matrix,
             attempts_directory / _CONTENT_SOURCE_CONCORDANCE_MATRIX_FILENAME,
         ),
         (
-            study_tables.grouped_study_summary,
+            tables.studies.grouped_study_summary,
             studies_directory / _GROUPED_STUDY_SUMMARY_FILENAME,
+        ),
+        (
+            tables.authors.grouped_author_summary,
+            authors_directory / _GROUPED_AUTHOR_SUMMARY_FILENAME,
+        ),
+        (
+            tables.authors.attempt_start_experience_summary,
+            authors_directory / _ATTEMPT_START_EXPERIENCE_SUMMARY_FILENAME,
+        ),
+        (
+            tables.authors.current_author_experience_summary,
+            authors_directory / _CURRENT_AUTHOR_EXPERIENCE_SUMMARY_FILENAME,
         ),
     )
 
@@ -128,34 +147,21 @@ def _write_staging_output(
     *,
     config: ExplorationRunConfig,
     report: LoadedAuditReport,
-    histories: AttemptHistoryTables,
-    overview_tables: OverviewTables,
-    attempt_tables: AttemptAnalysisTables,
-    study_tables: StudyAnalysisTables,
+    tables: ExplorationAnalysisTables,
 ) -> None:
     """Write all current exploration files into one staging directory."""
-    audit_directory = staging_directory / _ANALYSIS_AUDIT_DIRECTORY
-    overview_directory = staging_directory / _OVERVIEW_DIRECTORY
-    attempts_directory = staging_directory / _ATTEMPTS_DIRECTORY
-    studies_directory = staging_directory / _STUDIES_DIRECTORY
-
-    for directory in (
-        audit_directory,
-        overview_directory,
-        attempts_directory,
-        studies_directory,
+    for directory_name in (
+        _ANALYSIS_AUDIT_DIRECTORY,
+        _OVERVIEW_DIRECTORY,
+        _ATTEMPTS_DIRECTORY,
+        _STUDIES_DIRECTORY,
+        _AUTHORS_DIRECTORY,
     ):
-        directory.mkdir()
+        (staging_directory / directory_name).mkdir()
 
     output_frames = _output_frames(
-        histories=histories,
-        overview_tables=overview_tables,
-        attempt_tables=attempt_tables,
-        study_tables=study_tables,
-        audit_directory=audit_directory,
-        overview_directory=overview_directory,
-        attempts_directory=attempts_directory,
-        studies_directory=studies_directory,
+        tables=tables,
+        staging_directory=staging_directory,
     )
     manifest_path = staging_directory / manifest_filename()
 
@@ -169,10 +175,7 @@ def _write_staging_output(
         manifest_path,
         config=config,
         report=report,
-        histories=histories,
-        overview_tables=overview_tables,
-        attempt_tables=attempt_tables,
-        study_tables=study_tables,
+        tables=tables,
         output_file_count=_OUTPUT_FILE_COUNT,
     )
 
@@ -190,6 +193,7 @@ def publish_exploration(
     overview_tables: OverviewTables,
     attempt_tables: AttemptAnalysisTables,
     study_tables: StudyAnalysisTables,
+    author_tables: AuthorAnalysisTables,
 ) -> ExplorationPublication:
     """Atomically publish current exploration outputs."""
     destination = config.output_directory
@@ -217,16 +221,21 @@ def publish_exploration(
             f"Could not create exploration staging directory: {error}"
         ) from error
 
+    tables = ExplorationAnalysisTables(
+        histories=histories,
+        overview=overview_tables,
+        attempts=attempt_tables,
+        studies=study_tables,
+        authors=author_tables,
+    )
+
     try:
         try:
             _write_staging_output(
                 staging_directory,
                 config=config,
                 report=report,
-                histories=histories,
-                overview_tables=overview_tables,
-                attempt_tables=attempt_tables,
-                study_tables=study_tables,
+                tables=tables,
             )
             staging_directory.replace(destination)
         except OSError as error:
@@ -244,6 +253,7 @@ def publish_exploration(
     overview_directory = destination / _OVERVIEW_DIRECTORY
     attempts_directory = destination / _ATTEMPTS_DIRECTORY
     studies_directory = destination / _STUDIES_DIRECTORY
+    authors_directory = destination / _AUTHORS_DIRECTORY
 
     return ExplorationPublication(
         output_directory=destination,
@@ -271,6 +281,15 @@ def publish_exploration(
         ),
         grouped_study_summary_path=(
             studies_directory / _GROUPED_STUDY_SUMMARY_FILENAME
+        ),
+        grouped_author_summary_path=(
+            authors_directory / _GROUPED_AUTHOR_SUMMARY_FILENAME
+        ),
+        attempt_start_experience_summary_path=(
+            authors_directory / _ATTEMPT_START_EXPERIENCE_SUMMARY_FILENAME
+        ),
+        current_author_experience_summary_path=(
+            authors_directory / _CURRENT_AUTHOR_EXPERIENCE_SUMMARY_FILENAME
         ),
         output_file_count=_OUTPUT_FILE_COUNT,
     )

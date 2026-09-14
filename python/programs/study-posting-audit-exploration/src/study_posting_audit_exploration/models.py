@@ -89,6 +89,26 @@ class StudyAnalysisTables:
 
 
 @dataclass(frozen=True, slots=True)
+class AuthorAnalysisTables:
+    """Grouped author and experience aggregate tables."""
+
+    grouped_author_summary: pd.DataFrame
+    attempt_start_experience_summary: pd.DataFrame
+    current_author_experience_summary: pd.DataFrame
+
+
+@dataclass(frozen=True, slots=True)
+class ExplorationAnalysisTables:
+    """All derived and aggregate tables published by one analysis run."""
+
+    histories: AttemptHistoryTables
+    overview: OverviewTables
+    attempts: AttemptAnalysisTables
+    studies: StudyAnalysisTables
+    authors: AuthorAnalysisTables
+
+
+@dataclass(frozen=True, slots=True)
 class ExplorationPublication:
     """Successfully published exploration output."""
 
@@ -104,4 +124,7 @@ class ExplorationPublication:
     content_source_concordance_summary_path: Path
     content_source_concordance_matrix_path: Path
     grouped_study_summary_path: Path
+    grouped_author_summary_path: Path
+    attempt_start_experience_summary_path: Path
+    current_author_experience_summary_path: Path
     output_file_count: int

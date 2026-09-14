@@ -9,6 +9,7 @@ import pandas as pd
 
 from study_posting_audit_exploration.aggregation import (
     build_attempt_analysis_tables,
+    build_author_analysis_tables,
     build_overview_tables,
     build_study_analysis_tables,
 )
@@ -144,11 +145,7 @@ def _attempts_with_source_columns(
 def _study_snapshot_records(
     report: LoadedAuditReport,
 ) -> pd.DataFrame:
-    """Return one selected source-attempt snapshot per study.
-
-    Completed studies use their unique completed attempt. Studies without a
-    completion use the latest attempt by START_TIME and then audit ID.
-    """
+    """Return one selected source-attempt snapshot per study."""
     ordered = report.records.sort_values(
         by=["STUDY_NUM", "START_TIME", "ID"],
         kind="stable",
@@ -245,9 +242,16 @@ def _run_analyze(
         report,
         histories,
     )
-    studies, appointments, appointment_findings = _studies_with_grouping_columns(
+    studies, study_appointments, appointment_findings = _studies_with_grouping_columns(
         report,
         histories,
+    )
+    attempt_appointments, attempt_appointment_findings = derive_appointments(
+        report.records
+    )
+    all_appointment_findings = (
+        *appointment_findings,
+        *attempt_appointment_findings,
     )
 
     overview_tables = build_overview_tables(
@@ -258,8 +262,13 @@ def _run_analyze(
     attempt_tables = build_attempt_analysis_tables(attempts)
     study_tables = build_study_analysis_tables(
         studies,
-        appointments=appointments,
-        appointment_quality_findings=appointment_findings,
+        appointments=study_appointments,
+        appointment_quality_findings=all_appointment_findings,
+    )
+    author_tables = build_author_analysis_tables(
+        attempts=attempts,
+        authors=histories.author_history,
+        appointments=attempt_appointments,
     )
 
     publication = publish_exploration(
@@ -272,6 +281,7 @@ def _run_analyze(
         overview_tables=overview_tables,
         attempt_tables=attempt_tables,
         study_tables=study_tables,
+        author_tables=author_tables,
     )
 
     print(
@@ -296,7 +306,7 @@ def _run_analyze(
         file=output,
     )
     print(
-        "Study-attempt history summary CSV: "
+        f"Study-attempt history summary CSV: "
         f"{publication.study_attempt_history_summary_path}",
         file=output,
     )
@@ -309,17 +319,31 @@ def _run_analyze(
         file=output,
     )
     print(
-        "Content-source concordance summary CSV: "
+        f"Content-source concordance summary CSV: "
         f"{publication.content_source_concordance_summary_path}",
         file=output,
     )
     print(
-        "Content-source concordance matrix CSV: "
+        f"Content-source concordance matrix CSV: "
         f"{publication.content_source_concordance_matrix_path}",
         file=output,
     )
     print(
         f"Grouped study summary CSV: {publication.grouped_study_summary_path}",
+        file=output,
+    )
+    print(
+        f"Grouped author summary CSV: {publication.grouped_author_summary_path}",
+        file=output,
+    )
+    print(
+        f"Attempt-start experience summary CSV: "
+        f"{publication.attempt_start_experience_summary_path}",
+        file=output,
+    )
+    print(
+        f"Current author experience summary CSV: "
+        f"{publication.current_author_experience_summary_path}",
         file=output,
     )
     print(

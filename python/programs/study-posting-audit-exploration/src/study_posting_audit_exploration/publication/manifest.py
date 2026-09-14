@@ -6,11 +6,8 @@ from pathlib import Path
 
 from study_posting_audit_exploration.config import ExplorationRunConfig
 from study_posting_audit_exploration.models import (
-    AttemptAnalysisTables,
-    AttemptHistoryTables,
+    ExplorationAnalysisTables,
     LoadedAuditReport,
-    OverviewTables,
-    StudyAnalysisTables,
 )
 
 _MANIFEST_FILENAME = "analysis_manifest.json"
@@ -27,13 +24,16 @@ def write_manifest(
     *,
     config: ExplorationRunConfig,
     report: LoadedAuditReport,
-    histories: AttemptHistoryTables,
-    overview_tables: OverviewTables,
-    attempt_tables: AttemptAnalysisTables,
-    study_tables: StudyAnalysisTables,
+    tables: ExplorationAnalysisTables,
     output_file_count: int,
 ) -> None:
     """Write the minimal deterministic-shape analysis manifest."""
+    histories = tables.histories
+    overview_tables = tables.overview
+    attempt_tables = tables.attempts
+    study_tables = tables.studies
+    author_tables = tables.authors
+
     content = {
         "analysis_program_version": _PROGRAM_VERSION,
         "generated_at_utc": datetime.now(UTC).isoformat(),
@@ -72,9 +72,18 @@ def write_manifest(
         "study_analysis_row_counts": {
             "grouped_study_summary": len(study_tables.grouped_study_summary),
         },
+        "author_analysis_row_counts": {
+            "grouped_author_summary": len(author_tables.grouped_author_summary),
+            "attempt_start_experience_summary": len(
+                author_tables.attempt_start_experience_summary
+            ),
+            "current_author_experience_summary": len(
+                author_tables.current_author_experience_summary
+            ),
+        },
         "output_file_count": output_file_count,
-        "edit_intensity_threshold_scheme": (config.edit_intensity_threshold_scheme),
-        "readability_unchanged_tolerance": (config.readability_unchanged_tolerance),
+        "edit_intensity_threshold_scheme": config.edit_intensity_threshold_scheme,
+        "readability_unchanged_tolerance": config.readability_unchanged_tolerance,
         "warning_count": len(study_tables.appointment_quality_findings),
     }
     path.write_text(

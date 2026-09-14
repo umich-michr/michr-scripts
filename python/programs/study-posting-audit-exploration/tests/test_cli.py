@@ -74,7 +74,7 @@ def test_cli_validates_report_without_printing_identifiers(
     assert "completion-author@example.edu" not in text
 
 
-def test_analyze_command_publishes_study_analysis_output(
+def test_analyze_command_publishes_author_analysis_output(
     valid_report_directory: Path,
     tmp_path: Path,
 ) -> None:
@@ -98,23 +98,38 @@ def test_analyze_command_publishes_study_analysis_output(
     assert error_output.getvalue() == ""
 
     manifest_path = output_directory / "analysis_manifest.json"
-    grouped_study_path = output_directory / "studies" / "grouped_study_summary.csv"
+    authors_directory = output_directory / "authors"
+    grouped_author_path = authors_directory / "grouped_author_summary.csv"
+    attempt_experience_path = authors_directory / "attempt_start_experience_summary.csv"
+    current_experience_path = (
+        authors_directory / "current_author_experience_summary.csv"
+    )
 
     assert manifest_path.is_file()
-    assert grouped_study_path.is_file()
+    assert grouped_author_path.is_file()
+    assert attempt_experience_path.is_file()
+    assert current_experience_path.is_file()
 
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
 
-    assert manifest["study_analysis_row_counts"]["grouped_study_summary"] > 0
-    assert manifest["output_file_count"] == 11
+    assert manifest["author_analysis_row_counts"]["grouped_author_summary"] > 0
+    assert (
+        manifest["author_analysis_row_counts"]["attempt_start_experience_summary"] > 0
+    )
+    assert (
+        manifest["author_analysis_row_counts"]["current_author_experience_summary"] > 0
+    )
+    assert manifest["output_file_count"] == 14
     assert manifest["warning_count"] == 0
 
     text = output.getvalue()
 
     assert f"Exploration directory: {output_directory}" in text
     assert f"Manifest: {manifest_path}" in text
-    assert f"Grouped study summary CSV: {grouped_study_path}" in text
-    assert "Published files: 11" in text
+    assert f"Grouped author summary CSV: {grouped_author_path}" in text
+    assert f"Attempt-start experience summary CSV: {attempt_experience_path}" in text
+    assert f"Current author experience summary CSV: {current_experience_path}" in text
+    assert "Published files: 14" in text
     assert "SYNTHETIC-STUDY-1" not in text
     assert "completion-author@example.edu" not in text
 

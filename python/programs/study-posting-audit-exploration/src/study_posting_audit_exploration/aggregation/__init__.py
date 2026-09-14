@@ -9,6 +9,11 @@ from study_posting_audit_exploration.aggregation.attempt_histories import (
 from study_posting_audit_exploration.aggregation.attempts import (
     build_grouped_attempt_summary,
 )
+from study_posting_audit_exploration.aggregation.authors import (
+    build_attempt_start_experience_summary,
+    build_current_author_experience_summary,
+    build_grouped_author_summary,
+)
 from study_posting_audit_exploration.aggregation.content_sources import (
     build_content_source_concordance_matrix,
     build_content_source_concordance_summary,
@@ -22,6 +27,7 @@ from study_posting_audit_exploration.aggregation.studies import (
 from study_posting_audit_exploration.models import (
     AppointmentQualityFinding,
     AttemptAnalysisTables,
+    AuthorAnalysisTables,
     OverviewTables,
     StudyAnalysisTables,
 )
@@ -82,15 +88,44 @@ def build_study_analysis_tables(
     )
 
 
+def build_author_analysis_tables(
+    *,
+    attempts: pd.DataFrame,
+    authors: pd.DataFrame,
+    appointments: pd.DataFrame | None = None,
+) -> AuthorAnalysisTables:
+    """Build grouped author and experience aggregate tables."""
+    return AuthorAnalysisTables(
+        grouped_author_summary=build_grouped_author_summary(
+            attempts,
+            appointments=appointments,
+        ),
+        attempt_start_experience_summary=(
+            build_attempt_start_experience_summary(
+                attempts,
+                authors,
+            )
+        ),
+        current_author_experience_summary=(
+            build_current_author_experience_summary(authors)
+        ),
+    )
+
+
 __all__ = [
     "AttemptAnalysisTables",
+    "AuthorAnalysisTables",
     "OverviewTables",
     "StudyAnalysisTables",
     "build_attempt_analysis_tables",
+    "build_attempt_start_experience_summary",
+    "build_author_analysis_tables",
     "build_author_handoff_summary",
     "build_content_source_concordance_matrix",
     "build_content_source_concordance_summary",
+    "build_current_author_experience_summary",
     "build_grouped_attempt_summary",
+    "build_grouped_author_summary",
     "build_grouped_study_summary",
     "build_overview_summary",
     "build_overview_tables",
