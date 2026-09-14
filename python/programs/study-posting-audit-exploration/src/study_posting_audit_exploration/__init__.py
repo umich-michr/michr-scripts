@@ -21,10 +21,13 @@ from study_posting_audit_exploration.config import (
     ExplorationRunConfig,
 )
 from study_posting_audit_exploration.derivation import (
+    EDIT_INTENSITY_THRESHOLD_SCHEME,
     AppointmentQualityFinding,
     author_changed,
+    classify_edit_intensity,
     derive_appointments,
     derive_attempt_histories,
+    derive_completed_ai_field_analysis,
     derive_role_columns,
     effective_author_role,
     same_author_within_study,
@@ -54,6 +57,7 @@ from study_posting_audit_exploration.validation import validate_audit_report
 __version__ = "0.1.0"
 
 __all__ = [
+    "EDIT_INTENSITY_THRESHOLD_SCHEME",
     "AppointmentQualityFinding",
     "AttemptAnalysisTables",
     "AttemptHistoryTables",
@@ -86,8 +90,10 @@ __all__ = [
     "build_overview_tables",
     "build_study_analysis_tables",
     "build_study_attempt_history_summary",
+    "classify_edit_intensity",
     "derive_appointments",
     "derive_attempt_histories",
+    "derive_completed_ai_field_analysis",
     "derive_role_columns",
     "describe_numeric",
     "effective_author_role",
