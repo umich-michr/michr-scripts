@@ -47,6 +47,18 @@ _REQUIRED_CURRENT_AUTHOR_EXPERIENCE_COLUMNS: tuple[str, ...] = (
     "median_author_value",
 )
 
+_REQUIRED_GROUPED_STUDY_COLUMNS: tuple[str, ...] = (
+    "study_population_name",
+    "final_completion_authoring_mode",
+    "grouping_dimension_1_name",
+    "grouping_dimension_1_value",
+    "grouping_dimension_2_name",
+    "group_values_are_mutually_exclusive",
+    "distinct_study_count",
+    "population_distinct_study_count",
+    "distinct_study_percentage_within_population",
+)
+
 _ATTEMPT_RESULT_ORDER: tuple[str, ...] = (
     "COMPLETE",
     "AI_ERROR",
@@ -110,6 +122,8 @@ class ExplorationCharts:
     author_handoff_categories: go.Figure
     author_experience_studies: go.Figure
     author_experience_days: go.Figure
+    completed_study_participant_mix: go.Figure
+    completed_study_department_mix: go.Figure
     content_source_concordance: go.Figure
 
 
@@ -458,6 +472,95 @@ def build_author_experience_chart(
     return figure
 
 
+def build_completed_study_mix_chart(
+    grouped_study_summary: pd.DataFrame,
+    *,
+    dimension_name: str,
+    title: str,
+) -> go.Figure:
+    """Return one mutually exclusive completed-study category mix."""
+    _require_columns(
+        grouped_study_summary,
+        required=_REQUIRED_GROUPED_STUDY_COLUMNS,
+        frame_name="grouped_study_summary",
+    )
+    rows = grouped_study_summary.loc[
+        grouped_study_summary["study_population_name"].eq("COMPLETED_STUDIES")
+        & grouped_study_summary["final_completion_authoring_mode"].eq(_ALL)
+        & grouped_study_summary["grouping_dimension_1_name"].eq(dimension_name)
+        & grouped_study_summary["grouping_dimension_2_name"].eq("NONE")
+    ].copy()
+
+    if rows.empty:
+        return _empty_figure(
+            title=title,
+            message="No completed-study category aggregates are available.",
+        )
+
+    if not rows["group_values_are_mutually_exclusive"].eq(True).all():
+        raise ExplorationValidationError(
+            f"completed-study chart dimension {dimension_name!r} "
+            "must contain mutually exclusive groups"
+        )
+
+    rows = rows.sort_values(
+        by=[
+            "distinct_study_count",
+            "grouping_dimension_1_value",
+        ],
+        ascending=[
+            True,
+            True,
+        ],
+        kind="stable",
+    )
+    values = [str(value) for value in rows["grouping_dimension_1_value"].tolist()]
+    counts = [int(value) for value in rows["distinct_study_count"].tolist()]
+    percentages = [
+        float(value)
+        for value in rows["distinct_study_percentage_within_population"].tolist()
+    ]
+    population_counts = [
+        int(value) for value in rows["population_distinct_study_count"].tolist()
+    ]
+    figure = go.Figure(
+        data=[
+            go.Bar(
+                x=counts,
+                y=values,
+                orientation="h",
+                customdata=[
+                    [
+                        percentage,
+                        population_count,
+                    ]
+                    for percentage, population_count in zip(
+                        percentages,
+                        population_counts,
+                        strict=True,
+                    )
+                ],
+                hovertemplate=(
+                    "Category: %{y}<br>"
+                    "Completed studies: %{x}<br>"
+                    "Share: %{customdata[0]:.1f}%<br>"
+                    "Population: %{customdata[1]}"
+                    "<extra></extra>"
+                ),
+            )
+        ]
+    )
+    figure.update_layout(
+        title=title,
+        template="plotly_white",
+        xaxis_title="Completed study count",
+        yaxis_title="Category",
+        showlegend=False,
+    )
+
+    return figure
+
+
 def build_content_source_concordance_chart(
     content_source_matrix: pd.DataFrame,
 ) -> go.Figure:
@@ -534,6 +637,7 @@ def build_exploration_charts(
     study_attempt_history_summary: pd.DataFrame,
     author_handoff_summary: pd.DataFrame,
     current_author_experience_summary: pd.DataFrame,
+    grouped_study_summary: pd.DataFrame,
     content_source_matrix: pd.DataFrame,
 ) -> ExplorationCharts:
     """Return all aggregate-only exploration figures."""
@@ -551,6 +655,16 @@ def build_exploration_charts(
         author_experience_days=build_author_experience_chart(
             current_author_experience_summary,
             metric_unit="days",
+        ),
+        completed_study_participant_mix=build_completed_study_mix_chart(
+            grouped_study_summary,
+            dimension_name="STUDY_PARTICIPANT_TYPE",
+            title="Completed studies by participant type",
+        ),
+        completed_study_department_mix=build_completed_study_mix_chart(
+            grouped_study_summary,
+            dimension_name="STUDY_DEPARTMENT",
+            title="Completed studies by department",
         ),
         content_source_concordance=(
             build_content_source_concordance_chart(content_source_matrix)

@@ -145,6 +145,47 @@ def current_author_experience_rows() -> pd.DataFrame:
     return pd.DataFrame.from_records(rows)
 
 
+def grouped_study_rows() -> pd.DataFrame:
+    """Return aggregate-only completed-study category rows."""
+    rows: list[dict[str, object]] = [
+        {
+            "study_population_name": "COMPLETED_STUDIES",
+            "final_completion_authoring_mode": "ALL",
+            "grouping_dimension_1_name": "STUDY_PARTICIPANT_TYPE",
+            "grouping_dimension_1_value": "HEALTHY",
+            "grouping_dimension_2_name": "NONE",
+            "group_values_are_mutually_exclusive": True,
+            "distinct_study_count": 4,
+            "population_distinct_study_count": 7,
+            "distinct_study_percentage_within_population": 100.0 * 4.0 / 7.0,
+        },
+        {
+            "study_population_name": "COMPLETED_STUDIES",
+            "final_completion_authoring_mode": "ALL",
+            "grouping_dimension_1_name": "STUDY_PARTICIPANT_TYPE",
+            "grouping_dimension_1_value": "Other",
+            "grouping_dimension_2_name": "NONE",
+            "group_values_are_mutually_exclusive": True,
+            "distinct_study_count": 3,
+            "population_distinct_study_count": 7,
+            "distinct_study_percentage_within_population": 100.0 * 3.0 / 7.0,
+        },
+        {
+            "study_population_name": "COMPLETED_STUDIES",
+            "final_completion_authoring_mode": "ALL",
+            "grouping_dimension_1_name": "STUDY_DEPARTMENT",
+            "grouping_dimension_1_value": "Synthetic Department",
+            "grouping_dimension_2_name": "NONE",
+            "group_values_are_mutually_exclusive": True,
+            "distinct_study_count": 7,
+            "population_distinct_study_count": 7,
+            "distinct_study_percentage_within_population": 100.0,
+        },
+    ]
+
+    return pd.DataFrame.from_records(rows)
+
+
 def content_rows() -> pd.DataFrame:
     """Return aggregate-only content-source rows."""
     return pd.DataFrame.from_records(
@@ -165,8 +206,9 @@ def charts() -> ExplorationCharts:
         grouped_attempt_summary=attempt_rows(),
         study_attempt_history_summary=study_history_rows(),
         author_handoff_summary=author_handoff_rows(),
-        content_source_matrix=content_rows(),
         current_author_experience_summary=current_author_experience_rows(),
+        grouped_study_summary=grouped_study_rows(),
+        content_source_matrix=content_rows(),
     )
 
 
@@ -198,6 +240,12 @@ def test_html_report_is_self_contained_and_accessible() -> None:
     assert "Median author experience at report query time: studies" in html
     assert "Median author experience at report query time: days" in html
     assert "They are not attempt-time snapshots" in normalized_html
+
+    assert 'id="study-mix-heading"' in html
+    assert "Participant and department mix" in html
+    assert "Completed studies by participant type" in html
+    assert "Completed studies by department" in html
+    assert "Other and missing categories are retained" in normalized_html
 
 
 def test_html_report_excludes_identifier_and_payload_values() -> None:

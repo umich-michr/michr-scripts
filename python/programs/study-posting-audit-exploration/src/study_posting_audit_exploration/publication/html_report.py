@@ -164,6 +164,17 @@ _TEMPLATE = """<!doctype html>
     <div class="chart">{{ author_experience_days_html | safe }}</div>
   </section>
 
+  <section aria-labelledby="study-mix-heading">
+    <h2 id="study-mix-heading">Participant and department mix</h2>
+    <p class="caution">
+      These charts describe mutually exclusive categories among completed
+      studies. Other and missing categories are retained rather than silently
+      removed.
+    </p>
+    <div class="chart">{{ participant_mix_html | safe }}</div>
+    <div class="chart">{{ department_mix_html | safe }}</div>
+  </section>
+
   <section aria-labelledby="attempts-heading">
     <h2 id="attempts-heading">Attempts and workflow timing</h2>
     <div class="chart">{{ attempt_outcomes_html | safe }}</div>
@@ -339,6 +350,14 @@ def render_html_report(
         ),
         attempt_timing_html=_figure_html(
             charts.median_attempt_time_by_mode,
+            include_plotlyjs=False,
+        ),
+        participant_mix_html=_figure_html(
+            charts.completed_study_participant_mix,
+            include_plotlyjs=False,
+        ),
+        department_mix_html=_figure_html(
+            charts.completed_study_department_mix,
             include_plotlyjs=False,
         ),
         content_source_html=_figure_html(

@@ -250,6 +250,7 @@ def _write_staging_output(
         current_author_experience_summary=(
             tables.authors.current_author_experience_summary
         ),
+        grouped_study_summary=tables.studies.grouped_study_summary,
         content_source_matrix=(tables.attempts.content_source_concordance_matrix),
     )
 

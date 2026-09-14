@@ -13,6 +13,7 @@ from study_posting_audit_exploration.publication import (
     build_attempt_timing_chart,
     build_author_experience_chart,
     build_author_handoff_chart,
+    build_completed_study_mix_chart,
     build_content_source_concordance_chart,
     build_exploration_charts,
     build_study_completion_pathways_chart,
@@ -180,6 +181,91 @@ def current_author_experience_rows() -> pd.DataFrame:
     return pd.DataFrame.from_records(rows)
 
 
+def grouped_study_rows() -> pd.DataFrame:
+    """Return synthetic aggregate-only completed-study category rows."""
+    rows: list[dict[str, object]] = [
+        {
+            "study_population_name": "COMPLETED_STUDIES",
+            "final_completion_authoring_mode": "ALL",
+            "grouping_dimension_1_name": "STUDY_PARTICIPANT_TYPE",
+            "grouping_dimension_1_value": "HEALTHY",
+            "grouping_dimension_2_name": "NONE",
+            "group_values_are_mutually_exclusive": True,
+            "distinct_study_count": 5,
+            "population_distinct_study_count": 10,
+            "distinct_study_percentage_within_population": 50.0,
+        },
+        {
+            "study_population_name": "COMPLETED_STUDIES",
+            "final_completion_authoring_mode": "ALL",
+            "grouping_dimension_1_name": "STUDY_PARTICIPANT_TYPE",
+            "grouping_dimension_1_value": "Other",
+            "grouping_dimension_2_name": "NONE",
+            "group_values_are_mutually_exclusive": True,
+            "distinct_study_count": 3,
+            "population_distinct_study_count": 10,
+            "distinct_study_percentage_within_population": 30.0,
+        },
+        {
+            "study_population_name": "COMPLETED_STUDIES",
+            "final_completion_authoring_mode": "ALL",
+            "grouping_dimension_1_name": "STUDY_PARTICIPANT_TYPE",
+            "grouping_dimension_1_value": "MISSING",
+            "grouping_dimension_2_name": "NONE",
+            "group_values_are_mutually_exclusive": True,
+            "distinct_study_count": 2,
+            "population_distinct_study_count": 10,
+            "distinct_study_percentage_within_population": 20.0,
+        },
+        {
+            "study_population_name": "COMPLETED_STUDIES",
+            "final_completion_authoring_mode": "ALL",
+            "grouping_dimension_1_name": "STUDY_DEPARTMENT",
+            "grouping_dimension_1_value": "Department A",
+            "grouping_dimension_2_name": "NONE",
+            "group_values_are_mutually_exclusive": True,
+            "distinct_study_count": 6,
+            "population_distinct_study_count": 10,
+            "distinct_study_percentage_within_population": 60.0,
+        },
+        {
+            "study_population_name": "COMPLETED_STUDIES",
+            "final_completion_authoring_mode": "ALL",
+            "grouping_dimension_1_name": "STUDY_DEPARTMENT",
+            "grouping_dimension_1_value": "Department B",
+            "grouping_dimension_2_name": "NONE",
+            "group_values_are_mutually_exclusive": True,
+            "distinct_study_count": 4,
+            "population_distinct_study_count": 10,
+            "distinct_study_percentage_within_population": 40.0,
+        },
+        {
+            "study_population_name": "COMPLETED_STUDIES",
+            "final_completion_authoring_mode": "AI",
+            "grouping_dimension_1_name": "STUDY_DEPARTMENT",
+            "grouping_dimension_1_value": "Excluded mode",
+            "grouping_dimension_2_name": "NONE",
+            "group_values_are_mutually_exclusive": True,
+            "distinct_study_count": 1,
+            "population_distinct_study_count": 10,
+            "distinct_study_percentage_within_population": 10.0,
+        },
+        {
+            "study_population_name": "COMPLETED_STUDIES",
+            "final_completion_authoring_mode": "ALL",
+            "grouping_dimension_1_name": "STUDY_PARTICIPANT_TYPE",
+            "grouping_dimension_1_value": "Excluded two-way",
+            "grouping_dimension_2_name": "STUDY_DEPARTMENT",
+            "group_values_are_mutually_exclusive": True,
+            "distinct_study_count": 1,
+            "population_distinct_study_count": 10,
+            "distinct_study_percentage_within_population": 10.0,
+        },
+    ]
+
+    return pd.DataFrame.from_records(rows)
+
+
 def content_source_rows() -> pd.DataFrame:
     """Return synthetic aggregate-only concordance rows."""
     return pd.DataFrame.from_records(
@@ -204,6 +290,55 @@ def content_source_rows() -> pd.DataFrame:
             },
         ]
     )
+
+
+def test_completed_study_mix_chart_ranks_mutually_exclusive_groups() -> None:
+    figure = build_completed_study_mix_chart(
+        grouped_study_rows(),
+        dimension_name="STUDY_PARTICIPANT_TYPE",
+        title="Completed studies by participant type",
+    )
+    bar = figure.data[0]
+
+    assert figure.layout.title.text == "Completed studies by participant type"
+    assert bar.orientation == "h"
+    assert list(bar.y) == ["MISSING", "Other", "HEALTHY"]
+    assert list(bar.x) == [2, 3, 5]
+    assert [list(values) for values in bar.customdata] == [
+        [20.0, 10],
+        [30.0, 10],
+        [50.0, 10],
+    ]
+
+
+def test_completed_study_department_chart_excludes_other_modes() -> None:
+    figure = build_completed_study_mix_chart(
+        grouped_study_rows(),
+        dimension_name="STUDY_DEPARTMENT",
+        title="Completed studies by department",
+    )
+    bar = figure.data[0]
+
+    assert list(bar.y) == ["Department B", "Department A"]
+    assert list(bar.x) == [4, 6]
+
+
+def test_completed_study_mix_chart_rejects_overlapping_groups() -> None:
+    rows = grouped_study_rows()
+    rows.loc[
+        rows["grouping_dimension_1_name"].eq("STUDY_PARTICIPANT_TYPE"),
+        "group_values_are_mutually_exclusive",
+    ] = False
+
+    with pytest.raises(
+        ExplorationValidationError,
+        match="must contain mutually exclusive groups",
+    ):
+        build_completed_study_mix_chart(
+            rows,
+            dimension_name="STUDY_PARTICIPANT_TYPE",
+            title="Completed studies by participant type",
+        )
 
 
 def test_attempt_outcomes_chart_uses_aggregate_counts() -> None:
@@ -297,6 +432,7 @@ def test_chart_bundle_contains_all_figures() -> None:
         study_attempt_history_summary=study_history_rows(),
         author_handoff_summary=author_handoff_rows(),
         current_author_experience_summary=current_author_experience_rows(),
+        grouped_study_summary=grouped_study_rows(),
         content_source_matrix=content_source_rows(),
     )
 
@@ -308,6 +444,8 @@ def test_chart_bundle_contains_all_figures() -> None:
     assert charts.author_experience_studies.data
     assert charts.author_experience_days.data
     assert charts.content_source_concordance.data
+    assert charts.completed_study_participant_mix.data
+    assert charts.completed_study_department_mix.data
 
 
 def test_charts_return_accessible_empty_states() -> None:
@@ -316,6 +454,7 @@ def test_charts_return_accessible_empty_states() -> None:
     handoff_columns = author_handoff_rows().columns
     experience_columns = current_author_experience_rows().columns
     content_columns = content_source_rows().columns
+    grouped_study_columns = grouped_study_rows().columns
 
     attempt_figure = build_attempt_outcomes_chart(pd.DataFrame(columns=attempt_columns))
     study_figure = build_study_completion_pathways_chart(
@@ -329,12 +468,18 @@ def test_charts_return_accessible_empty_states() -> None:
     content_figure = build_content_source_concordance_chart(
         pd.DataFrame(columns=content_columns)
     )
+    study_mix_figure = build_completed_study_mix_chart(
+        pd.DataFrame(columns=grouped_study_columns),
+        dimension_name="STUDY_PARTICIPANT_TYPE",
+        title="Completed studies by participant type",
+    )
 
     assert attempt_figure.layout.annotations[0].text
     assert study_figure.layout.annotations[0].text
     assert handoff_figure.layout.annotations[0].text
     assert experience_figure.layout.annotations[0].text
     assert content_figure.layout.annotations[0].text
+    assert study_mix_figure.layout.annotations[0].text
 
 
 @pytest.mark.parametrize(
@@ -380,6 +525,18 @@ def test_charts_return_accessible_empty_states() -> None:
             pd.DataFrame(
                 {
                     "attempt_completion_group": ["ALL"],
+                }
+            ),
+        ),
+        (
+            lambda frame: build_completed_study_mix_chart(
+                frame,
+                dimension_name="STUDY_PARTICIPANT_TYPE",
+                title="Completed studies by participant type",
+            ),
+            pd.DataFrame(
+                {
+                    "study_population_name": ["COMPLETED_STUDIES"],
                 }
             ),
         ),
