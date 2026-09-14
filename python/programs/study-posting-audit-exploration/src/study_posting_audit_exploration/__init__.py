@@ -64,7 +64,14 @@ from study_posting_audit_exploration.models import (
     StudyAnalysisTables,
     ValidationSummary,
 )
-from study_posting_audit_exploration.publication import publish_exploration
+from study_posting_audit_exploration.publication import (
+    ExplorationCharts,
+    build_attempt_outcomes_chart,
+    build_attempt_timing_chart,
+    build_content_source_concordance_chart,
+    build_exploration_charts,
+    publish_exploration,
+)
 from study_posting_audit_exploration.statistics import describe_numeric
 from study_posting_audit_exploration.validation import validate_audit_report
 
@@ -78,6 +85,7 @@ __all__ = [
     "AuditExplorationError",
     "AuthorAnalysisTables",
     "DescriptiveStatistics",
+    "ExplorationCharts",
     "ExplorationConfigurationError",
     "ExplorationInputConfig",
     "ExplorationInputError",
@@ -93,13 +101,17 @@ __all__ = [
     "__version__",
     "author_changed",
     "build_attempt_analysis_tables",
+    "build_attempt_outcomes_chart",
     "build_attempt_start_experience_summary",
+    "build_attempt_timing_chart",
     "build_author_analysis_tables",
     "build_author_handoff_summary",
     "build_compensation_analysis_summary",
+    "build_content_source_concordance_chart",
     "build_content_source_concordance_matrix",
     "build_content_source_concordance_summary",
     "build_current_author_experience_summary",
+    "build_exploration_charts",
     "build_field_adoption_editing_summary",
     "build_field_analysis_tables",
     "build_field_edit_readability_cross_summary",

@@ -155,6 +155,9 @@ implicit_reexport = true
 module = ["textstat", "textstat.*"]
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+module = ["plotly", "plotly.*"]
+ignore_missing_imports = true
 # ===========================================================================
 # Bandit: shared
 # ===========================================================================
