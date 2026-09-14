@@ -30,6 +30,9 @@ from study_posting_audit_exploration.aggregation.nontext_fields import (
 from study_posting_audit_exploration.aggregation.overview import (
     build_overview_summary,
 )
+from study_posting_audit_exploration.aggregation.readability import (
+    build_selected_vs_unselected_readability_summary,
+)
 from study_posting_audit_exploration.aggregation.studies import (
     build_grouped_study_summary,
 )
@@ -168,6 +171,7 @@ __all__ = [
     "build_nontext_field_adoption_summary",
     "build_overview_summary",
     "build_overview_tables",
+    "build_selected_vs_unselected_readability_summary",
     "build_study_analysis_tables",
     "build_study_attempt_history_summary",
     "build_suggestion_selection_summary",
