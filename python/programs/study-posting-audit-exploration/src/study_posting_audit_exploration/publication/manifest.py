@@ -34,6 +34,7 @@ def write_manifest(
     study_tables = tables.studies
     author_tables = tables.authors
     field_tables = tables.fields
+    readability_tables = tables.readability
 
     content = {
         "analysis_program_version": _PROGRAM_VERSION,
@@ -55,6 +56,9 @@ def write_manifest(
             "author_history": len(histories.author_history),
             "completed_ai_field_analysis": len(
                 field_tables.completed_ai_field_analysis
+            ),
+            "completed_ai_readability_pairs": len(
+                readability_tables.completed_ai_readability_pairs
             ),
         },
         "overview_row_counts": {
@@ -97,6 +101,23 @@ def write_manifest(
             ),
             "compensation_analysis_summary": len(
                 field_tables.compensation_analysis_summary
+            ),
+        },
+        "readability_analysis_row_counts": {
+            "selected_vs_unselected_readability_summary": len(
+                readability_tables.selected_vs_unselected_readability_summary
+            ),
+            "field_readability_change_summary": len(
+                readability_tables.field_readability_change_summary
+            ),
+            "field_readability_target_summary": len(
+                readability_tables.field_readability_target_summary
+            ),
+            "field_edit_readability_cross_summary": len(
+                readability_tables.field_edit_readability_cross_summary
+            ),
+            "final_text_metric_summary": len(
+                readability_tables.final_text_metric_summary
             ),
         },
         "output_file_count": output_file_count,

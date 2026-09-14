@@ -13,15 +13,9 @@ from study_posting_audit_exploration.errors import (
     ExplorationInputError,
 )
 from study_posting_audit_exploration.models import (
-    AttemptAnalysisTables,
-    AttemptHistoryTables,
-    AuthorAnalysisTables,
     ExplorationAnalysisTables,
     ExplorationPublication,
-    FieldAnalysisTables,
     LoadedAuditReport,
-    OverviewTables,
-    StudyAnalysisTables,
 )
 from study_posting_audit_exploration.publication.manifest import (
     manifest_filename,
@@ -34,11 +28,13 @@ _ATTEMPTS_DIRECTORY = "attempts"
 _STUDIES_DIRECTORY = "studies"
 _AUTHORS_DIRECTORY = "authors"
 _FIELDS_DIRECTORY = "fields"
+_READABILITY_DIRECTORY = "readability"
 
 _STUDY_ATTEMPT_AUTHOR_HISTORY_FILENAME = "study_attempt_author_history.csv"
 _STUDY_ATTEMPT_HISTORY_FILENAME = "study_attempt_history.csv"
 _AUTHOR_HISTORY_FILENAME = "author_history.csv"
 _COMPLETED_AI_FIELD_ANALYSIS_FILENAME = "completed_ai_field_analysis.csv"
+_COMPLETED_AI_READABILITY_PAIRS_FILENAME = "completed_ai_readability_pairs.csv"
 
 _OVERVIEW_SUMMARY_FILENAME = "overview_summary.csv"
 _STUDY_ATTEMPT_HISTORY_SUMMARY_FILENAME = "study_attempt_history_summary.csv"
@@ -59,7 +55,17 @@ _NONTEXT_FIELD_ADOPTION_SUMMARY_FILENAME = "nontext_field_adoption_summary.csv"
 _SUGGESTION_SELECTION_SUMMARY_FILENAME = "suggestion_selection_summary.csv"
 _COMPENSATION_ANALYSIS_SUMMARY_FILENAME = "compensation_analysis_summary.csv"
 
-_OUTPUT_FILE_COUNT = 19
+_SELECTED_VS_UNSELECTED_READABILITY_SUMMARY_FILENAME = (
+    "selected_vs_unselected_readability_summary.csv"
+)
+_FIELD_READABILITY_CHANGE_SUMMARY_FILENAME = "field_readability_change_summary.csv"
+_FIELD_READABILITY_TARGET_SUMMARY_FILENAME = "field_readability_target_summary.csv"
+_FIELD_EDIT_READABILITY_CROSS_SUMMARY_FILENAME = (
+    "field_edit_readability_cross_summary.csv"
+)
+_FINAL_TEXT_METRIC_SUMMARY_FILENAME = "final_text_metric_summary.csv"
+
+_OUTPUT_FILE_COUNT = 25
 
 
 def _write_frame(
@@ -94,6 +100,7 @@ def _output_frames(
     studies_directory = staging_directory / _STUDIES_DIRECTORY
     authors_directory = staging_directory / _AUTHORS_DIRECTORY
     fields_directory = staging_directory / _FIELDS_DIRECTORY
+    readability_directory = staging_directory / _READABILITY_DIRECTORY
 
     return (
         (
@@ -111,6 +118,10 @@ def _output_frames(
         (
             tables.fields.completed_ai_field_analysis,
             audit_directory / _COMPLETED_AI_FIELD_ANALYSIS_FILENAME,
+        ),
+        (
+            tables.readability.completed_ai_readability_pairs,
+            audit_directory / _COMPLETED_AI_READABILITY_PAIRS_FILENAME,
         ),
         (
             tables.overview.overview_summary,
@@ -168,6 +179,27 @@ def _output_frames(
             tables.fields.compensation_analysis_summary,
             fields_directory / _COMPENSATION_ANALYSIS_SUMMARY_FILENAME,
         ),
+        (
+            tables.readability.selected_vs_unselected_readability_summary,
+            readability_directory
+            / _SELECTED_VS_UNSELECTED_READABILITY_SUMMARY_FILENAME,
+        ),
+        (
+            tables.readability.field_readability_change_summary,
+            readability_directory / _FIELD_READABILITY_CHANGE_SUMMARY_FILENAME,
+        ),
+        (
+            tables.readability.field_readability_target_summary,
+            readability_directory / _FIELD_READABILITY_TARGET_SUMMARY_FILENAME,
+        ),
+        (
+            tables.readability.field_edit_readability_cross_summary,
+            readability_directory / _FIELD_EDIT_READABILITY_CROSS_SUMMARY_FILENAME,
+        ),
+        (
+            tables.readability.final_text_metric_summary,
+            readability_directory / _FINAL_TEXT_METRIC_SUMMARY_FILENAME,
+        ),
     )
 
 
@@ -186,6 +218,7 @@ def _write_staging_output(
         _STUDIES_DIRECTORY,
         _AUTHORS_DIRECTORY,
         _FIELDS_DIRECTORY,
+        _READABILITY_DIRECTORY,
     ):
         (staging_directory / directory_name).mkdir()
 
@@ -225,6 +258,7 @@ def _publication_result(
     studies_directory = destination / _STUDIES_DIRECTORY
     authors_directory = destination / _AUTHORS_DIRECTORY
     fields_directory = destination / _FIELDS_DIRECTORY
+    readability_directory = destination / _READABILITY_DIRECTORY
 
     return ExplorationPublication(
         output_directory=destination,
@@ -234,6 +268,12 @@ def _publication_result(
         ),
         study_attempt_history_path=(audit_directory / _STUDY_ATTEMPT_HISTORY_FILENAME),
         author_history_path=audit_directory / _AUTHOR_HISTORY_FILENAME,
+        completed_ai_field_analysis_path=(
+            audit_directory / _COMPLETED_AI_FIELD_ANALYSIS_FILENAME
+        ),
+        completed_ai_readability_pairs_path=(
+            audit_directory / _COMPLETED_AI_READABILITY_PAIRS_FILENAME
+        ),
         overview_summary_path=overview_directory / _OVERVIEW_SUMMARY_FILENAME,
         study_attempt_history_summary_path=(
             overview_directory / _STUDY_ATTEMPT_HISTORY_SUMMARY_FILENAME
@@ -262,9 +302,6 @@ def _publication_result(
         current_author_experience_summary_path=(
             authors_directory / _CURRENT_AUTHOR_EXPERIENCE_SUMMARY_FILENAME
         ),
-        completed_ai_field_analysis_path=(
-            audit_directory / _COMPLETED_AI_FIELD_ANALYSIS_FILENAME
-        ),
         field_adoption_editing_summary_path=(
             fields_directory / _FIELD_ADOPTION_EDITING_SUMMARY_FILENAME
         ),
@@ -277,6 +314,21 @@ def _publication_result(
         compensation_analysis_summary_path=(
             fields_directory / _COMPENSATION_ANALYSIS_SUMMARY_FILENAME
         ),
+        selected_vs_unselected_readability_summary_path=(
+            readability_directory / _SELECTED_VS_UNSELECTED_READABILITY_SUMMARY_FILENAME
+        ),
+        field_readability_change_summary_path=(
+            readability_directory / _FIELD_READABILITY_CHANGE_SUMMARY_FILENAME
+        ),
+        field_readability_target_summary_path=(
+            readability_directory / _FIELD_READABILITY_TARGET_SUMMARY_FILENAME
+        ),
+        field_edit_readability_cross_summary_path=(
+            readability_directory / _FIELD_EDIT_READABILITY_CROSS_SUMMARY_FILENAME
+        ),
+        final_text_metric_summary_path=(
+            readability_directory / _FINAL_TEXT_METRIC_SUMMARY_FILENAME
+        ),
         output_file_count=_OUTPUT_FILE_COUNT,
     )
 
@@ -285,12 +337,7 @@ def publish_exploration(
     *,
     config: ExplorationRunConfig,
     report: LoadedAuditReport,
-    histories: AttemptHistoryTables,
-    overview_tables: OverviewTables,
-    attempt_tables: AttemptAnalysisTables,
-    study_tables: StudyAnalysisTables,
-    author_tables: AuthorAnalysisTables,
-    field_tables: FieldAnalysisTables,
+    tables: ExplorationAnalysisTables,
 ) -> ExplorationPublication:
     """Atomically publish current exploration outputs."""
     destination = config.output_directory
@@ -317,15 +364,6 @@ def publish_exploration(
         raise ExplorationInputError(
             f"Could not create exploration staging directory: {error}"
         ) from error
-
-    tables = ExplorationAnalysisTables(
-        histories=histories,
-        overview=overview_tables,
-        attempts=attempt_tables,
-        studies=study_tables,
-        authors=author_tables,
-        fields=field_tables,
-    )
 
     try:
         try:

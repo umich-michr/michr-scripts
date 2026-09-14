@@ -16,14 +16,26 @@ from study_posting_audit_exploration import (
     build_author_analysis_tables,
     build_field_analysis_tables,
     build_overview_tables,
+    build_readability_analysis_tables,
     build_study_analysis_tables,
     derive_appointments,
     derive_attempt_histories,
     derive_completed_ai_field_analysis,
+    derive_completed_ai_readability_pairs,
     load_audit_report,
     publish_exploration,
 )
+from study_posting_audit_exploration.models import ExplorationAnalysisTables
 from study_posting_audit_exploration.publication import manifest_filename
+
+
+def read_published_csv(path: Path) -> pd.DataFrame:
+    """Read a published CSV using the exploration null convention."""
+    return pd.read_csv(
+        path,
+        keep_default_na=False,
+        na_values=["\\N"],
+    )
 
 
 def loaded_report(path: Path) -> LoadedAuditReport:
@@ -125,12 +137,10 @@ def _study_analysis_inputs(
     return studies, appointments, findings
 
 
-def publish_valid_report(
-    input_directory: Path,
-    output_directory: Path,
-) -> ExplorationPublication:
-    """Publish one synthetic exploration report."""
-    report = loaded_report(input_directory)
+def _analysis_tables(
+    report: LoadedAuditReport,
+) -> ExplorationAnalysisTables:
+    """Build all current exploration tables for one synthetic report."""
     histories = derive_attempt_histories(report.records)
     attempts = _attempts_with_source_columns(
         report,
@@ -141,31 +151,54 @@ def publish_valid_report(
         histories,
     )
     attempt_appointments, attempt_findings = derive_appointments(report.records)
-    overview_tables = build_overview_tables(
-        attempts=attempts,
-        studies=histories.study_attempt_history,
-        authors=histories.author_history,
+    completed_ai_fields = derive_completed_ai_field_analysis(
+        report.ai_assistance_metrics,
+        report.records,
     )
-    attempt_tables = build_attempt_analysis_tables(attempts)
-    study_tables = build_study_analysis_tables(
-        studies,
-        appointments=study_appointments,
-        appointment_quality_findings=(
-            *findings,
-            *attempt_findings,
+    readability_pairs = derive_completed_ai_readability_pairs(
+        report.readability_metrics,
+        completed_ai_fields,
+    )
+
+    return ExplorationAnalysisTables(
+        histories=histories,
+        overview=build_overview_tables(
+            attempts=attempts,
+            studies=histories.study_attempt_history,
+            authors=histories.author_history,
+        ),
+        attempts=build_attempt_analysis_tables(attempts),
+        studies=build_study_analysis_tables(
+            studies,
+            appointments=study_appointments,
+            appointment_quality_findings=(
+                *findings,
+                *attempt_findings,
+            ),
+        ),
+        authors=build_author_analysis_tables(
+            attempts=attempts,
+            authors=histories.author_history,
+            appointments=attempt_appointments,
+        ),
+        fields=build_field_analysis_tables(
+            completed_ai_fields,
+            readability_pairs,
+        ),
+        readability=build_readability_analysis_tables(
+            readability=report.readability_metrics,
+            readability_pairs=readability_pairs,
+            completed_ai_fields=completed_ai_fields,
         ),
     )
-    author_tables = build_author_analysis_tables(
-        attempts=attempts,
-        authors=histories.author_history,
-        appointments=attempt_appointments,
-    )
-    field_tables = build_field_analysis_tables(
-        derive_completed_ai_field_analysis(
-            report.ai_assistance_metrics,
-            report.records,
-        )
-    )
+
+
+def publish_valid_report(
+    input_directory: Path,
+    output_directory: Path,
+) -> ExplorationPublication:
+    """Publish one synthetic exploration report."""
+    report = loaded_report(input_directory)
 
     return publish_exploration(
         config=ExplorationRunConfig(
@@ -173,16 +206,11 @@ def publish_valid_report(
             output_directory=output_directory,
         ),
         report=report,
-        histories=histories,
-        overview_tables=overview_tables,
-        attempt_tables=attempt_tables,
-        study_tables=study_tables,
-        author_tables=author_tables,
-        field_tables=field_tables,
+        tables=_analysis_tables(report),
     )
 
 
-def test_publish_exploration_writes_atomic_field_analysis_output(
+def test_publish_exploration_writes_atomic_readability_output(
     valid_report_directory: Path,
     tmp_path: Path,
 ) -> None:
@@ -194,40 +222,71 @@ def test_publish_exploration_writes_atomic_field_analysis_output(
     )
 
     assert publication.output_directory == output_directory
-    assert publication.output_file_count == 19
+    assert publication.output_file_count == 25
     assert publication.manifest_path.is_file()
+
     assert publication.study_attempt_author_history_path.is_file()
     assert publication.study_attempt_history_path.is_file()
     assert publication.author_history_path.is_file()
     assert publication.completed_ai_field_analysis_path.is_file()
+    assert publication.completed_ai_readability_pairs_path.is_file()
+
     assert publication.overview_summary_path.is_file()
     assert publication.study_attempt_history_summary_path.is_file()
     assert publication.author_handoff_summary_path.is_file()
+
     assert publication.grouped_attempt_summary_path.is_file()
     assert publication.content_source_concordance_summary_path.is_file()
     assert publication.content_source_concordance_matrix_path.is_file()
+
     assert publication.grouped_study_summary_path.is_file()
+
     assert publication.grouped_author_summary_path.is_file()
     assert publication.attempt_start_experience_summary_path.is_file()
     assert publication.current_author_experience_summary_path.is_file()
+
     assert publication.field_adoption_editing_summary_path.is_file()
     assert publication.nontext_field_adoption_summary_path.is_file()
     assert publication.suggestion_selection_summary_path.is_file()
     assert publication.compensation_analysis_summary_path.is_file()
+
+    assert publication.selected_vs_unselected_readability_summary_path.is_file()
+    assert publication.field_readability_change_summary_path.is_file()
+    assert publication.field_readability_target_summary_path.is_file()
+    assert publication.field_edit_readability_cross_summary_path.is_file()
+    assert publication.final_text_metric_summary_path.is_file()
+
     assert list(tmp_path.glob(".exploration.*")) == []
 
-    completed_fields = pd.read_csv(publication.completed_ai_field_analysis_path)
-    field_summary = pd.read_csv(publication.field_adoption_editing_summary_path)
-    suggestion_summary = pd.read_csv(publication.suggestion_selection_summary_path)
+    completed_fields = read_published_csv(publication.completed_ai_field_analysis_path)
+    readability_pairs = read_published_csv(
+        publication.completed_ai_readability_pairs_path
+    )
+    field_summary = read_published_csv(publication.field_adoption_editing_summary_path)
+    readability_change = read_published_csv(
+        publication.field_readability_change_summary_path
+    )
+    readability_target = read_published_csv(
+        publication.field_readability_target_summary_path
+    )
+    final_metrics = read_published_csv(publication.final_text_metric_summary_path)
 
     assert not completed_fields.empty
+    assert not readability_pairs.empty
     assert not field_summary.empty
-    assert not suggestion_summary.empty
+    assert not readability_change.empty
+    assert not readability_target.empty
+    assert not final_metrics.empty
+
     assert "selected_text" not in completed_fields.columns
     assert "final_text" not in completed_fields.columns
+    assert "selected_text" not in readability_pairs.columns
+    assert "final_text" not in readability_pairs.columns
+
+    assert final_metrics["final_text_attempt_count_missing_or_blank"].isna().all()
 
 
-def test_manifest_contains_field_analysis_counts(
+def test_manifest_contains_readability_analysis_counts(
     valid_report_directory: Path,
     tmp_path: Path,
 ) -> None:
@@ -240,9 +299,22 @@ def test_manifest_contains_field_analysis_counts(
     assert (
         manifest["analysis_audit_record_row_counts"]["completed_ai_field_analysis"] > 0
     )
+    assert (
+        manifest["analysis_audit_record_row_counts"]["completed_ai_readability_pairs"]
+        > 0
+    )
     assert manifest["field_analysis_row_counts"]["field_adoption_editing_summary"] > 0
     assert manifest["field_analysis_row_counts"]["suggestion_selection_summary"] > 0
-    assert manifest["output_file_count"] == 19
+    assert (
+        manifest["readability_analysis_row_counts"]["field_readability_change_summary"]
+        > 0
+    )
+    assert (
+        manifest["readability_analysis_row_counts"]["field_readability_target_summary"]
+        > 0
+    )
+    assert manifest["readability_analysis_row_counts"]["final_text_metric_summary"] > 0
+    assert manifest["output_file_count"] == 25
     assert manifest["warning_count"] == 0
     assert manifest_filename() == "analysis_manifest.json"
 

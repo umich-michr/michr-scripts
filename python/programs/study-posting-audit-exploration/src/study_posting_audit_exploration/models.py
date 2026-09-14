@@ -109,6 +109,18 @@ class FieldAnalysisTables:
 
 
 @dataclass(frozen=True, slots=True)
+class ReadabilityAnalysisTables:
+    """Readability audit pairs and faculty-facing readability summaries."""
+
+    completed_ai_readability_pairs: pd.DataFrame
+    selected_vs_unselected_readability_summary: pd.DataFrame
+    field_readability_change_summary: pd.DataFrame
+    field_readability_target_summary: pd.DataFrame
+    field_edit_readability_cross_summary: pd.DataFrame
+    final_text_metric_summary: pd.DataFrame
+
+
+@dataclass(frozen=True, slots=True)
 class ExplorationAnalysisTables:
     """All derived and aggregate tables published by one analysis run."""
 
@@ -118,6 +130,7 @@ class ExplorationAnalysisTables:
     studies: StudyAnalysisTables
     authors: AuthorAnalysisTables
     fields: FieldAnalysisTables
+    readability: ReadabilityAnalysisTables
 
 
 @dataclass(frozen=True, slots=True)
@@ -129,6 +142,8 @@ class ExplorationPublication:
     study_attempt_author_history_path: Path
     study_attempt_history_path: Path
     author_history_path: Path
+    completed_ai_field_analysis_path: Path
+    completed_ai_readability_pairs_path: Path
     overview_summary_path: Path
     study_attempt_history_summary_path: Path
     author_handoff_summary_path: Path
@@ -139,9 +154,13 @@ class ExplorationPublication:
     grouped_author_summary_path: Path
     attempt_start_experience_summary_path: Path
     current_author_experience_summary_path: Path
-    completed_ai_field_analysis_path: Path
     field_adoption_editing_summary_path: Path
     nontext_field_adoption_summary_path: Path
     suggestion_selection_summary_path: Path
     compensation_analysis_summary_path: Path
+    selected_vs_unselected_readability_summary_path: Path
+    field_readability_change_summary_path: Path
+    field_readability_target_summary_path: Path
+    field_edit_readability_cross_summary_path: Path
+    final_text_metric_summary_path: Path
     output_file_count: int

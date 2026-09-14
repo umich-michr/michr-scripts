@@ -74,19 +74,18 @@ def test_cli_validates_report_without_printing_identifiers(
     assert "completion-author@example.edu" not in text
 
 
-def test_analyze_command_publishes_field_analysis_output(
-    valid_report_directory: Path,
-    tmp_path: Path,
-) -> None:
-    output_directory = tmp_path / "exploration"
+def _run_analyze(
+    input_directory: Path,
+    output_directory: Path,
+) -> tuple[int, str, str]:
+    """Run analyze and return status, standard output, and error output."""
     output = StringIO()
     error_output = StringIO()
-
     status = main(
         [
             "analyze",
             "--input-report",
-            str(valid_report_directory),
+            str(input_directory),
             "--output",
             str(output_directory),
         ],
@@ -94,46 +93,112 @@ def test_analyze_command_publishes_field_analysis_output(
         error_output=error_output,
     )
 
-    assert status == 0
-    assert error_output.getvalue() == ""
+    return status, output.getvalue(), error_output.getvalue()
 
-    manifest_path = output_directory / "analysis_manifest.json"
-    audit_path = (
-        output_directory / "analysis-audit-records" / "completed_ai_field_analysis.csv"
-    )
+
+def _expected_readability_paths(
+    output_directory: Path,
+) -> dict[str, Path]:
+    """Return the published paths checked by the CLI integration test."""
+    audit_directory = output_directory / "analysis-audit-records"
     fields_directory = output_directory / "fields"
-    adoption_path = fields_directory / "field_adoption_editing_summary.csv"
-    nontext_path = fields_directory / "nontext_field_adoption_summary.csv"
-    selection_path = fields_directory / "suggestion_selection_summary.csv"
-    compensation_path = fields_directory / "compensation_analysis_summary.csv"
+    readability_directory = output_directory / "readability"
 
-    assert manifest_path.is_file()
-    assert audit_path.is_file()
-    assert adoption_path.is_file()
-    assert nontext_path.is_file()
-    assert selection_path.is_file()
-    assert compensation_path.is_file()
+    return {
+        "manifest": output_directory / "analysis_manifest.json",
+        "field_audit": (audit_directory / "completed_ai_field_analysis.csv"),
+        "readability_pairs": (audit_directory / "completed_ai_readability_pairs.csv"),
+        "field_adoption": (fields_directory / "field_adoption_editing_summary.csv"),
+        "nontext": (fields_directory / "nontext_field_adoption_summary.csv"),
+        "selection": (fields_directory / "suggestion_selection_summary.csv"),
+        "compensation": (fields_directory / "compensation_analysis_summary.csv"),
+        "selected_comparison": (
+            readability_directory / "selected_vs_unselected_readability_summary.csv"
+        ),
+        "change": (readability_directory / "field_readability_change_summary.csv"),
+        "target": (readability_directory / "field_readability_target_summary.csv"),
+        "cross": (readability_directory / "field_edit_readability_cross_summary.csv"),
+        "final_metric": (readability_directory / "final_text_metric_summary.csv"),
+    }
 
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
 
-    assert (
-        manifest["analysis_audit_record_row_counts"]["completed_ai_field_analysis"] > 0
-    )
-    assert manifest["field_analysis_row_counts"]["field_adoption_editing_summary"] > 0
-    assert manifest["field_analysis_row_counts"]["suggestion_selection_summary"] > 0
-    assert manifest["output_file_count"] == 19
+def _assert_readability_manifest(manifest: dict[str, object]) -> None:
+    """Assert current field and readability manifest counts."""
+    audit_counts = manifest["analysis_audit_record_row_counts"]
+    field_counts = manifest["field_analysis_row_counts"]
+    readability_counts = manifest["readability_analysis_row_counts"]
+
+    assert isinstance(audit_counts, dict)
+    assert isinstance(field_counts, dict)
+    assert isinstance(readability_counts, dict)
+
+    assert audit_counts["completed_ai_field_analysis"] > 0
+    assert audit_counts["completed_ai_readability_pairs"] > 0
+    assert field_counts["field_adoption_editing_summary"] > 0
+    assert field_counts["suggestion_selection_summary"] > 0
+    assert readability_counts["field_readability_change_summary"] > 0
+    assert readability_counts["field_readability_target_summary"] > 0
+    assert readability_counts["final_text_metric_summary"] > 0
+    assert manifest["output_file_count"] == 25
     assert manifest["warning_count"] == 0
 
-    text = output.getvalue()
 
-    assert f"Exploration directory: {output_directory}" in text
-    assert f"Manifest: {manifest_path}" in text
-    assert f"Completed AI field analysis CSV: {audit_path}" in text
-    assert f"Field adoption and editing summary CSV: {adoption_path}" in text
-    assert f"Nontext field adoption summary CSV: {nontext_path}" in text
-    assert f"Suggestion selection summary CSV: {selection_path}" in text
-    assert f"Compensation analysis summary CSV: {compensation_path}" in text
-    assert "Published files: 19" in text
+def _assert_cli_paths_printed(
+    text: str,
+    *,
+    output_directory: Path,
+    paths: dict[str, Path],
+) -> None:
+    """Assert the CLI prints every new readability path."""
+    expected_lines = (
+        f"Exploration directory: {output_directory}",
+        f"Manifest: {paths['manifest']}",
+        f"Completed AI field analysis CSV: {paths['field_audit']}",
+        (f"Completed AI readability pairs CSV: {paths['readability_pairs']}"),
+        (f"Field adoption and editing summary CSV: {paths['field_adoption']}"),
+        f"Nontext field adoption summary CSV: {paths['nontext']}",
+        f"Suggestion selection summary CSV: {paths['selection']}",
+        f"Compensation analysis summary CSV: {paths['compensation']}",
+        (
+            "Selected versus unselected readability summary CSV: "
+            f"{paths['selected_comparison']}"
+        ),
+        f"Field readability change summary CSV: {paths['change']}",
+        f"Field readability target summary CSV: {paths['target']}",
+        f"Field edit/readability cross summary CSV: {paths['cross']}",
+        f"Final text metric summary CSV: {paths['final_metric']}",
+        "Published files: 25",
+    )
+
+    for expected_line in expected_lines:
+        assert expected_line in text
+
+
+def test_analyze_command_publishes_readability_analysis_output(
+    valid_report_directory: Path,
+    tmp_path: Path,
+) -> None:
+    output_directory = tmp_path / "exploration"
+    status, text, error_text = _run_analyze(
+        valid_report_directory,
+        output_directory,
+    )
+    paths = _expected_readability_paths(output_directory)
+
+    assert status == 0
+    assert error_text == ""
+
+    for path in paths.values():
+        assert path.is_file()
+
+    manifest = json.loads(paths["manifest"].read_text(encoding="utf-8"))
+    _assert_readability_manifest(manifest)
+    _assert_cli_paths_printed(
+        text,
+        output_directory=output_directory,
+        paths=paths,
+    )
+
     assert "SYNTHETIC-STUDY-1" not in text
     assert "completion-author@example.edu" not in text
 

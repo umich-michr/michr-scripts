@@ -12,6 +12,7 @@ from study_posting_audit_exploration.aggregation import (
     build_author_analysis_tables,
     build_field_analysis_tables,
     build_overview_tables,
+    build_readability_analysis_tables,
     build_study_analysis_tables,
 )
 from study_posting_audit_exploration.config import (
@@ -22,12 +23,14 @@ from study_posting_audit_exploration.derivation import (
     derive_appointments,
     derive_attempt_histories,
     derive_completed_ai_field_analysis,
+    derive_completed_ai_readability_pairs,
 )
 from study_posting_audit_exploration.errors import AuditExplorationError
 from study_posting_audit_exploration.loading import load_audit_report
 from study_posting_audit_exploration.models import (
     AppointmentQualityFinding,
     AttemptHistoryTables,
+    ExplorationAnalysisTables,
     LoadedAuditReport,
     ValidationSummary,
 )
@@ -259,6 +262,10 @@ def _run_analyze(
         report.ai_assistance_metrics,
         report.records,
     )
+    readability_pairs = derive_completed_ai_readability_pairs(
+        report.readability_metrics,
+        completed_ai_fields,
+    )
 
     overview_tables = build_overview_tables(
         attempts=attempts,
@@ -276,7 +283,24 @@ def _run_analyze(
         authors=histories.author_history,
         appointments=attempt_appointments,
     )
-    field_tables = build_field_analysis_tables(completed_ai_fields)
+    field_tables = build_field_analysis_tables(
+        completed_ai_fields,
+        readability_pairs,
+    )
+    readability_tables = build_readability_analysis_tables(
+        readability=report.readability_metrics,
+        readability_pairs=readability_pairs,
+        completed_ai_fields=completed_ai_fields,
+    )
+    tables = ExplorationAnalysisTables(
+        histories=histories,
+        overview=overview_tables,
+        attempts=attempt_tables,
+        studies=study_tables,
+        authors=author_tables,
+        fields=field_tables,
+        readability=readability_tables,
+    )
 
     publication = publish_exploration(
         config=ExplorationRunConfig(
@@ -284,12 +308,7 @@ def _run_analyze(
             output_directory=namespace.output,
         ),
         report=report,
-        histories=histories,
-        overview_tables=overview_tables,
-        attempt_tables=attempt_tables,
-        study_tables=study_tables,
-        author_tables=author_tables,
-        field_tables=field_tables,
+        tables=tables,
     )
 
     print(
@@ -312,6 +331,11 @@ def _run_analyze(
     print(
         f"Completed AI field analysis CSV: "
         f"{publication.completed_ai_field_analysis_path}",
+        file=output,
+    )
+    print(
+        f"Completed AI readability pairs CSV: "
+        f"{publication.completed_ai_readability_pairs_path}",
         file=output,
     )
     print(
@@ -377,6 +401,30 @@ def _run_analyze(
     print(
         f"Compensation analysis summary CSV: "
         f"{publication.compensation_analysis_summary_path}",
+        file=output,
+    )
+    print(
+        f"Selected versus unselected readability summary CSV: "
+        f"{publication.selected_vs_unselected_readability_summary_path}",
+        file=output,
+    )
+    print(
+        f"Field readability change summary CSV: "
+        f"{publication.field_readability_change_summary_path}",
+        file=output,
+    )
+    print(
+        f"Field readability target summary CSV: "
+        f"{publication.field_readability_target_summary_path}",
+        file=output,
+    )
+    print(
+        f"Field edit/readability cross summary CSV: "
+        f"{publication.field_edit_readability_cross_summary_path}",
+        file=output,
+    )
+    print(
+        f"Final text metric summary CSV: {publication.final_text_metric_summary_path}",
         file=output,
     )
     print(

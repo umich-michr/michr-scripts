@@ -51,6 +51,7 @@ from study_posting_audit_exploration.models import (
     AuthorAnalysisTables,
     FieldAnalysisTables,
     OverviewTables,
+    ReadabilityAnalysisTables,
     StudyAnalysisTables,
 )
 
@@ -136,6 +137,7 @@ def build_author_analysis_tables(
 
 def build_field_analysis_tables(
     completed_ai_fields: pd.DataFrame,
+    readability_pairs: pd.DataFrame | None = None,
 ) -> FieldAnalysisTables:
     """Build completed-AI field audit rows and aggregate summaries."""
     return FieldAnalysisTables(
@@ -150,7 +152,43 @@ def build_field_analysis_tables(
             build_suggestion_selection_summary(completed_ai_fields)
         ),
         compensation_analysis_summary=(
-            build_compensation_analysis_summary(completed_ai_fields)
+            build_compensation_analysis_summary(
+                completed_ai_fields,
+                readability_pairs,
+            )
+        ),
+    )
+
+
+def build_readability_analysis_tables(
+    *,
+    readability: pd.DataFrame,
+    readability_pairs: pd.DataFrame,
+    completed_ai_fields: pd.DataFrame,
+) -> ReadabilityAnalysisTables:
+    """Build readability audit pairs and aggregate summaries."""
+    return ReadabilityAnalysisTables(
+        completed_ai_readability_pairs=readability_pairs,
+        selected_vs_unselected_readability_summary=(
+            build_selected_vs_unselected_readability_summary(readability)
+        ),
+        field_readability_change_summary=(
+            build_field_readability_change_summary(readability_pairs)
+        ),
+        field_readability_target_summary=(
+            build_field_readability_target_summary(readability)
+        ),
+        field_edit_readability_cross_summary=(
+            build_field_edit_readability_cross_summary(
+                readability_pairs,
+                completed_ai_fields,
+            )
+        ),
+        final_text_metric_summary=(
+            build_final_text_metric_summary(
+                readability,
+                completed_ai_fields,
+            )
         ),
     )
 
@@ -160,6 +198,7 @@ __all__ = [
     "AuthorAnalysisTables",
     "FieldAnalysisTables",
     "OverviewTables",
+    "ReadabilityAnalysisTables",
     "StudyAnalysisTables",
     "build_attempt_analysis_tables",
     "build_attempt_start_experience_summary",
@@ -181,6 +220,7 @@ __all__ = [
     "build_nontext_field_adoption_summary",
     "build_overview_summary",
     "build_overview_tables",
+    "build_readability_analysis_tables",
     "build_selected_vs_unselected_readability_summary",
     "build_study_analysis_tables",
     "build_study_attempt_history_summary",
