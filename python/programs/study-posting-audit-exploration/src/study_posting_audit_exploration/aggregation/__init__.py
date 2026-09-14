@@ -24,6 +24,10 @@ from study_posting_audit_exploration.aggregation.content_sources import (
 from study_posting_audit_exploration.aggregation.fields import (
     build_field_adoption_editing_summary,
 )
+from study_posting_audit_exploration.aggregation.final_readability import (
+    build_field_readability_target_summary,
+    build_final_text_metric_summary,
+)
 from study_posting_audit_exploration.aggregation.nontext_fields import (
     build_nontext_field_adoption_summary,
 )
@@ -169,6 +173,8 @@ __all__ = [
     "build_field_analysis_tables",
     "build_field_edit_readability_cross_summary",
     "build_field_readability_change_summary",
+    "build_field_readability_target_summary",
+    "build_final_text_metric_summary",
     "build_grouped_attempt_summary",
     "build_grouped_author_summary",
     "build_grouped_study_summary",
