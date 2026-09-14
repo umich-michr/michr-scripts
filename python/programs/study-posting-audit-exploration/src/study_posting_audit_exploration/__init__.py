@@ -66,11 +66,14 @@ from study_posting_audit_exploration.models import (
 )
 from study_posting_audit_exploration.publication import (
     ExplorationCharts,
+    KpiCard,
     build_attempt_outcomes_chart,
     build_attempt_timing_chart,
     build_content_source_concordance_chart,
     build_exploration_charts,
     publish_exploration,
+    render_html_report,
+    write_html_report,
 )
 from study_posting_audit_exploration.statistics import describe_numeric
 from study_posting_audit_exploration.validation import validate_audit_report
@@ -93,6 +96,7 @@ __all__ = [
     "ExplorationRunConfig",
     "ExplorationValidationError",
     "FieldAnalysisTables",
+    "KpiCard",
     "LoadedAuditReport",
     "OverviewTables",
     "ReadabilityAnalysisTables",
@@ -139,6 +143,8 @@ __all__ = [
     "effective_author_role",
     "load_audit_report",
     "publish_exploration",
+    "render_html_report",
     "same_author_within_study",
     "validate_audit_report",
+    "write_html_report",
 ]
