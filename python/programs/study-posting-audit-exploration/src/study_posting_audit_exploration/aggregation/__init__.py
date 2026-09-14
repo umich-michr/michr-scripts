@@ -14,6 +14,9 @@ from study_posting_audit_exploration.aggregation.authors import (
     build_current_author_experience_summary,
     build_grouped_author_summary,
 )
+from study_posting_audit_exploration.aggregation.compensation import (
+    build_compensation_analysis_summary,
+)
 from study_posting_audit_exploration.aggregation.content_sources import (
     build_content_source_concordance_matrix,
     build_content_source_concordance_summary,
@@ -130,6 +133,7 @@ __all__ = [
     "build_attempt_start_experience_summary",
     "build_author_analysis_tables",
     "build_author_handoff_summary",
+    "build_compensation_analysis_summary",
     "build_content_source_concordance_matrix",
     "build_content_source_concordance_summary",
     "build_current_author_experience_summary",
