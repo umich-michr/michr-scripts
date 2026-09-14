@@ -94,6 +94,7 @@ def _metric_row(
             "analysis_type": "TEXT",
             "match_type": match_type,
             "suggestion_count_total": 1,
+            "suggestion_counts_json": '{"title": 1}',
             "picked_kind": field_name,
             "picked_index": 0,
             "character_edit_distance": edit_distance,
@@ -103,6 +104,18 @@ def _metric_row(
             "soft_word_edit_distance": 1.0,
             "policy_adjusted_effort_saved": 0.75,
             "estimated_characters_saved": 10.0,
+            "offered_ids": "[1, 2]",
+            "picked_ids": "[1]",
+            "saved_ids": "[1, 3]",
+            "kept_ids": "[1]",
+            "dropped_ids": "[]",
+            "added_ids": "[3]",
+            "saved_not_offered_ids": "[3]",
+            "flag_suggested": "true",
+            "flag_saved": "false",
+            "flag_accepted": "false",
+            "flag_changed": "true",
+            "compensation_text_required": "false",
         }
     )
 
@@ -170,6 +183,10 @@ def test_derive_completed_ai_field_analysis_adds_ratio_and_context() -> None:
     assert (
         row["edit_intensity_threshold_scheme_name"] == EDIT_INTENSITY_THRESHOLD_SCHEME
     )
+    assert row["suggestion_counts_json"] == '{"title": 1}'
+    assert row["picked_ids"] == "[1]"
+    assert row["saved_ids"] == "[1, 3]"
+    assert row["compensation_text_required"] == "false"
     assert "selected_text" not in derived.columns
     assert "final_text" not in derived.columns
 
