@@ -11,10 +11,13 @@ from study_posting_audit_exploration.publication import (
     ExplorationCharts,
     build_attempt_outcomes_chart,
     build_attempt_timing_chart,
+    build_author_appointment_context_chart,
     build_author_experience_chart,
     build_author_handoff_chart,
+    build_author_pi_context_chart,
     build_completed_study_mix_chart,
     build_content_source_concordance_chart,
+    build_effective_author_role_chart,
     build_exploration_charts,
     build_study_completion_pathways_chart,
 )
@@ -266,6 +269,92 @@ def grouped_study_rows() -> pd.DataFrame:
     return pd.DataFrame.from_records(rows)
 
 
+def grouped_author_rows() -> pd.DataFrame:
+    """Return synthetic aggregate-only author context rows."""
+    rows: list[dict[str, object]] = [
+        {
+            "author_population_name": "ALL_AUTHORS",
+            "attempt_completion_group": "ALL",
+            "attempt_authoring_mode": "ALL",
+            "effective_author_role": "ALL",
+            "grouping_dimension_name": "ALL",
+            "grouping_dimension_value": "ALL",
+            "group_values_are_mutually_exclusive": True,
+            "distinct_author_count": 10,
+            "population_distinct_author_count": 10,
+            "distinct_author_percentage_within_population": 100.0,
+            "distinct_author_count_classified_as_pi": 3,
+        },
+        {
+            "author_population_name": "ALL_AUTHORS",
+            "attempt_completion_group": "ALL",
+            "attempt_authoring_mode": "ALL",
+            "effective_author_role": "TEAM_MEMBER",
+            "grouping_dimension_name": "EFFECTIVE_AUTHOR_ROLE",
+            "grouping_dimension_value": "TEAM_MEMBER",
+            "group_values_are_mutually_exclusive": True,
+            "distinct_author_count": 7,
+            "population_distinct_author_count": 10,
+            "distinct_author_percentage_within_population": 70.0,
+            "distinct_author_count_classified_as_pi": 1,
+        },
+        {
+            "author_population_name": "ALL_AUTHORS",
+            "attempt_completion_group": "ALL",
+            "attempt_authoring_mode": "ALL",
+            "effective_author_role": "PI",
+            "grouping_dimension_name": "EFFECTIVE_AUTHOR_ROLE",
+            "grouping_dimension_value": "PI",
+            "group_values_are_mutually_exclusive": True,
+            "distinct_author_count": 3,
+            "population_distinct_author_count": 10,
+            "distinct_author_percentage_within_population": 30.0,
+            "distinct_author_count_classified_as_pi": 3,
+        },
+        {
+            "author_population_name": "ALL_AUTHORS",
+            "attempt_completion_group": "ALL",
+            "attempt_authoring_mode": "ALL",
+            "effective_author_role": "ALL",
+            "grouping_dimension_name": "AUTHOR_APPOINTMENT_SCHOOL",
+            "grouping_dimension_value": "School A",
+            "group_values_are_mutually_exclusive": False,
+            "distinct_author_count": 6,
+            "population_distinct_author_count": 10,
+            "distinct_author_percentage_within_population": 60.0,
+            "distinct_author_count_classified_as_pi": 2,
+        },
+        {
+            "author_population_name": "ALL_AUTHORS",
+            "attempt_completion_group": "ALL",
+            "attempt_authoring_mode": "ALL",
+            "effective_author_role": "ALL",
+            "grouping_dimension_name": "AUTHOR_APPOINTMENT_SCHOOL",
+            "grouping_dimension_value": "School B",
+            "group_values_are_mutually_exclusive": False,
+            "distinct_author_count": 5,
+            "population_distinct_author_count": 10,
+            "distinct_author_percentage_within_population": 50.0,
+            "distinct_author_count_classified_as_pi": 2,
+        },
+        {
+            "author_population_name": "ALL_AUTHORS",
+            "attempt_completion_group": "ALL",
+            "attempt_authoring_mode": "ALL",
+            "effective_author_role": "ALL",
+            "grouping_dimension_name": "PI_APPOINTMENT_SCHOOL",
+            "grouping_dimension_value": "PI School",
+            "group_values_are_mutually_exclusive": False,
+            "distinct_author_count": 4,
+            "population_distinct_author_count": 10,
+            "distinct_author_percentage_within_population": 40.0,
+            "distinct_author_count_classified_as_pi": 2,
+        },
+    ]
+
+    return pd.DataFrame.from_records(rows)
+
+
 def content_source_rows() -> pd.DataFrame:
     """Return synthetic aggregate-only concordance rows."""
     return pd.DataFrame.from_records(
@@ -434,6 +523,7 @@ def test_chart_bundle_contains_all_figures() -> None:
         current_author_experience_summary=current_author_experience_rows(),
         grouped_study_summary=grouped_study_rows(),
         content_source_matrix=content_source_rows(),
+        grouped_author_summary=grouped_author_rows(),
     )
 
     assert isinstance(charts, ExplorationCharts)
@@ -446,6 +536,10 @@ def test_chart_bundle_contains_all_figures() -> None:
     assert charts.content_source_concordance.data
     assert charts.completed_study_participant_mix.data
     assert charts.completed_study_department_mix.data
+    assert charts.effective_author_roles.data
+    assert charts.author_pi_context.data
+    assert charts.author_appointment_schools.data
+    assert charts.pi_appointment_schools.data
 
 
 def test_charts_return_accessible_empty_states() -> None:
@@ -455,6 +549,7 @@ def test_charts_return_accessible_empty_states() -> None:
     experience_columns = current_author_experience_rows().columns
     content_columns = content_source_rows().columns
     grouped_study_columns = grouped_study_rows().columns
+    grouped_author_columns = grouped_author_rows().columns
 
     attempt_figure = build_attempt_outcomes_chart(pd.DataFrame(columns=attempt_columns))
     study_figure = build_study_completion_pathways_chart(
@@ -473,6 +568,17 @@ def test_charts_return_accessible_empty_states() -> None:
         dimension_name="STUDY_PARTICIPANT_TYPE",
         title="Completed studies by participant type",
     )
+    author_role_figure = build_effective_author_role_chart(
+        pd.DataFrame(columns=grouped_author_columns)
+    )
+    author_pi_figure = build_author_pi_context_chart(
+        pd.DataFrame(columns=grouped_author_columns)
+    )
+    author_appointment_figure = build_author_appointment_context_chart(
+        pd.DataFrame(columns=grouped_author_columns),
+        dimension_name="AUTHOR_APPOINTMENT_SCHOOL",
+        title="Author appointment schools",
+    )
 
     assert attempt_figure.layout.annotations[0].text
     assert study_figure.layout.annotations[0].text
@@ -480,6 +586,9 @@ def test_charts_return_accessible_empty_states() -> None:
     assert experience_figure.layout.annotations[0].text
     assert content_figure.layout.annotations[0].text
     assert study_mix_figure.layout.annotations[0].text
+    assert author_role_figure.layout.annotations[0].text
+    assert author_pi_figure.layout.annotations[0].text
+    assert author_appointment_figure.layout.annotations[0].text
 
 
 @pytest.mark.parametrize(
@@ -540,6 +649,34 @@ def test_charts_return_accessible_empty_states() -> None:
                 }
             ),
         ),
+        (
+            build_effective_author_role_chart,
+            pd.DataFrame(
+                {
+                    "author_population_name": ["ALL_AUTHORS"],
+                }
+            ),
+        ),
+        (
+            build_author_pi_context_chart,
+            pd.DataFrame(
+                {
+                    "author_population_name": ["ALL_AUTHORS"],
+                }
+            ),
+        ),
+        (
+            lambda frame: build_author_appointment_context_chart(
+                frame,
+                dimension_name="AUTHOR_APPOINTMENT_SCHOOL",
+                title="Author appointment schools",
+            ),
+            pd.DataFrame(
+                {
+                    "author_population_name": ["ALL_AUTHORS"],
+                }
+            ),
+        ),
     ],
 )
 def test_charts_require_aggregate_columns(
@@ -551,3 +688,124 @@ def test_charts_require_aggregate_columns(
         match="lacks required chart columns",
     ):
         builder(frame)
+
+
+def test_effective_author_role_chart_uses_mutually_exclusive_counts() -> None:
+    figure = build_effective_author_role_chart(grouped_author_rows())
+    bar = figure.data[0]
+
+    assert figure.layout.title.text == "Distinct authors by effective role"
+    assert list(bar.y) == ["PI", "TEAM_MEMBER"]
+    assert list(bar.x) == [3, 7]
+
+
+def test_author_pi_context_chart_uses_all_author_population() -> None:
+    figure = build_author_pi_context_chart(grouped_author_rows())
+    bar = figure.data[0]
+
+    assert list(bar.x) == [
+        "Classified as PI",
+        "Not classified as PI",
+    ]
+    assert list(bar.y) == [3, 7]
+
+
+@pytest.mark.parametrize(
+    "pi_count",
+    [
+        -1,
+        11,
+    ],
+)
+def test_author_pi_context_chart_rejects_invalid_pi_count(
+    pi_count: int,
+) -> None:
+    rows = grouped_author_rows()
+    all_author_row = rows["grouping_dimension_name"].eq("ALL") & rows[
+        "grouping_dimension_value"
+    ].eq("ALL")
+    rows.loc[
+        all_author_row,
+        "distinct_author_count_classified_as_pi",
+    ] = pi_count
+
+    with pytest.raises(
+        ExplorationValidationError,
+        match=(
+            "authors classified as principal investigators must be between "
+            "zero and the all-author population count"
+        ),
+    ):
+        build_author_pi_context_chart(rows)
+
+
+def test_author_pi_context_chart_rejects_duplicate_all_author_rows() -> None:
+    rows = grouped_author_rows()
+    all_author_rows = rows.loc[
+        rows["grouping_dimension_name"].eq("ALL")
+        & rows["grouping_dimension_value"].eq("ALL")
+    ]
+    rows = pd.concat(
+        [
+            rows,
+            all_author_rows,
+        ],
+        ignore_index=True,
+    )
+
+    with pytest.raises(
+        ExplorationValidationError,
+        match=(
+            "author principal-investigator context requires exactly one "
+            "all-author aggregate row"
+        ),
+    ):
+        build_author_pi_context_chart(rows)
+
+
+def test_author_pi_context_chart_rejects_negative_population() -> None:
+    rows = grouped_author_rows()
+    all_author_row = rows["grouping_dimension_name"].eq("ALL") & rows[
+        "grouping_dimension_value"
+    ].eq("ALL")
+    rows.loc[
+        all_author_row,
+        "population_distinct_author_count",
+    ] = -1
+
+    with pytest.raises(
+        ExplorationValidationError,
+        match="all-author population count must be nonnegative",
+    ):
+        build_author_pi_context_chart(rows)
+
+
+def test_author_appointment_context_chart_preserves_overlapping_groups() -> None:
+    figure = build_author_appointment_context_chart(
+        grouped_author_rows(),
+        dimension_name="AUTHOR_APPOINTMENT_SCHOOL",
+        title="Author appointment schools",
+    )
+    bar = figure.data[0]
+
+    assert list(bar.y) == ["School B", "School A"]
+    assert list(bar.x) == [5, 6]
+    assert "Groups may overlap" in str(bar.hovertemplate)
+
+
+def test_author_appointment_context_chart_rejects_exclusive_groups() -> None:
+    rows = grouped_author_rows()
+    rows.loc[
+        rows["grouping_dimension_name"].eq("AUTHOR_APPOINTMENT_SCHOOL"),
+        "group_values_are_mutually_exclusive",
+    ] = True
+
+    with pytest.raises(
+        ExplorationValidationError,
+        match="must contain non-mutually-exclusive groups",
+    ):
+        build_author_appointment_context_chart(
+            rows,
+            dimension_name="AUTHOR_APPOINTMENT_SCHOOL",
+            title="Author appointment schools",
+        )

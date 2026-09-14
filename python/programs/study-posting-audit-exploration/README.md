@@ -147,10 +147,19 @@ exploration/
 aggregate analysis tables. It currently includes:
 
 - executive key performance indicator cards;
+- study completion pathways and author-handoff categories;
+- author experience and activity summaries;
+- effective author roles and author-level principal-investigator context;
+- author and principal-investigator appointment-school context;
+- completed-study participant-type and department mix;
 - attempt outcomes by authoring mode;
 - median attempt timing by authoring mode;
 - reported-versus-inferred content-source concordance;
 - privacy and interpretation cautions.
+
+Appointment-school chart groups may overlap because an author or principal
+investigator can have more than one appointment. Those chart values are not
+intended to sum to 100 percent.
 
 The report embeds its Plotly JavaScript and does not require an external script
 service. It does not contain usernames, audit IDs, study numbers, source

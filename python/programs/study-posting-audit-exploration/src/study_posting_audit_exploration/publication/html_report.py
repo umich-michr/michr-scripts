@@ -164,6 +164,22 @@ _TEMPLATE = """<!doctype html>
     <div class="chart">{{ author_experience_days_html | safe }}</div>
   </section>
 
+  <section aria-labelledby="author-context-heading">
+    <h2 id="author-context-heading">
+      Author and principal-investigator context
+    </h2>
+    <p class="caution">
+      Effective roles and principal-investigator classification are
+      author-level summaries. Appointment-school groups may overlap because an
+      author or principal investigator can have more than one appointment;
+      those charts are not intended to sum to 100 percent.
+    </p>
+    <div class="chart">{{ effective_author_roles_html | safe }}</div>
+    <div class="chart">{{ author_pi_context_html | safe }}</div>
+    <div class="chart">{{ author_appointment_schools_html | safe }}</div>
+    <div class="chart">{{ pi_appointment_schools_html | safe }}</div>
+  </section>
+
   <section aria-labelledby="study-mix-heading">
     <h2 id="study-mix-heading">Participant and department mix</h2>
     <p class="caution">
@@ -350,6 +366,22 @@ def render_html_report(
         ),
         attempt_timing_html=_figure_html(
             charts.median_attempt_time_by_mode,
+            include_plotlyjs=False,
+        ),
+        effective_author_roles_html=_figure_html(
+            charts.effective_author_roles,
+            include_plotlyjs=False,
+        ),
+        author_pi_context_html=_figure_html(
+            charts.author_pi_context,
+            include_plotlyjs=False,
+        ),
+        author_appointment_schools_html=_figure_html(
+            charts.author_appointment_schools,
+            include_plotlyjs=False,
+        ),
+        pi_appointment_schools_html=_figure_html(
+            charts.pi_appointment_schools,
             include_plotlyjs=False,
         ),
         participant_mix_html=_figure_html(

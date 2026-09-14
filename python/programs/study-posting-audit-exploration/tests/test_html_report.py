@@ -200,12 +200,99 @@ def content_rows() -> pd.DataFrame:
     )
 
 
+def grouped_author_rows() -> pd.DataFrame:
+    """Return synthetic aggregate-only author context rows."""
+    rows: list[dict[str, object]] = [
+        {
+            "author_population_name": "ALL_AUTHORS",
+            "attempt_completion_group": "ALL",
+            "attempt_authoring_mode": "ALL",
+            "effective_author_role": "ALL",
+            "grouping_dimension_name": "ALL",
+            "grouping_dimension_value": "ALL",
+            "group_values_are_mutually_exclusive": True,
+            "distinct_author_count": 10,
+            "population_distinct_author_count": 10,
+            "distinct_author_percentage_within_population": 100.0,
+            "distinct_author_count_classified_as_pi": 3,
+        },
+        {
+            "author_population_name": "ALL_AUTHORS",
+            "attempt_completion_group": "ALL",
+            "attempt_authoring_mode": "ALL",
+            "effective_author_role": "TEAM_MEMBER",
+            "grouping_dimension_name": "EFFECTIVE_AUTHOR_ROLE",
+            "grouping_dimension_value": "TEAM_MEMBER",
+            "group_values_are_mutually_exclusive": True,
+            "distinct_author_count": 7,
+            "population_distinct_author_count": 10,
+            "distinct_author_percentage_within_population": 70.0,
+            "distinct_author_count_classified_as_pi": 1,
+        },
+        {
+            "author_population_name": "ALL_AUTHORS",
+            "attempt_completion_group": "ALL",
+            "attempt_authoring_mode": "ALL",
+            "effective_author_role": "PI",
+            "grouping_dimension_name": "EFFECTIVE_AUTHOR_ROLE",
+            "grouping_dimension_value": "PI",
+            "group_values_are_mutually_exclusive": True,
+            "distinct_author_count": 3,
+            "population_distinct_author_count": 10,
+            "distinct_author_percentage_within_population": 30.0,
+            "distinct_author_count_classified_as_pi": 3,
+        },
+        {
+            "author_population_name": "ALL_AUTHORS",
+            "attempt_completion_group": "ALL",
+            "attempt_authoring_mode": "ALL",
+            "effective_author_role": "ALL",
+            "grouping_dimension_name": "AUTHOR_APPOINTMENT_SCHOOL",
+            "grouping_dimension_value": "School A",
+            "group_values_are_mutually_exclusive": False,
+            "distinct_author_count": 6,
+            "population_distinct_author_count": 10,
+            "distinct_author_percentage_within_population": 60.0,
+            "distinct_author_count_classified_as_pi": 2,
+        },
+        {
+            "author_population_name": "ALL_AUTHORS",
+            "attempt_completion_group": "ALL",
+            "attempt_authoring_mode": "ALL",
+            "effective_author_role": "ALL",
+            "grouping_dimension_name": "AUTHOR_APPOINTMENT_SCHOOL",
+            "grouping_dimension_value": "School B",
+            "group_values_are_mutually_exclusive": False,
+            "distinct_author_count": 5,
+            "population_distinct_author_count": 10,
+            "distinct_author_percentage_within_population": 50.0,
+            "distinct_author_count_classified_as_pi": 2,
+        },
+        {
+            "author_population_name": "ALL_AUTHORS",
+            "attempt_completion_group": "ALL",
+            "attempt_authoring_mode": "ALL",
+            "effective_author_role": "ALL",
+            "grouping_dimension_name": "PI_APPOINTMENT_SCHOOL",
+            "grouping_dimension_value": "PI School",
+            "group_values_are_mutually_exclusive": False,
+            "distinct_author_count": 4,
+            "population_distinct_author_count": 10,
+            "distinct_author_percentage_within_population": 40.0,
+            "distinct_author_count_classified_as_pi": 2,
+        },
+    ]
+
+    return pd.DataFrame.from_records(rows)
+
+
 def charts() -> ExplorationCharts:
     """Return synthetic aggregate-only chart bundle."""
     return build_exploration_charts(
         grouped_attempt_summary=attempt_rows(),
         study_attempt_history_summary=study_history_rows(),
         author_handoff_summary=author_handoff_rows(),
+        grouped_author_summary=grouped_author_rows(),
         current_author_experience_summary=current_author_experience_rows(),
         grouped_study_summary=grouped_study_rows(),
         content_source_matrix=content_rows(),
@@ -240,6 +327,14 @@ def test_html_report_is_self_contained_and_accessible() -> None:
     assert "Median author experience at report query time: studies" in html
     assert "Median author experience at report query time: days" in html
     assert "They are not attempt-time snapshots" in normalized_html
+
+    assert 'id="author-context-heading"' in html
+    assert "Author and principal-investigator context" in html
+    assert "Distinct authors by effective role" in html
+    assert "Authors classified as study principal investigators" in html
+    assert "Author appointment schools" in html
+    assert "Principal-investigator appointment schools" in html
+    assert "those charts are not intended to sum to 100 percent" in normalized_html
 
     assert 'id="study-mix-heading"' in html
     assert "Participant and department mix" in html
