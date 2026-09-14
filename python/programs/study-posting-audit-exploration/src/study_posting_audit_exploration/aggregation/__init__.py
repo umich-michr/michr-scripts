@@ -18,6 +18,9 @@ from study_posting_audit_exploration.aggregation.content_sources import (
     build_content_source_concordance_matrix,
     build_content_source_concordance_summary,
 )
+from study_posting_audit_exploration.aggregation.fields import (
+    build_field_adoption_editing_summary,
+)
 from study_posting_audit_exploration.aggregation.overview import (
     build_overview_summary,
 )
@@ -124,6 +127,7 @@ __all__ = [
     "build_content_source_concordance_matrix",
     "build_content_source_concordance_summary",
     "build_current_author_experience_summary",
+    "build_field_adoption_editing_summary",
     "build_grouped_attempt_summary",
     "build_grouped_author_summary",
     "build_grouped_study_summary",
