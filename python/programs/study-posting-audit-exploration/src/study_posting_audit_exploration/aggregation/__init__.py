@@ -31,6 +31,8 @@ from study_posting_audit_exploration.aggregation.overview import (
     build_overview_summary,
 )
 from study_posting_audit_exploration.aggregation.readability import (
+    build_field_edit_readability_cross_summary,
+    build_field_readability_change_summary,
     build_selected_vs_unselected_readability_summary,
 )
 from study_posting_audit_exploration.aggregation.studies import (
@@ -165,6 +167,8 @@ __all__ = [
     "build_current_author_experience_summary",
     "build_field_adoption_editing_summary",
     "build_field_analysis_tables",
+    "build_field_edit_readability_cross_summary",
+    "build_field_readability_change_summary",
     "build_grouped_attempt_summary",
     "build_grouped_author_summary",
     "build_grouped_study_summary",
