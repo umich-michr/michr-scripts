@@ -1,4 +1,4 @@
-"""Compensation suggestion selection and editing summaries."""
+"""Compensation suggestion selection, editing, and readability summaries."""
 
 import json
 import math
@@ -7,12 +7,14 @@ from numbers import Real
 import pandas as pd
 
 from study_posting_audit_exploration.errors import ExplorationValidationError
+from study_posting_audit_exploration.models import DescriptiveStatistics
 from study_posting_audit_exploration.statistics import describe_numeric
 
 _COMPENSATION_KINDS: tuple[str, ...] = (
     "genericCompensation",
     "specificCompensation",
 )
+_FLESCH_KINCAID_GRADE = "flesch_kincaid_grade"
 
 _COMPENSATION_ANALYSIS_COLUMNS: tuple[str, ...] = (
     "compensation_suggestion_kind",
@@ -152,12 +154,32 @@ def _scheme_name(fields: pd.DataFrame) -> str | None:
     return str(values[0]) if len(values) == 1 else None
 
 
+def _readability_values(
+    readability_pairs: pd.DataFrame,
+    *,
+    suggestion_kind: str,
+) -> tuple[pd.DataFrame, DescriptiveStatistics]:
+    """Return one compensation kind's Flesch-Kincaid pair rows and statistics."""
+    grade_pairs = readability_pairs.loc[
+        readability_pairs["field_name"].eq("compensation")
+        & readability_pairs["suggestion_kind"].eq(suggestion_kind)
+        & readability_pairs["readability_measure_name"].eq(_FLESCH_KINCAID_GRADE)
+    ]
+    statistics = describe_numeric(
+        grade_pairs["change_final_minus_selected"],
+        metric_name=(f"{suggestion_kind}_flesch_kincaid_grade_change"),
+    )
+
+    return grade_pairs, statistics
+
+
 def _compensation_summary_row(
     fields: pd.DataFrame,
+    readability_pairs: pd.DataFrame,
     *,
     suggestion_kind: str,
 ) -> dict[str, object]:
-    """Return one compensation-kind selection and editing summary."""
+    """Return one compensation-kind selection, editing, and readability row."""
     count_mappings = fields["suggestion_counts_json"].map(_suggestion_counts)
     offered_counts = count_mappings.map(lambda counts: counts[suggestion_kind])
     offered_attempts = offered_counts.gt(0)
@@ -169,6 +191,11 @@ def _compensation_summary_row(
         edited["character_edit_ratio"],
         metric_name=f"{suggestion_kind}_character_edit_ratio",
     )
+    grade_pairs, grade_statistics = _readability_values(
+        readability_pairs,
+        suggestion_kind=suggestion_kind,
+    )
+    consensus = grade_pairs["consensus_grade_level_direction_category"]
     offered_suggestion_count = int(offered_counts.sum())
     selected_count = len(selected)
 
@@ -212,24 +239,51 @@ def _compensation_summary_row(
         ),
         "median_character_edit_ratio": character_statistics.median,
         "average_character_edit_ratio": character_statistics.average,
-        "paired_selected_final_readability_count": None,
-        "median_flesch_kincaid_grade_change_final_minus_selected": None,
-        "average_flesch_kincaid_grade_change_final_minus_selected": None,
-        "count_consensus_grade_level_decrease": None,
-        "count_no_material_change": None,
-        "count_consensus_grade_level_increase": None,
-        "count_mixed_formula_direction": None,
+        "paired_selected_final_readability_count": int(
+            grade_pairs["audit_record_id"].nunique(dropna=True)
+        ),
+        "median_flesch_kincaid_grade_change_final_minus_selected": (
+            grade_statistics.median
+        ),
+        "average_flesch_kincaid_grade_change_final_minus_selected": (
+            grade_statistics.average
+        ),
+        "count_consensus_grade_level_decrease": int(
+            consensus.eq("CONSENSUS_GRADE_LEVEL_DECREASE").sum()
+        ),
+        "count_no_material_change": int(consensus.eq("NO_MATERIAL_CHANGE").sum()),
+        "count_consensus_grade_level_increase": int(
+            consensus.eq("CONSENSUS_GRADE_LEVEL_INCREASE").sum()
+        ),
+        "count_mixed_formula_direction": int(
+            consensus.eq("MIXED_FORMULA_DIRECTION").sum()
+        ),
         "edit_intensity_threshold_scheme_name": _scheme_name(fields),
     }
 
 
 def build_compensation_analysis_summary(
     completed_ai_fields: pd.DataFrame,
+    readability_pairs: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """Return compensation summaries by generic and specific suggestion kind."""
     compensation = completed_ai_fields.loc[
         completed_ai_fields["analysis_type"].eq("COMPENSATION")
     ]
+    resolved_pairs = (
+        pd.DataFrame(
+            columns=[
+                "audit_record_id",
+                "field_name",
+                "suggestion_kind",
+                "readability_measure_name",
+                "change_final_minus_selected",
+                "consensus_grade_level_direction_category",
+            ]
+        )
+        if readability_pairs is None
+        else readability_pairs
+    )
 
     if compensation.empty:
         rows: list[dict[str, object]] = []
@@ -237,6 +291,7 @@ def build_compensation_analysis_summary(
         rows = [
             _compensation_summary_row(
                 compensation,
+                resolved_pairs,
                 suggestion_kind=suggestion_kind,
             )
             for suggestion_kind in _COMPENSATION_KINDS

@@ -90,7 +90,7 @@ def test_compensation_summary_reports_kind_selection_and_editing() -> None:
     assert specific["average_character_edit_ratio"] == pytest.approx(0.20)
 
 
-def test_compensation_summary_leaves_readability_for_batch_six() -> None:
+def test_compensation_summary_reports_zero_without_readability_pairs() -> None:
     fields = pd.DataFrame.from_records(
         [
             compensation_row(
@@ -109,9 +109,13 @@ def test_compensation_summary_leaves_readability_for_batch_six() -> None:
         "genericCompensation",
     )
 
-    assert row["paired_selected_final_readability_count"] is None
-    assert row["median_flesch_kincaid_grade_change_final_minus_selected"] is None
-    assert row["count_consensus_grade_level_decrease"] is None
+    assert row["paired_selected_final_readability_count"] == 0
+    assert pd.isna(row["median_flesch_kincaid_grade_change_final_minus_selected"])
+    assert pd.isna(row["average_flesch_kincaid_grade_change_final_minus_selected"])
+    assert row["count_consensus_grade_level_decrease"] == 0
+    assert row["count_no_material_change"] == 0
+    assert row["count_consensus_grade_level_increase"] == 0
+    assert row["count_mixed_formula_direction"] == 0
     assert (
         row["edit_intensity_threshold_scheme_name"]
         == "EXPLORATORY_CHARACTER_RATIO_10_30"
@@ -170,3 +174,64 @@ def test_compensation_summary_rejects_invalid_counts(
         match=message,
     ):
         build_compensation_analysis_summary(fields)
+
+
+def test_compensation_summary_includes_readability_pairs() -> None:
+    fields = pd.DataFrame.from_records(
+        [
+            compensation_row(
+                audit_record_id=1,
+                counts='{"genericCompensation": 1}',
+                picked_kind="genericCompensation",
+                picked_index=0,
+                category="LIGHT_EDIT",
+                ratio=0.10,
+            ),
+            compensation_row(
+                audit_record_id=2,
+                counts='{"genericCompensation": 1}',
+                picked_kind="genericCompensation",
+                picked_index=0,
+                category="MODERATE_EDIT",
+                ratio=0.20,
+            ),
+        ]
+    )
+    pairs = pd.DataFrame.from_records(
+        [
+            {
+                "audit_record_id": 1,
+                "field_name": "compensation",
+                "suggestion_kind": "genericCompensation",
+                "readability_measure_name": "flesch_kincaid_grade",
+                "change_final_minus_selected": -1.0,
+                "consensus_grade_level_direction_category": (
+                    "CONSENSUS_GRADE_LEVEL_DECREASE"
+                ),
+            },
+            {
+                "audit_record_id": 2,
+                "field_name": "compensation",
+                "suggestion_kind": "genericCompensation",
+                "readability_measure_name": "flesch_kincaid_grade",
+                "change_final_minus_selected": 0.0,
+                "consensus_grade_level_direction_category": ("NO_MATERIAL_CHANGE"),
+            },
+        ]
+    )
+
+    row = summary_row(
+        build_compensation_analysis_summary(
+            fields,
+            pairs,
+        ),
+        "genericCompensation",
+    )
+
+    assert row["paired_selected_final_readability_count"] == 2
+    assert row["median_flesch_kincaid_grade_change_final_minus_selected"] == -0.5
+    assert row["average_flesch_kincaid_grade_change_final_minus_selected"] == -0.5
+    assert row["count_consensus_grade_level_decrease"] == 1
+    assert row["count_no_material_change"] == 1
+    assert row["count_consensus_grade_level_increase"] == 0
+    assert row["count_mixed_formula_direction"] == 0
