@@ -20,6 +20,18 @@ def load_valid(path: Path) -> LoadedAuditReport:
     )
 
 
+def report_with_ai_metrics(
+    report: LoadedAuditReport,
+    metrics: pd.DataFrame,
+) -> LoadedAuditReport:
+    """Return a report with replacement AI-assistance metrics."""
+    return LoadedAuditReport(
+        records=report.records,
+        ai_assistance_metrics=metrics,
+        readability_metrics=report.readability_metrics,
+    )
+
+
 def test_valid_report_returns_counts(
     valid_report_directory: Path,
 ) -> None:
@@ -152,6 +164,171 @@ def test_nonfinite_metric_is_rejected(
     with pytest.raises(
         ExplorationValidationError,
         match="contains non-finite values",
+    ):
+        validate_audit_report(report)
+
+
+def test_ai_assistance_field_name_is_required(
+    valid_report_directory: Path,
+) -> None:
+    report = load_valid(valid_report_directory)
+    report.ai_assistance_metrics.loc[0, "field_name"] = pd.NA
+
+    with pytest.raises(
+        ExplorationValidationError,
+        match="missing field names",
+    ):
+        validate_audit_report(report)
+
+
+def test_duplicate_ai_assistance_identity_is_rejected(
+    valid_report_directory: Path,
+) -> None:
+    report = load_valid(valid_report_directory)
+    duplicate = report.ai_assistance_metrics.iloc[[0]].copy()
+    metrics = pd.concat(
+        [
+            report.ai_assistance_metrics,
+            duplicate,
+        ],
+        ignore_index=True,
+    )
+
+    with pytest.raises(
+        ExplorationValidationError,
+        match="duplicate audit-field identities",
+    ):
+        validate_audit_report(report_with_ai_metrics(report, metrics))
+
+
+@pytest.mark.parametrize(
+    ("column_name", "value"),
+    [
+        ("analysis_type", "SYNTHETIC_UNKNOWN"),
+        ("match_type", "SYNTHETIC_UNKNOWN"),
+    ],
+)
+def test_ai_assistance_vocabularies_are_validated(
+    valid_report_directory: Path,
+    column_name: str,
+    value: str,
+) -> None:
+    report = load_valid(valid_report_directory)
+    report.ai_assistance_metrics.loc[0, column_name] = value
+
+    with pytest.raises(
+        ExplorationValidationError,
+        match=rf"unsupported {column_name} values",
+    ):
+        validate_audit_report(report)
+
+
+@pytest.mark.parametrize(
+    "column_name",
+    [
+        "flag_suggested",
+        "flag_saved",
+        "flag_accepted",
+        "flag_changed",
+        "compensation_text_required",
+    ],
+)
+def test_ai_assistance_boolean_text_is_validated(
+    valid_report_directory: Path,
+    column_name: str,
+) -> None:
+    report = load_valid(valid_report_directory)
+    report.ai_assistance_metrics.loc[0, column_name] = "SYNTHETIC_UNKNOWN"
+
+    with pytest.raises(
+        ExplorationValidationError,
+        match=rf"{column_name!r} must contain true, false, or null",
+    ):
+        validate_audit_report(report)
+
+
+@pytest.mark.parametrize(
+    "column_name",
+    [
+        "picked_kind",
+        "picked_index",
+    ],
+)
+def test_assisted_text_requires_pick_identity(
+    valid_report_directory: Path,
+    column_name: str,
+) -> None:
+    report = load_valid(valid_report_directory)
+    report.ai_assistance_metrics.loc[0, column_name] = pd.NA
+
+    with pytest.raises(
+        ExplorationValidationError,
+        match="assisted text AI metrics require picked_kind and picked_index",
+    ):
+        validate_audit_report(report)
+
+
+def test_unassisted_text_must_not_contain_pick(
+    valid_report_directory: Path,
+) -> None:
+    report = load_valid(valid_report_directory)
+    report.ai_assistance_metrics.loc[0, "match_type"] = "UNASSISTED"
+
+    with pytest.raises(
+        ExplorationValidationError,
+        match="unassisted text AI metrics must not contain a picked suggestion",
+    ):
+        validate_audit_report(report)
+
+
+def test_negative_picked_index_is_rejected(
+    valid_report_directory: Path,
+) -> None:
+    report = load_valid(valid_report_directory)
+    report.ai_assistance_metrics.loc[0, "picked_index"] = -1
+
+    with pytest.raises(
+        ExplorationValidationError,
+        match="negative picked indices",
+    ):
+        validate_audit_report(report)
+
+
+def test_lookup_row_must_not_contain_text_pick(
+    valid_report_directory: Path,
+) -> None:
+    report = load_valid(valid_report_directory)
+    report.ai_assistance_metrics.loc[0, "analysis_type"] = "LOOKUP"
+
+    with pytest.raises(
+        ExplorationValidationError,
+        match="lookup AI metrics must not contain text suggestion picks",
+    ):
+        validate_audit_report(report)
+
+
+@pytest.mark.parametrize(
+    ("record_index", "attempt_type", "attempt_result"),
+    [
+        (0, "AI", "USER_DROPPED"),
+        (1, "MANUAL", "COMPLETE"),
+    ],
+)
+def test_ai_assistance_rows_require_completed_ai_attempts(
+    valid_report_directory: Path,
+    record_index: int,
+    attempt_type: str,
+    attempt_result: str,
+) -> None:
+    report = load_valid(valid_report_directory)
+    audit_id = report.records["ID"].astype("int64").iloc[record_index]
+    report.ai_assistance_metrics.loc[0, "record_id"] = audit_id
+    report.records.loc[record_index, "ATTEMPT_TYPE"] = attempt_type
+    report.records.loc[record_index, "ATTEMPT_RESULT"] = attempt_result
+
+    with pytest.raises(
+        ExplorationValidationError,
+        match="must belong to completed AI attempts",
     ):
         validate_audit_report(report)
 

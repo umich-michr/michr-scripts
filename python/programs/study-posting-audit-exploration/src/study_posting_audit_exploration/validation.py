@@ -17,12 +17,51 @@ from study_posting_audit_exploration.models import (
 _COMPLETE = "COMPLETE"
 _AI = "AI"
 _MANUAL = "MANUAL"
-_READABILITY_TEXT_ROLES = frozenset({"SUGGESTED", "FINAL"})
+
+_AI_ANALYSIS_TYPES = frozenset(
+    {
+        "TEXT",
+        "COMPENSATION",
+        "LOOKUP",
+    }
+)
+_AI_MATCH_TYPES = frozenset(
+    {
+        "EXACT",
+        "COSMETIC_EQUIVALENT",
+        "EDITED",
+        "REMOVED",
+        "UNASSISTED",
+    }
+)
+_TEXT_ANALYSIS_TYPES = frozenset(
+    {
+        "TEXT",
+        "COMPENSATION",
+    }
+)
+_READABILITY_TEXT_ROLES = frozenset(
+    {
+        "SUGGESTED",
+        "FINAL",
+    }
+)
+_BOOLEAN_TEXT_VALUES = frozenset(
+    {
+        "true",
+        "false",
+    }
+)
 
 
 def _nonblank_mask(series: pd.Series) -> pd.Series:
     """Return whether nullable-string values are present and nonblank."""
     return series.notna() & series.str.strip().ne("")
+
+
+def _normalized_strings(series: pd.Series) -> pd.Series:
+    """Return lowercase string values while preserving nulls."""
+    return series.astype("string").str.lower()
 
 
 def _require_unique_attempt_ids(records: pd.DataFrame) -> None:
@@ -183,6 +222,210 @@ def _require_finite_columns(
             )
 
 
+def _require_supported_values(
+    frame: pd.DataFrame,
+    *,
+    column_name: str,
+    allowed_values: frozenset[str],
+    file_name: str,
+) -> None:
+    """Require one non-null categorical column to use supported values."""
+    values = frame[column_name]
+    invalid_values = sorted(
+        str(value)
+        for value in values.loc[~values.isin(allowed_values)].dropna().unique()
+    )
+
+    if invalid_values or values.isna().any():
+        raise ExplorationValidationError(
+            f"{file_name} contains unsupported {column_name} values: {invalid_values!r}"
+        )
+
+
+def _require_ai_assistance_identity(ai_assistance: pd.DataFrame) -> None:
+    """Require one named AI-assistance row per audit attempt and field."""
+    missing_fields = int((~_nonblank_mask(ai_assistance["field_name"])).sum())
+
+    if missing_fields:
+        raise ExplorationValidationError(
+            "ai_assistance_metrics.csv contains missing field names: "
+            f"{missing_fields} affected rows"
+        )
+
+    duplicate_count = int(
+        ai_assistance.duplicated(
+            subset=[
+                "record_id",
+                "field_name",
+            ],
+            keep=False,
+        ).sum()
+    )
+
+    if duplicate_count:
+        raise ExplorationValidationError(
+            "ai_assistance_metrics.csv contains duplicate audit-field identities: "
+            f"{duplicate_count} affected rows"
+        )
+
+
+def _require_ai_assistance_ownership(
+    records: pd.DataFrame,
+    ai_assistance: pd.DataFrame,
+) -> None:
+    """Require metric rows to belong to completed AI attempts."""
+    attempt_context = records.loc[
+        :,
+        [
+            "ID",
+            "ATTEMPT_TYPE",
+            "ATTEMPT_RESULT",
+        ],
+    ].rename(columns={"ID": "record_id"})
+    joined = ai_assistance.merge(
+        attempt_context,
+        on="record_id",
+        how="left",
+        validate="many_to_one",
+    )
+    invalid_count = int(
+        (
+            ~joined["ATTEMPT_TYPE"].eq(_AI) | ~joined["ATTEMPT_RESULT"].eq(_COMPLETE)
+        ).sum()
+    )
+
+    if invalid_count:
+        raise ExplorationValidationError(
+            "ai_assistance_metrics.csv rows must belong to completed AI attempts: "
+            f"{invalid_count} affected rows"
+        )
+
+
+def _require_boolean_text(
+    frame: pd.DataFrame,
+    *,
+    column_name: str,
+) -> None:
+    """Require nullable lowercase-compatible Boolean text."""
+    non_null = frame[column_name].notna()
+    normalized = _normalized_strings(frame[column_name])
+    invalid_count = int((non_null & ~normalized.isin(_BOOLEAN_TEXT_VALUES)).sum())
+
+    if invalid_count:
+        raise ExplorationValidationError(
+            "ai_assistance_metrics.csv column "
+            f"{column_name!r} must contain true, false, or null: "
+            f"{invalid_count} affected rows"
+        )
+
+
+def _require_ai_assistance_relationships(ai_assistance: pd.DataFrame) -> None:
+    """Require analysis-type, selection, and outcome relationships."""
+    _require_supported_values(
+        ai_assistance,
+        column_name="analysis_type",
+        allowed_values=_AI_ANALYSIS_TYPES,
+        file_name="ai_assistance_metrics.csv",
+    )
+    _require_supported_values(
+        ai_assistance,
+        column_name="match_type",
+        allowed_values=_AI_MATCH_TYPES,
+        file_name="ai_assistance_metrics.csv",
+    )
+
+    for column_name in (
+        "flag_suggested",
+        "flag_saved",
+        "flag_accepted",
+        "flag_changed",
+        "compensation_text_required",
+    ):
+        _require_boolean_text(
+            ai_assistance,
+            column_name=column_name,
+        )
+
+    text_rows = ai_assistance["analysis_type"].isin(_TEXT_ANALYSIS_TYPES)
+    lookup_rows = ai_assistance["analysis_type"].eq("LOOKUP")
+    unassisted = ai_assistance["match_type"].eq("UNASSISTED")
+    assisted_text = text_rows & ~unassisted
+
+    invalid_assisted_count = int(
+        (
+            assisted_text
+            & (
+                ai_assistance["picked_kind"].isna()
+                | ai_assistance["picked_index"].isna()
+            )
+        ).sum()
+    )
+
+    if invalid_assisted_count:
+        raise ExplorationValidationError(
+            "assisted text AI metrics require picked_kind and picked_index: "
+            f"{invalid_assisted_count} affected rows"
+        )
+
+    invalid_unassisted_count = int(
+        (
+            text_rows
+            & unassisted
+            & (
+                ai_assistance["picked_kind"].notna()
+                | ai_assistance["picked_index"].notna()
+            )
+        ).sum()
+    )
+
+    if invalid_unassisted_count:
+        raise ExplorationValidationError(
+            "unassisted text AI metrics must not contain a picked suggestion: "
+            f"{invalid_unassisted_count} affected rows"
+        )
+
+    negative_picked_index_count = int(
+        (
+            ai_assistance["picked_index"].notna() & ai_assistance["picked_index"].lt(0)
+        ).sum()
+    )
+
+    if negative_picked_index_count:
+        raise ExplorationValidationError(
+            "ai_assistance_metrics.csv contains negative picked indices: "
+            f"{negative_picked_index_count} affected rows"
+        )
+
+    invalid_lookup_pick_count = int(
+        (
+            lookup_rows
+            & (
+                ai_assistance["picked_kind"].notna()
+                | ai_assistance["picked_index"].notna()
+            )
+        ).sum()
+    )
+
+    if invalid_lookup_pick_count:
+        raise ExplorationValidationError(
+            "lookup AI metrics must not contain text suggestion picks: "
+            f"{invalid_lookup_pick_count} affected rows"
+        )
+
+
+def _require_ai_assistance_contract(
+    records: pd.DataFrame,
+    ai_assistance: pd.DataFrame,
+) -> None:
+    """Require identities and relationships needed by field aggregation."""
+    _require_ai_assistance_identity(ai_assistance)
+    _require_ai_assistance_ownership(
+        records,
+        ai_assistance,
+    )
+    _require_ai_assistance_relationships(ai_assistance)
+
+
 def _require_readability_contract(readability: pd.DataFrame) -> None:
     """Require valid text roles and selected-marker relationships."""
     invalid_roles = sorted(
@@ -205,10 +448,10 @@ def _require_readability_contract(readability: pd.DataFrame) -> None:
     final = readability["text_role"].eq("FINAL")
     selected_non_null = readability["selected"].notna()
     selected_values = set(
-        readability.loc[selected_non_null, "selected"].astype(str).str.lower()
+        _normalized_strings(readability.loc[selected_non_null, "selected"])
     )
 
-    if not selected_values.issubset({"true", "false"}):
+    if not selected_values.issubset(_BOOLEAN_TEXT_VALUES):
         raise ExplorationValidationError(
             "readability_metrics.csv selected values must be true, false, or null"
         )
@@ -281,6 +524,10 @@ def validate_audit_report(
         readability,
         column_names=READABILITY_FLOAT_COLUMNS,
         file_name="readability_metrics.csv",
+    )
+    _require_ai_assistance_contract(
+        records,
+        ai_assistance,
     )
     _require_readability_contract(readability)
 
