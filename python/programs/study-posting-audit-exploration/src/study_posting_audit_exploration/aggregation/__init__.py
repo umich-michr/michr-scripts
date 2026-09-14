@@ -21,6 +21,9 @@ from study_posting_audit_exploration.aggregation.content_sources import (
 from study_posting_audit_exploration.aggregation.fields import (
     build_field_adoption_editing_summary,
 )
+from study_posting_audit_exploration.aggregation.nontext_fields import (
+    build_nontext_field_adoption_summary,
+)
 from study_posting_audit_exploration.aggregation.overview import (
     build_overview_summary,
 )
@@ -131,6 +134,7 @@ __all__ = [
     "build_grouped_attempt_summary",
     "build_grouped_author_summary",
     "build_grouped_study_summary",
+    "build_nontext_field_adoption_summary",
     "build_overview_summary",
     "build_overview_tables",
     "build_study_analysis_tables",
