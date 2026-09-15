@@ -174,6 +174,7 @@ aggregate analysis tables. It currently includes:
 - completed-study participant-type and department mix;
 - AI suggestion offers and selections by field;
 - selected-suggestion retention and edit outcomes by field;
+- suggestion selection by field, kind, and zero-based position;
 - attempt outcomes by authoring mode;
 - median attempt timing by authoring mode;
 - reported-versus-inferred content-source concordance;
@@ -196,6 +197,14 @@ Selection percentages use attempts with at least one offered suggestion as
 their denominator. Selected-suggestion outcomes retain
 `EDITED_UNCLASSIFIED` separately from `REPLACED`; they are descriptive and
 do not establish writing quality or causal benefit.
+
+The suggestion-choice section distinguishes two denominators.
+Attempt-level selection is the percentage of completed AI attempts with at
+least one offered suggestion that selected a suggestion. Suggestion-level
+selection is the percentage of all offered suggestion instances that were
+selected. Position charts use zero-based indices, so index 0 is the first
+offered suggestion. These descriptive measures do not establish suggestion
+quality or causal benefit.
 
 The report embeds its Plotly JavaScript and does not require an external script
 service. It does not contain usernames, audit IDs, study numbers, source

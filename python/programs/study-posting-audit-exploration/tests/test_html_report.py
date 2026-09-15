@@ -242,6 +242,29 @@ def field_adoption_rows() -> pd.DataFrame:
     )
 
 
+def suggestion_selection_rows() -> pd.DataFrame:
+    """Return aggregate-only suggestion-selection rows."""
+    return pd.DataFrame.from_records(
+        [
+            {
+                "field_name": "title",
+                "suggestion_kind": "title",
+                "suggestion_index": 0,
+                "offered_suggestion_count": 8,
+                "selected_suggestion_count": 3,
+                "unselected_suggestion_count": 5,
+                "completed_ai_attempt_count_with_at_least_one_suggestion": 4,
+                "completed_ai_attempt_count_with_selected_suggestion": 3,
+                "suggestion_level_selection_percentage": 37.5,
+                "attempt_level_selection_percentage": 75.0,
+                "suggestion_count_at_index": 4,
+                "selected_suggestion_count_at_index": 3,
+                "selection_percentage_at_index": 75.0,
+            }
+        ]
+    )
+
+
 def content_rows() -> pd.DataFrame:
     """Return aggregate-only content-source rows."""
     return pd.DataFrame.from_records(
@@ -354,6 +377,7 @@ def charts() -> ExplorationCharts:
             grouped_study_summary=grouped_study_rows(),
             grouped_author_summary=grouped_author_rows(),
             field_adoption_editing_summary=field_adoption_rows(),
+            suggestion_selection_summary=suggestion_selection_rows(),
             content_source_matrix=content_rows(),
         )
     )
@@ -418,6 +442,23 @@ def test_html_report_is_self_contained_and_accessible() -> None:
     assert "Field populations and denominators can differ" in normalized_html
     assert "Edited-unclassified is kept separate from replaced" in normalized_html
     assert "do not establish writing quality" in normalized_html
+
+
+def test_html_report_explains_suggestion_choice_denominators() -> None:
+    html = render_html_report(
+        overview_summary=overview_rows(),
+        charts=charts(),
+    )
+    normalized_html = " ".join(html.split())
+
+    assert 'id="suggestion-choice-heading"' in html
+    assert "Suggestion choice" in html
+    assert "Suggestion selection by field and kind" in html
+    assert "Selection by zero-based suggestion index" in html
+    assert "Attempt-level selection is the percentage" in normalized_html
+    assert "Suggestion-level selection is the percentage" in normalized_html
+    assert "index 0 is the first offered suggestion" in normalized_html
+    assert "does not establish that a suggestion was better" in normalized_html
 
 
 def test_html_report_excludes_identifier_and_payload_values() -> None:

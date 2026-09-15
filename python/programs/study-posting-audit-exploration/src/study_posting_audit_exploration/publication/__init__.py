@@ -17,6 +17,8 @@ from study_posting_audit_exploration.publication.charts import (
     build_field_selected_outcomes_chart,
     build_field_suggestion_adoption_chart,
     build_study_completion_pathways_chart,
+    build_suggestion_selection_by_index_chart,
+    build_suggestion_selection_by_kind_chart,
 )
 from study_posting_audit_exploration.publication.csv_output import (
     publish_exploration,
@@ -46,6 +48,8 @@ __all__ = [
     "build_field_selected_outcomes_chart",
     "build_field_suggestion_adoption_chart",
     "build_study_completion_pathways_chart",
+    "build_suggestion_selection_by_index_chart",
+    "build_suggestion_selection_by_kind_chart",
     "manifest_filename",
     "publish_exploration",
     "render_html_report",

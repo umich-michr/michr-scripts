@@ -280,6 +280,7 @@ def _write_staging_output(
             field_adoption_editing_summary=(
                 tables.fields.field_adoption_editing_summary
             ),
+            suggestion_selection_summary=(tables.fields.suggestion_selection_summary),
             content_source_matrix=(tables.attempts.content_source_concordance_matrix),
         )
     )

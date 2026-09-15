@@ -22,6 +22,8 @@ from study_posting_audit_exploration.publication import (
     build_effective_author_role_chart,
     build_exploration_charts,
     build_study_completion_pathways_chart,
+    build_suggestion_selection_by_index_chart,
+    build_suggestion_selection_by_kind_chart,
 )
 from study_posting_audit_exploration.publication.charts import (
     build_field_selected_outcomes_chart,
@@ -463,6 +465,59 @@ def field_adoption_rows() -> pd.DataFrame:
     )
 
 
+def suggestion_selection_rows() -> pd.DataFrame:
+    """Return synthetic aggregate-only suggestion-selection rows."""
+    return pd.DataFrame.from_records(
+        [
+            {
+                "field_name": "title",
+                "suggestion_kind": "title",
+                "suggestion_index": 0,
+                "offered_suggestion_count": 18,
+                "selected_suggestion_count": 7,
+                "unselected_suggestion_count": 11,
+                "completed_ai_attempt_count_with_at_least_one_suggestion": 9,
+                "completed_ai_attempt_count_with_selected_suggestion": 7,
+                "suggestion_level_selection_percentage": 100.0 * 7.0 / 18.0,
+                "attempt_level_selection_percentage": 100.0 * 7.0 / 9.0,
+                "suggestion_count_at_index": 9,
+                "selected_suggestion_count_at_index": 5,
+                "selection_percentage_at_index": 100.0 * 5.0 / 9.0,
+            },
+            {
+                "field_name": "title",
+                "suggestion_kind": "title",
+                "suggestion_index": 1,
+                "offered_suggestion_count": 18,
+                "selected_suggestion_count": 7,
+                "unselected_suggestion_count": 11,
+                "completed_ai_attempt_count_with_at_least_one_suggestion": 9,
+                "completed_ai_attempt_count_with_selected_suggestion": 7,
+                "suggestion_level_selection_percentage": 100.0 * 7.0 / 18.0,
+                "attempt_level_selection_percentage": 100.0 * 7.0 / 9.0,
+                "suggestion_count_at_index": 9,
+                "selected_suggestion_count_at_index": 2,
+                "selection_percentage_at_index": 100.0 * 2.0 / 9.0,
+            },
+            {
+                "field_name": "compensation",
+                "suggestion_kind": "genericCompensation",
+                "suggestion_index": 0,
+                "offered_suggestion_count": 6,
+                "selected_suggestion_count": 3,
+                "unselected_suggestion_count": 3,
+                "completed_ai_attempt_count_with_at_least_one_suggestion": 6,
+                "completed_ai_attempt_count_with_selected_suggestion": 3,
+                "suggestion_level_selection_percentage": 50.0,
+                "attempt_level_selection_percentage": 50.0,
+                "suggestion_count_at_index": 6,
+                "selected_suggestion_count_at_index": 3,
+                "selection_percentage_at_index": 50.0,
+            },
+        ]
+    )
+
+
 def content_source_rows() -> pd.DataFrame:
     """Return synthetic aggregate-only concordance rows."""
     return pd.DataFrame.from_records(
@@ -667,6 +722,44 @@ def test_field_selected_outcomes_chart_preserves_unclassified() -> None:
     )
 
 
+def test_suggestion_selection_by_kind_chart_distinguishes_denominators() -> None:
+    figure = build_suggestion_selection_by_kind_chart(suggestion_selection_rows())
+    bar = figure.data[0]
+
+    assert figure.layout.title.text == ("Suggestion selection by field and kind")
+    assert list(bar.x) == [
+        "Compensation — Generic compensation",
+        "Title",
+    ]
+    assert list(bar.y) == [
+        50.0,
+        pytest.approx(100.0 * 7.0 / 9.0),
+    ]
+    title_customdata = bar.customdata[1]
+    assert list(title_customdata[:4]) == [9, 7, 18, 7]
+    assert title_customdata[4] == pytest.approx(100.0 * 7.0 / 18.0)
+    assert "Attempt-level selection" in str(bar.hovertemplate)
+    assert "Suggestion-level selection" in str(bar.hovertemplate)
+
+
+def test_suggestion_selection_by_index_chart_is_zero_based() -> None:
+    figure = build_suggestion_selection_by_index_chart(suggestion_selection_rows())
+    traces_by_name = {str(trace.name): trace for trace in figure.data}
+    title_trace = traces_by_name["Title"]
+
+    assert figure.layout.title.text == ("Selection by zero-based suggestion index")
+    assert list(title_trace.x) == [0, 1]
+    assert list(title_trace.y) == [
+        pytest.approx(100.0 * 5.0 / 9.0),
+        pytest.approx(100.0 * 2.0 / 9.0),
+    ]
+    assert [list(value) for value in title_trace.customdata] == [
+        [9, 5],
+        [9, 2],
+    ]
+    assert "Zero-based suggestion index" in str(title_trace.hovertemplate)
+
+
 def test_content_source_chart_uses_all_attempt_population() -> None:
     figure = build_content_source_concordance_chart(content_source_rows())
     heatmap = figure.data[0]
@@ -688,6 +781,7 @@ def test_chart_bundle_contains_all_figures() -> None:
             grouped_study_summary=grouped_study_rows(),
             grouped_author_summary=grouped_author_rows(),
             field_adoption_editing_summary=field_adoption_rows(),
+            suggestion_selection_summary=suggestion_selection_rows(),
             content_source_matrix=content_source_rows(),
         )
     )
@@ -709,6 +803,8 @@ def test_chart_bundle_contains_all_figures() -> None:
     assert charts.pi_appointment_schools.data
     assert charts.field_suggestion_adoption.data
     assert charts.field_selected_outcomes.data
+    assert charts.suggestion_selection_by_kind.data
+    assert charts.suggestion_selection_by_index.data
 
 
 def test_charts_return_accessible_empty_states() -> None:
@@ -724,6 +820,7 @@ def test_charts_return_accessible_empty_states() -> None:
     grouped_study_columns = grouped_study_rows().columns
     grouped_author_columns = grouped_author_rows().columns
     field_adoption_columns = field_adoption_rows().columns
+    suggestion_columns = suggestion_selection_rows().columns
 
     attempt_figure = build_attempt_outcomes_chart(pd.DataFrame(columns=attempt_columns))
     study_figure = build_study_completion_pathways_chart(
@@ -760,6 +857,12 @@ def test_charts_return_accessible_empty_states() -> None:
     field_outcomes_figure = build_field_selected_outcomes_chart(
         pd.DataFrame(columns=field_adoption_columns)
     )
+    suggestion_kind_figure = build_suggestion_selection_by_kind_chart(
+        pd.DataFrame(columns=suggestion_columns)
+    )
+    suggestion_index_figure = build_suggestion_selection_by_index_chart(
+        pd.DataFrame(columns=suggestion_columns)
+    )
 
     assert attempt_figure.layout.annotations[0].text
     assert study_figure.layout.annotations[0].text
@@ -773,6 +876,8 @@ def test_charts_return_accessible_empty_states() -> None:
     assert author_appointment_figure.layout.annotations[0].text
     assert field_adoption_figure.layout.annotations[0].text
     assert field_outcomes_figure.layout.annotations[0].text
+    assert suggestion_kind_figure.layout.annotations[0].text
+    assert suggestion_index_figure.layout.annotations[0].text
 
 
 @pytest.mark.parametrize(
@@ -879,6 +984,22 @@ def test_charts_return_accessible_empty_states() -> None:
         ),
         (
             build_field_selected_outcomes_chart,
+            pd.DataFrame(
+                {
+                    "field_name": ["title"],
+                }
+            ),
+        ),
+        (
+            build_suggestion_selection_by_kind_chart,
+            pd.DataFrame(
+                {
+                    "field_name": ["title"],
+                }
+            ),
+        ),
+        (
+            build_suggestion_selection_by_index_chart,
             pd.DataFrame(
                 {
                     "field_name": ["title"],

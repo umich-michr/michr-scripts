@@ -249,6 +249,26 @@ _TEMPLATE = """<!doctype html>
   <div class="chart">{{ field_selected_outcomes_html | safe }}</div>
 </section>
 
+<section aria-labelledby="suggestion-choice-heading">
+  <h2 id="suggestion-choice-heading">Suggestion choice</h2>
+  <p>
+    These charts summarize completed AI attempts without displaying
+    suggestion text. Attempt-level selection is the percentage of eligible
+    attempts with at least one selected suggestion. Suggestion-level
+    selection is the percentage of all offered suggestion instances that
+    were selected.
+  </p>
+  <p class="caution">
+    Suggestion index is zero-based, so index 0 is the first offered
+    suggestion. Fields and suggestion kinds can have different numbers of
+    offers and eligible attempts. Selection does not establish that a
+    suggestion was better, correct, accessible, useful, or causally
+    beneficial.
+  </p>
+  <div class="chart">{{ suggestion_selection_by_kind_html | safe }}</div>
+  <div class="chart">{{ suggestion_selection_by_index_html | safe }}</div>
+</section>
+
   <section aria-labelledby="attempts-heading">
     <h2 id="attempts-heading">Attempts and workflow timing</h2>
     <div class="chart">{{ attempt_outcomes_html | safe }}</div>
@@ -428,6 +448,14 @@ def render_html_report(
         ),
         field_selected_outcomes_html=_figure_html(
             charts.field_selected_outcomes,
+            include_plotlyjs=False,
+        ),
+        suggestion_selection_by_kind_html=_figure_html(
+            charts.suggestion_selection_by_kind,
+            include_plotlyjs=False,
+        ),
+        suggestion_selection_by_index_html=_figure_html(
+            charts.suggestion_selection_by_index,
             include_plotlyjs=False,
         ),
         attempt_outcomes_html=_figure_html(

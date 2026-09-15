@@ -101,6 +101,21 @@ _REQUIRED_FIELD_ADOPTION_COLUMNS: tuple[str, ...] = (
     "suggestion_selection_percentage_among_attempts_with_offer",
 )
 
+_REQUIRED_SUGGESTION_SELECTION_COLUMNS: tuple[str, ...] = (
+    "field_name",
+    "suggestion_kind",
+    "suggestion_index",
+    "offered_suggestion_count",
+    "selected_suggestion_count",
+    "completed_ai_attempt_count_with_at_least_one_suggestion",
+    "completed_ai_attempt_count_with_selected_suggestion",
+    "suggestion_level_selection_percentage",
+    "attempt_level_selection_percentage",
+    "suggestion_count_at_index",
+    "selected_suggestion_count_at_index",
+    "selection_percentage_at_index",
+)
+
 _ATTEMPT_RESULT_ORDER: tuple[str, ...] = (
     "COMPLETE",
     "AI_ERROR",
@@ -235,6 +250,7 @@ class ExplorationChartInputs:
     grouped_study_summary: pd.DataFrame
     grouped_author_summary: pd.DataFrame
     field_adoption_editing_summary: pd.DataFrame
+    suggestion_selection_summary: pd.DataFrame
     content_source_matrix: pd.DataFrame
 
 
@@ -257,6 +273,8 @@ class ExplorationCharts:
     pi_appointment_schools: go.Figure
     field_suggestion_adoption: go.Figure
     field_selected_outcomes: go.Figure
+    suggestion_selection_by_kind: go.Figure
+    suggestion_selection_by_index: go.Figure
     content_source_concordance: go.Figure
 
 
@@ -1219,6 +1237,229 @@ def build_field_selected_outcomes_chart(
     return figure
 
 
+def _suggestion_kind_label(value: object) -> str:
+    """Return one faculty-facing suggestion-kind label."""
+    text = str(value)
+    aliases = {
+        "genericCompensation": "Generic compensation",
+        "specificCompensation": "Specific compensation",
+    }
+
+    return aliases.get(
+        text,
+        text.replace("_", " ").replace("-", " ").title(),
+    )
+
+
+def _suggestion_group_label(
+    *,
+    field_name: object,
+    suggestion_kind: object,
+) -> str:
+    """Return one stable field and suggestion-kind label."""
+    field_label = _field_label(field_name)
+    kind_label = _suggestion_kind_label(suggestion_kind)
+
+    if str(field_name) == str(suggestion_kind):
+        return field_label
+
+    return f"{field_label} — {kind_label}"
+
+
+def _suggestion_kind_rows(
+    suggestion_selection_summary: pd.DataFrame,
+) -> pd.DataFrame:
+    """Return one deduplicated aggregate row per field and kind."""
+    ordered = suggestion_selection_summary.sort_values(
+        by=[
+            "field_name",
+            "suggestion_kind",
+            "suggestion_index",
+        ],
+        kind="stable",
+    )
+
+    return ordered.drop_duplicates(
+        subset=[
+            "field_name",
+            "suggestion_kind",
+        ],
+        keep="first",
+    )
+
+
+def build_suggestion_selection_by_kind_chart(
+    suggestion_selection_summary: pd.DataFrame,
+) -> go.Figure:
+    """Return attempt-level suggestion selection by field and kind."""
+    _require_columns(
+        suggestion_selection_summary,
+        required=_REQUIRED_SUGGESTION_SELECTION_COLUMNS,
+        frame_name="suggestion_selection_summary",
+    )
+    rows = _suggestion_kind_rows(suggestion_selection_summary)
+
+    if rows.empty:
+        return _empty_figure(
+            title="Suggestion selection by field and kind",
+            message="No suggestion-selection aggregates are available.",
+        )
+
+    labels = [
+        _suggestion_group_label(
+            field_name=row["field_name"],
+            suggestion_kind=row["suggestion_kind"],
+        )
+        for row in rows.to_dict(orient="records")
+    ]
+    percentages = [
+        float(value) if not pd.isna(value) else None
+        for value in rows["attempt_level_selection_percentage"].tolist()
+    ]
+    customdata = [
+        [
+            int(attempts_with_offer),
+            int(attempts_with_selection),
+            int(offered_count),
+            int(selected_count),
+            (
+                float(suggestion_percentage)
+                if not pd.isna(suggestion_percentage)
+                else None
+            ),
+        ]
+        for (
+            attempts_with_offer,
+            attempts_with_selection,
+            offered_count,
+            selected_count,
+            suggestion_percentage,
+        ) in zip(
+            rows["completed_ai_attempt_count_with_at_least_one_suggestion"].tolist(),
+            rows["completed_ai_attempt_count_with_selected_suggestion"].tolist(),
+            rows["offered_suggestion_count"].tolist(),
+            rows["selected_suggestion_count"].tolist(),
+            rows["suggestion_level_selection_percentage"].tolist(),
+            strict=True,
+        )
+    ]
+    figure = go.Figure(
+        data=[
+            go.Bar(
+                x=labels,
+                y=percentages,
+                customdata=customdata,
+                hovertemplate=(
+                    "Field and suggestion kind: %{x}<br>"
+                    "Attempt-level selection: %{y:.1f}%<br>"
+                    "Attempts with one or more suggestions: "
+                    "%{customdata[0]}<br>"
+                    "Attempts with a selected suggestion: "
+                    "%{customdata[1]}<br>"
+                    "Suggestions offered: %{customdata[2]}<br>"
+                    "Suggestions selected: %{customdata[3]}<br>"
+                    "Suggestion-level selection: "
+                    "%{customdata[4]:.1f}%"
+                    "<extra></extra>"
+                ),
+            )
+        ]
+    )
+    figure.update_layout(
+        title="Suggestion selection by field and kind",
+        template="plotly_white",
+        xaxis_title="Study-posting field and suggestion kind",
+        yaxis_title="Attempt-level selection percentage",
+        showlegend=False,
+    )
+
+    return figure
+
+
+def build_suggestion_selection_by_index_chart(
+    suggestion_selection_summary: pd.DataFrame,
+) -> go.Figure:
+    """Return selection percentages by zero-based suggestion index."""
+    _require_columns(
+        suggestion_selection_summary,
+        required=_REQUIRED_SUGGESTION_SELECTION_COLUMNS,
+        frame_name="suggestion_selection_summary",
+    )
+    rows = suggestion_selection_summary.sort_values(
+        by=[
+            "field_name",
+            "suggestion_kind",
+            "suggestion_index",
+        ],
+        kind="stable",
+    )
+
+    if rows.empty:
+        return _empty_figure(
+            title="Selection by zero-based suggestion index",
+            message="No suggestion-index aggregates are available.",
+        )
+
+    figure = go.Figure()
+
+    for keys, group in rows.groupby(
+        [
+            "field_name",
+            "suggestion_kind",
+        ],
+        sort=True,
+        dropna=False,
+    ):
+        field_name, suggestion_kind = keys
+        indices = [int(value) for value in group["suggestion_index"].tolist()]
+        percentages = [
+            float(value) if not pd.isna(value) else None
+            for value in group["selection_percentage_at_index"].tolist()
+        ]
+        customdata = [
+            [
+                int(offered_count),
+                int(selected_count),
+            ]
+            for offered_count, selected_count in zip(
+                group["suggestion_count_at_index"].tolist(),
+                group["selected_suggestion_count_at_index"].tolist(),
+                strict=True,
+            )
+        ]
+        figure.add_scatter(
+            name=_suggestion_group_label(
+                field_name=field_name,
+                suggestion_kind=suggestion_kind,
+            ),
+            x=indices,
+            y=percentages,
+            customdata=customdata,
+            mode="lines+markers",
+            hovertemplate=(
+                "Suggestion group: %{fullData.name}<br>"
+                "Zero-based suggestion index: %{x}<br>"
+                "Selection at index: %{y:.1f}%<br>"
+                "Suggestions offered at index: %{customdata[0]}<br>"
+                "Suggestions selected at index: %{customdata[1]}"
+                "<extra></extra>"
+            ),
+        )
+
+    figure.update_layout(
+        title="Selection by zero-based suggestion index",
+        template="plotly_white",
+        xaxis_title="Zero-based suggestion index",
+        yaxis_title="Selection percentage at index",
+        legend_title_text="Field and suggestion kind",
+    )
+    figure.update_xaxes(
+        dtick=1,
+    )
+
+    return figure
+
+
 def build_content_source_concordance_chart(
     content_source_matrix: pd.DataFrame,
 ) -> go.Figure:
@@ -1348,6 +1589,16 @@ def build_exploration_charts(
         ),
         field_selected_outcomes=build_field_selected_outcomes_chart(
             inputs.field_adoption_editing_summary
+        ),
+        suggestion_selection_by_kind=(
+            build_suggestion_selection_by_kind_chart(
+                inputs.suggestion_selection_summary
+            )
+        ),
+        suggestion_selection_by_index=(
+            build_suggestion_selection_by_index_chart(
+                inputs.suggestion_selection_summary
+            )
         ),
         content_source_concordance=build_content_source_concordance_chart(
             inputs.content_source_matrix
