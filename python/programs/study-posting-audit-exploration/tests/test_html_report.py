@@ -265,6 +265,71 @@ def suggestion_selection_rows() -> pd.DataFrame:
     )
 
 
+def readability_change_rows() -> pd.DataFrame:
+    """Return aggregate-only readability-change rows."""
+    return pd.DataFrame.from_records(
+        [
+            {
+                "field_name": "title",
+                "readability_measure_name": "flesch_kincaid_grade",
+                "paired_selected_final_attempt_count": 3,
+                "attempt_count_value_decreased": 1,
+                "attempt_count_no_material_change": 1,
+                "attempt_count_value_increased": 1,
+                "percentage_value_decreased": 100.0 / 3.0,
+                "percentage_no_material_change": 100.0 / 3.0,
+                "percentage_value_increased": 100.0 / 3.0,
+                "unchanged_absolute_tolerance": 0.1,
+                "short_text_readability_caution": True,
+            }
+        ]
+    )
+
+
+def readability_target_rows() -> pd.DataFrame:
+    """Return aggregate-only final grade-band rows."""
+    return pd.DataFrame.from_records(
+        [
+            {
+                "attempt_authoring_mode": "AI",
+                "field_name": "title",
+                "readability_measure_name": "flesch_kincaid_grade",
+                "final_text_attempt_count": 4,
+                "attempt_count_at_or_below_grade_6": 1,
+                "attempt_count_above_grade_6_through_grade_8": 1,
+                "attempt_count_above_grade_8_through_grade_10": 1,
+                "attempt_count_above_grade_10": 1,
+                "percentage_at_or_below_grade_8": 50.0,
+                "short_text_readability_caution": True,
+                "target_interpretation_note": (
+                    "Grade-level formulas are indicators only."
+                ),
+            }
+        ]
+    )
+
+
+def selected_comparison_rows() -> pd.DataFrame:
+    """Return aggregate-only selected-comparison rows."""
+    return pd.DataFrame.from_records(
+        [
+            {
+                "field_name": "title",
+                "readability_measure_name": "flesch_kincaid_grade",
+                (
+                    "completed_ai_attempt_count_with_selected_and_"
+                    "unselected_suggestions"
+                ): 3,
+                "median_selected_minus_mean_unselected_value": -0.5,
+                "attempt_count_selected_value_lower": 2,
+                "attempt_count_selected_value_equal_within_tolerance": 0,
+                "attempt_count_selected_value_higher": 1,
+                "equality_tolerance": 0.1,
+            }
+        ]
+    )
+
+
 def content_rows() -> pd.DataFrame:
     """Return aggregate-only content-source rows."""
     return pd.DataFrame.from_records(
@@ -378,6 +443,9 @@ def charts() -> ExplorationCharts:
             grouped_author_summary=grouped_author_rows(),
             field_adoption_editing_summary=field_adoption_rows(),
             suggestion_selection_summary=suggestion_selection_rows(),
+            field_readability_change_summary=readability_change_rows(),
+            field_readability_target_summary=readability_target_rows(),
+            selected_vs_unselected_readability_summary=(selected_comparison_rows()),
             content_source_matrix=content_rows(),
         )
     )
@@ -459,6 +527,26 @@ def test_html_report_explains_suggestion_choice_denominators() -> None:
     assert "Suggestion-level selection is the percentage" in normalized_html
     assert "index 0 is the first offered suggestion" in normalized_html
     assert "does not establish that a suggestion was better" in normalized_html
+
+
+def test_html_report_explains_readability_indicators() -> None:
+    html = render_html_report(
+        overview_summary=overview_rows(),
+        charts=charts(),
+    )
+    normalized_html = " ".join(html.split())
+
+    assert 'id="readability-heading"' in html
+    assert "Readability indicators" in html
+    assert "Selected-to-final Flesch-Kincaid direction by field" in html
+    assert "Observed final Flesch-Kincaid grade bands" in html
+    assert "Selected versus mean-unselected Flesch-Kincaid difference" in html
+    assert "final minus selected" in normalized_html
+    assert (
+        "Lower or higher formula values are not automatically better" in normalized_html
+    )
+    assert "Titles are short text" in normalized_html
+    assert "Sample counts and tolerances appear in hover text" in (normalized_html)
 
 
 def test_html_report_excludes_identifier_and_payload_values() -> None:

@@ -175,6 +175,9 @@ aggregate analysis tables. It currently includes:
 - AI suggestion offers and selections by field;
 - selected-suggestion retention and edit outcomes by field;
 - suggestion selection by field, kind, and zero-based position;
+- selected-to-final Flesch-Kincaid direction by field;
+- observed final Flesch-Kincaid grade bands by field and mode;
+- selected versus mean-unselected Flesch-Kincaid differences;
 - attempt outcomes by authoring mode;
 - median attempt timing by authoring mode;
 - reported-versus-inferred content-source concordance;
@@ -205,6 +208,14 @@ selection is the percentage of all offered suggestion instances that were
 selected. Position charts use zero-based indices, so index 0 is the first
 offered suggestion. These descriptive measures do not establish suggestion
 quality or causal benefit.
+
+The readability section uses aggregate Flesch-Kincaid summaries. Change
+direction is final minus selected. Negative values indicate a lower final
+formula value and positive values indicate a higher final formula value;
+neither direction is automatically better. Final grade bands include only
+observed nonblank final texts. Titles carry a short-text reliability
+caution. Readability formulas do not establish comprehension, accuracy,
+accessibility, usefulness, cultural appropriateness, or ethical adequacy.
 
 The report embeds its Plotly JavaScript and does not require an external script
 service. It does not contain usernames, audit IDs, study numbers, source

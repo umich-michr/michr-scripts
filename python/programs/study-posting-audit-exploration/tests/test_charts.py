@@ -28,6 +28,9 @@ from study_posting_audit_exploration.publication import (
 from study_posting_audit_exploration.publication.charts import (
     build_field_selected_outcomes_chart,
     build_field_suggestion_adoption_chart,
+    build_final_grade_bands_chart,
+    build_readability_change_direction_chart,
+    build_selected_vs_unselected_readability_chart,
 )
 
 
@@ -518,6 +521,125 @@ def suggestion_selection_rows() -> pd.DataFrame:
     )
 
 
+def readability_change_rows() -> pd.DataFrame:
+    """Return synthetic selected-to-final readability summaries."""
+    return pd.DataFrame.from_records(
+        [
+            {
+                "field_name": "title",
+                "readability_measure_name": "flesch_kincaid_grade",
+                "paired_selected_final_attempt_count": 6,
+                "attempt_count_value_decreased": 2,
+                "attempt_count_no_material_change": 1,
+                "attempt_count_value_increased": 3,
+                "percentage_value_decreased": 100.0 * 2.0 / 6.0,
+                "percentage_no_material_change": 100.0 / 6.0,
+                "percentage_value_increased": 50.0,
+                "unchanged_absolute_tolerance": 0.1,
+                "short_text_readability_caution": True,
+            },
+            {
+                "field_name": "description",
+                "readability_measure_name": "flesch_kincaid_grade",
+                "paired_selected_final_attempt_count": 5,
+                "attempt_count_value_decreased": 3,
+                "attempt_count_no_material_change": 1,
+                "attempt_count_value_increased": 1,
+                "percentage_value_decreased": 60.0,
+                "percentage_no_material_change": 20.0,
+                "percentage_value_increased": 20.0,
+                "unchanged_absolute_tolerance": 0.1,
+                "short_text_readability_caution": False,
+            },
+            {
+                "field_name": "title",
+                "readability_measure_name": "word_count",
+                "paired_selected_final_attempt_count": 6,
+                "attempt_count_value_decreased": 1,
+                "attempt_count_no_material_change": 2,
+                "attempt_count_value_increased": 3,
+                "percentage_value_decreased": 100.0 / 6.0,
+                "percentage_no_material_change": 100.0 * 2.0 / 6.0,
+                "percentage_value_increased": 50.0,
+                "unchanged_absolute_tolerance": 0.1,
+                "short_text_readability_caution": True,
+            },
+        ]
+    )
+
+
+def readability_target_rows() -> pd.DataFrame:
+    """Return synthetic final grade-band summaries."""
+    note = (
+        "Grade-level formulas are indicators only and do not establish comprehension."
+    )
+
+    return pd.DataFrame.from_records(
+        [
+            {
+                "attempt_authoring_mode": "AI",
+                "field_name": "title",
+                "readability_measure_name": "flesch_kincaid_grade",
+                "final_text_attempt_count": 8,
+                "attempt_count_at_or_below_grade_6": 2,
+                "attempt_count_above_grade_6_through_grade_8": 2,
+                "attempt_count_above_grade_8_through_grade_10": 1,
+                "attempt_count_above_grade_10": 3,
+                "percentage_at_or_below_grade_8": 50.0,
+                "short_text_readability_caution": True,
+                "target_interpretation_note": note,
+            },
+            {
+                "attempt_authoring_mode": "MANUAL",
+                "field_name": "description",
+                "readability_measure_name": "flesch_kincaid_grade",
+                "final_text_attempt_count": 6,
+                "attempt_count_at_or_below_grade_6": 1,
+                "attempt_count_above_grade_6_through_grade_8": 2,
+                "attempt_count_above_grade_8_through_grade_10": 2,
+                "attempt_count_above_grade_10": 1,
+                "percentage_at_or_below_grade_8": 50.0,
+                "short_text_readability_caution": False,
+                "target_interpretation_note": note,
+            },
+        ]
+    )
+
+
+def selected_comparison_rows() -> pd.DataFrame:
+    """Return synthetic selected-versus-unselected summaries."""
+    return pd.DataFrame.from_records(
+        [
+            {
+                "field_name": "title",
+                "readability_measure_name": "flesch_kincaid_grade",
+                (
+                    "completed_ai_attempt_count_with_selected_and_"
+                    "unselected_suggestions"
+                ): 5,
+                "median_selected_minus_mean_unselected_value": -0.5,
+                "attempt_count_selected_value_lower": 3,
+                "attempt_count_selected_value_equal_within_tolerance": 1,
+                "attempt_count_selected_value_higher": 1,
+                "equality_tolerance": 0.1,
+            },
+            {
+                "field_name": "description",
+                "readability_measure_name": "flesch_kincaid_grade",
+                (
+                    "completed_ai_attempt_count_with_selected_and_"
+                    "unselected_suggestions"
+                ): 4,
+                "median_selected_minus_mean_unselected_value": 0.75,
+                "attempt_count_selected_value_lower": 1,
+                "attempt_count_selected_value_equal_within_tolerance": 1,
+                "attempt_count_selected_value_higher": 2,
+                "equality_tolerance": 0.1,
+            },
+        ]
+    )
+
+
 def content_source_rows() -> pd.DataFrame:
     """Return synthetic aggregate-only concordance rows."""
     return pd.DataFrame.from_records(
@@ -760,6 +882,62 @@ def test_suggestion_selection_by_index_chart_is_zero_based() -> None:
     assert "Zero-based suggestion index" in str(title_trace.hovertemplate)
 
 
+def test_readability_change_chart_uses_final_minus_selected_direction() -> None:
+    figure = build_readability_change_direction_chart(readability_change_rows())
+    traces = {str(trace.name): trace for trace in figure.data}
+
+    assert figure.layout.title.text == (
+        "Selected-to-final Flesch-Kincaid direction by field"
+    )
+    assert figure.layout.barmode == "stack"
+    assert list(traces["Final value decreased"].x) == [
+        "Description",
+        "Title",
+    ]
+    assert list(traces["Final value decreased"].y) == [3, 2]
+    assert list(traces["Final value increased"].y) == [1, 3]
+    assert (figure.layout.legend.title.text) == "Final minus selected direction"
+    assert "No-material-change tolerance" in str(
+        traces["No material change"].hovertemplate
+    )
+
+
+def test_final_grade_bands_chart_uses_observed_final_texts() -> None:
+    figure = build_final_grade_bands_chart(readability_target_rows())
+    traces = {str(trace.name): trace for trace in figure.data}
+
+    assert figure.layout.title.text == ("Observed final Flesch-Kincaid grade bands")
+    assert figure.layout.barmode == "stack"
+    assert list(traces["At or below grade 6"].x) == [
+        "Description — MANUAL",
+        "Title — AI",
+    ]
+    assert list(traces["At or below grade 6"].y) == [1, 2]
+    assert "Observed nonblank final texts" in str(
+        traces["At or below grade 6"].hovertemplate
+    )
+    assert "Short-text caution applies" in str(
+        traces["At or below grade 6"].customdata[1][2]
+    )
+
+
+def test_selected_vs_unselected_chart_uses_comparable_attempts() -> None:
+    figure = build_selected_vs_unselected_readability_chart(selected_comparison_rows())
+    bar = figure.data[0]
+
+    assert figure.layout.title.text == (
+        "Selected versus mean-unselected Flesch-Kincaid difference"
+    )
+    assert list(bar.x) == ["Description", "Title"]
+    assert list(bar.y) == [0.75, -0.5]
+    assert [list(value) for value in bar.customdata] == [
+        [4, 1, 1, 2, 0.1],
+        [5, 3, 1, 1, 0.1],
+    ]
+    assert "Comparable completed AI attempts" in str(bar.hovertemplate)
+    assert len(figure.layout.shapes) == 1
+
+
 def test_content_source_chart_uses_all_attempt_population() -> None:
     figure = build_content_source_concordance_chart(content_source_rows())
     heatmap = figure.data[0]
@@ -782,6 +960,9 @@ def test_chart_bundle_contains_all_figures() -> None:
             grouped_author_summary=grouped_author_rows(),
             field_adoption_editing_summary=field_adoption_rows(),
             suggestion_selection_summary=suggestion_selection_rows(),
+            field_readability_change_summary=readability_change_rows(),
+            field_readability_target_summary=readability_target_rows(),
+            selected_vs_unselected_readability_summary=(selected_comparison_rows()),
             content_source_matrix=content_source_rows(),
         )
     )
@@ -805,6 +986,9 @@ def test_chart_bundle_contains_all_figures() -> None:
     assert charts.field_selected_outcomes.data
     assert charts.suggestion_selection_by_kind.data
     assert charts.suggestion_selection_by_index.data
+    assert charts.readability_change_direction.data
+    assert charts.final_grade_bands.data
+    assert charts.selected_vs_unselected_readability.data
 
 
 def test_charts_return_accessible_empty_states() -> None:
@@ -821,6 +1005,9 @@ def test_charts_return_accessible_empty_states() -> None:
     grouped_author_columns = grouped_author_rows().columns
     field_adoption_columns = field_adoption_rows().columns
     suggestion_columns = suggestion_selection_rows().columns
+    readability_change_columns = readability_change_rows().columns
+    readability_target_columns = readability_target_rows().columns
+    selected_comparison_columns = selected_comparison_rows().columns
 
     attempt_figure = build_attempt_outcomes_chart(pd.DataFrame(columns=attempt_columns))
     study_figure = build_study_completion_pathways_chart(
@@ -863,6 +1050,15 @@ def test_charts_return_accessible_empty_states() -> None:
     suggestion_index_figure = build_suggestion_selection_by_index_chart(
         pd.DataFrame(columns=suggestion_columns)
     )
+    readability_change_figure = build_readability_change_direction_chart(
+        pd.DataFrame(columns=readability_change_columns)
+    )
+    readability_target_figure = build_final_grade_bands_chart(
+        pd.DataFrame(columns=readability_target_columns)
+    )
+    selected_comparison_figure = build_selected_vs_unselected_readability_chart(
+        pd.DataFrame(columns=selected_comparison_columns)
+    )
 
     assert attempt_figure.layout.annotations[0].text
     assert study_figure.layout.annotations[0].text
@@ -878,6 +1074,9 @@ def test_charts_return_accessible_empty_states() -> None:
     assert field_outcomes_figure.layout.annotations[0].text
     assert suggestion_kind_figure.layout.annotations[0].text
     assert suggestion_index_figure.layout.annotations[0].text
+    assert readability_change_figure.layout.annotations[0].text
+    assert readability_target_figure.layout.annotations[0].text
+    assert selected_comparison_figure.layout.annotations[0].text
 
 
 @pytest.mark.parametrize(
@@ -1000,6 +1199,30 @@ def test_charts_return_accessible_empty_states() -> None:
         ),
         (
             build_suggestion_selection_by_index_chart,
+            pd.DataFrame(
+                {
+                    "field_name": ["title"],
+                }
+            ),
+        ),
+        (
+            build_readability_change_direction_chart,
+            pd.DataFrame(
+                {
+                    "field_name": ["title"],
+                }
+            ),
+        ),
+        (
+            build_final_grade_bands_chart,
+            pd.DataFrame(
+                {
+                    "field_name": ["title"],
+                }
+            ),
+        ),
+        (
+            build_selected_vs_unselected_readability_chart,
             pd.DataFrame(
                 {
                     "field_name": ["title"],

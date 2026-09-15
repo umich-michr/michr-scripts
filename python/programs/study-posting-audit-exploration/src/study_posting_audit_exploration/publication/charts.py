@@ -116,6 +116,45 @@ _REQUIRED_SUGGESTION_SELECTION_COLUMNS: tuple[str, ...] = (
     "selection_percentage_at_index",
 )
 
+_REQUIRED_READABILITY_CHANGE_COLUMNS: tuple[str, ...] = (
+    "field_name",
+    "readability_measure_name",
+    "paired_selected_final_attempt_count",
+    "attempt_count_value_decreased",
+    "attempt_count_no_material_change",
+    "attempt_count_value_increased",
+    "percentage_value_decreased",
+    "percentage_no_material_change",
+    "percentage_value_increased",
+    "unchanged_absolute_tolerance",
+    "short_text_readability_caution",
+)
+
+_REQUIRED_READABILITY_TARGET_COLUMNS: tuple[str, ...] = (
+    "attempt_authoring_mode",
+    "field_name",
+    "readability_measure_name",
+    "final_text_attempt_count",
+    "attempt_count_at_or_below_grade_6",
+    "attempt_count_above_grade_6_through_grade_8",
+    "attempt_count_above_grade_8_through_grade_10",
+    "attempt_count_above_grade_10",
+    "percentage_at_or_below_grade_8",
+    "short_text_readability_caution",
+    "target_interpretation_note",
+)
+
+_REQUIRED_SELECTED_COMPARISON_COLUMNS: tuple[str, ...] = (
+    "field_name",
+    "readability_measure_name",
+    "completed_ai_attempt_count_with_selected_and_unselected_suggestions",
+    "median_selected_minus_mean_unselected_value",
+    "attempt_count_selected_value_lower",
+    "attempt_count_selected_value_equal_within_tolerance",
+    "attempt_count_selected_value_higher",
+    "equality_tolerance",
+)
+
 _ATTEMPT_RESULT_ORDER: tuple[str, ...] = (
     "COMPLETE",
     "AI_ERROR",
@@ -202,6 +241,42 @@ _FIELD_DISPLAY_LABELS: Mapping[str, str] = {
     "compensation": "Compensation",
 }
 
+_FLESCH_KINCAID_GRADE = "flesch_kincaid_grade"
+
+_READABILITY_DIRECTION_SERIES: tuple[tuple[str, str], ...] = (
+    (
+        "attempt_count_value_decreased",
+        "Final value decreased",
+    ),
+    (
+        "attempt_count_no_material_change",
+        "No material change",
+    ),
+    (
+        "attempt_count_value_increased",
+        "Final value increased",
+    ),
+)
+
+_GRADE_BAND_SERIES: tuple[tuple[str, str], ...] = (
+    (
+        "attempt_count_at_or_below_grade_6",
+        "At or below grade 6",
+    ),
+    (
+        "attempt_count_above_grade_6_through_grade_8",
+        "Above grade 6 through grade 8",
+    ),
+    (
+        "attempt_count_above_grade_8_through_grade_10",
+        "Above grade 8 through grade 10",
+    ),
+    (
+        "attempt_count_above_grade_10",
+        "Above grade 10",
+    ),
+)
+
 _FIELD_EDIT_OUTCOMES: tuple[tuple[str, str], ...] = (
     (
         "completed_ai_attempt_count_selected_and_exactly_retained",
@@ -251,6 +326,9 @@ class ExplorationChartInputs:
     grouped_author_summary: pd.DataFrame
     field_adoption_editing_summary: pd.DataFrame
     suggestion_selection_summary: pd.DataFrame
+    field_readability_change_summary: pd.DataFrame
+    field_readability_target_summary: pd.DataFrame
+    selected_vs_unselected_readability_summary: pd.DataFrame
     content_source_matrix: pd.DataFrame
 
 
@@ -275,6 +353,9 @@ class ExplorationCharts:
     field_selected_outcomes: go.Figure
     suggestion_selection_by_kind: go.Figure
     suggestion_selection_by_index: go.Figure
+    readability_change_direction: go.Figure
+    final_grade_bands: go.Figure
+    selected_vs_unselected_readability: go.Figure
     content_source_concordance: go.Figure
 
 
@@ -1460,6 +1541,291 @@ def build_suggestion_selection_by_index_chart(
     return figure
 
 
+def build_readability_change_direction_chart(
+    field_readability_change_summary: pd.DataFrame,
+) -> go.Figure:
+    """Return selected-to-final Flesch-Kincaid direction counts by field."""
+    _require_columns(
+        field_readability_change_summary,
+        required=_REQUIRED_READABILITY_CHANGE_COLUMNS,
+        frame_name="field_readability_change_summary",
+    )
+    rows = field_readability_change_summary.loc[
+        field_readability_change_summary["readability_measure_name"].eq(
+            _FLESCH_KINCAID_GRADE
+        )
+    ].copy()
+
+    if rows.empty:
+        return _empty_figure(
+            title="Selected-to-final Flesch-Kincaid direction by field",
+            message="No selected-to-final readability aggregates are available.",
+        )
+
+    rows["_field_label"] = rows["field_name"].map(_field_label)
+    rows = rows.sort_values(
+        by=[
+            "_field_label",
+        ],
+        kind="stable",
+    )
+    field_labels = rows["_field_label"].astype(str).tolist()
+    pair_counts = [
+        int(value) for value in rows["paired_selected_final_attempt_count"].tolist()
+    ]
+    tolerances = [
+        float(value) if not pd.isna(value) else None
+        for value in rows["unchanged_absolute_tolerance"].tolist()
+    ]
+    short_text_cautions = [
+        bool(value) for value in rows["short_text_readability_caution"].tolist()
+    ]
+    figure = go.Figure()
+
+    for column_name, label in _READABILITY_DIRECTION_SERIES:
+        values = [int(value) for value in rows[column_name].tolist()]
+        customdata = [
+            [
+                pair_count,
+                tolerance,
+                (
+                    "Short-text caution applies"
+                    if caution
+                    else "Standard interpretation caution applies"
+                ),
+            ]
+            for pair_count, tolerance, caution in zip(
+                pair_counts,
+                tolerances,
+                short_text_cautions,
+                strict=True,
+            )
+        ]
+        figure.add_bar(
+            name=label,
+            x=field_labels,
+            y=values,
+            customdata=customdata,
+            hovertemplate=(
+                "Field: %{x}<br>"
+                "Direction: %{fullData.name}<br>"
+                "Paired selected-final attempts: %{customdata[0]}<br>"
+                "Attempts in direction: %{y}<br>"
+                "No-material-change tolerance: ±%{customdata[1]}<br>"
+                "%{customdata[2]}"
+                "<extra></extra>"
+            ),
+        )
+
+    figure.update_layout(
+        title="Selected-to-final Flesch-Kincaid direction by field",
+        template="plotly_white",
+        barmode="stack",
+        xaxis_title="Study-posting field",
+        yaxis_title="Paired selected-final attempt count",
+        legend_title_text="Final minus selected direction",
+    )
+
+    return figure
+
+
+def build_final_grade_bands_chart(
+    field_readability_target_summary: pd.DataFrame,
+) -> go.Figure:
+    """Return observed final Flesch-Kincaid grade bands by mode and field."""
+    _require_columns(
+        field_readability_target_summary,
+        required=_REQUIRED_READABILITY_TARGET_COLUMNS,
+        frame_name="field_readability_target_summary",
+    )
+    rows = field_readability_target_summary.loc[
+        field_readability_target_summary["readability_measure_name"].eq(
+            _FLESCH_KINCAID_GRADE
+        )
+        & field_readability_target_summary["attempt_authoring_mode"].isin(
+            _AUTHORING_MODE_ORDER
+        )
+    ].copy()
+
+    if rows.empty:
+        return _empty_figure(
+            title="Observed final Flesch-Kincaid grade bands",
+            message="No observed final grade-band aggregates are available.",
+        )
+
+    rows["_group_label"] = [
+        f"{_field_label(field_name)} — {mode}"
+        for field_name, mode in zip(
+            rows["field_name"],
+            rows["attempt_authoring_mode"],
+            strict=True,
+        )
+    ]
+    rows = rows.sort_values(
+        by=[
+            "_group_label",
+        ],
+        kind="stable",
+    )
+    group_labels = rows["_group_label"].astype(str).tolist()
+    final_counts = [int(value) for value in rows["final_text_attempt_count"].tolist()]
+    percentages_at_or_below_8 = [
+        float(value) if not pd.isna(value) else None
+        for value in rows["percentage_at_or_below_grade_8"].tolist()
+    ]
+    short_text_cautions = [
+        bool(value) for value in rows["short_text_readability_caution"].tolist()
+    ]
+    interpretation_notes = [
+        str(value) for value in rows["target_interpretation_note"].tolist()
+    ]
+    figure = go.Figure()
+
+    for column_name, label in _GRADE_BAND_SERIES:
+        values = [int(value) for value in rows[column_name].tolist()]
+        customdata = [
+            [
+                final_count,
+                percentage,
+                (
+                    "Short-text caution applies"
+                    if caution
+                    else "Standard interpretation caution applies"
+                ),
+                note,
+            ]
+            for final_count, percentage, caution, note in zip(
+                final_counts,
+                percentages_at_or_below_8,
+                short_text_cautions,
+                interpretation_notes,
+                strict=True,
+            )
+        ]
+        figure.add_bar(
+            name=label,
+            x=group_labels,
+            y=values,
+            customdata=customdata,
+            hovertemplate=(
+                "Field and mode: %{x}<br>"
+                "Grade band: %{fullData.name}<br>"
+                "Observed nonblank final texts: %{customdata[0]}<br>"
+                "Texts in band: %{y}<br>"
+                "At or below grade 8: %{customdata[1]:.1f}%<br>"
+                "%{customdata[2]}<br>"
+                "%{customdata[3]}"
+                "<extra></extra>"
+            ),
+        )
+
+    figure.update_layout(
+        title="Observed final Flesch-Kincaid grade bands",
+        template="plotly_white",
+        barmode="stack",
+        xaxis_title="Study-posting field and authoring mode",
+        yaxis_title="Observed nonblank final text count",
+        legend_title_text="Grade-level indicator band",
+    )
+
+    return figure
+
+
+def build_selected_vs_unselected_readability_chart(
+    selected_vs_unselected_summary: pd.DataFrame,
+) -> go.Figure:
+    """Return selected-minus-mean-unselected Flesch-Kincaid medians."""
+    _require_columns(
+        selected_vs_unselected_summary,
+        required=_REQUIRED_SELECTED_COMPARISON_COLUMNS,
+        frame_name="selected_vs_unselected_readability_summary",
+    )
+    rows = selected_vs_unselected_summary.loc[
+        selected_vs_unselected_summary["readability_measure_name"].eq(
+            _FLESCH_KINCAID_GRADE
+        )
+    ].copy()
+
+    if rows.empty:
+        return _empty_figure(
+            title=("Selected versus mean-unselected Flesch-Kincaid difference"),
+            message=(
+                "No selected-versus-unselected readability aggregates are available."
+            ),
+        )
+
+    rows["_field_label"] = rows["field_name"].map(_field_label)
+    rows = rows.sort_values(
+        by=[
+            "_field_label",
+        ],
+        kind="stable",
+    )
+    values = [
+        float(value)
+        for value in rows["median_selected_minus_mean_unselected_value"].tolist()
+    ]
+    customdata = [
+        [
+            int(attempt_count),
+            int(lower_count),
+            int(equal_count),
+            int(higher_count),
+            float(tolerance),
+        ]
+        for (
+            attempt_count,
+            lower_count,
+            equal_count,
+            higher_count,
+            tolerance,
+        ) in zip(
+            rows[
+                "completed_ai_attempt_count_with_selected_and_unselected_suggestions"
+            ].tolist(),
+            rows["attempt_count_selected_value_lower"].tolist(),
+            rows["attempt_count_selected_value_equal_within_tolerance"].tolist(),
+            rows["attempt_count_selected_value_higher"].tolist(),
+            rows["equality_tolerance"].tolist(),
+            strict=True,
+        )
+    ]
+    figure = go.Figure(
+        data=[
+            go.Bar(
+                x=rows["_field_label"].astype(str).tolist(),
+                y=values,
+                customdata=customdata,
+                hovertemplate=(
+                    "Field: %{x}<br>"
+                    "Median selected minus mean unselected: %{y:.2f}<br>"
+                    "Comparable completed AI attempts: "
+                    "%{customdata[0]}<br>"
+                    "Selected value lower: %{customdata[1]}<br>"
+                    "Equal within tolerance: %{customdata[2]}<br>"
+                    "Selected value higher: %{customdata[3]}<br>"
+                    "Equality tolerance: ±%{customdata[4]}"
+                    "<extra></extra>"
+                ),
+            )
+        ]
+    )
+    figure.add_hline(
+        y=0,
+        line_dash="dash",
+        line_color="#52606d",
+    )
+    figure.update_layout(
+        title=("Selected versus mean-unselected Flesch-Kincaid difference"),
+        template="plotly_white",
+        xaxis_title="Study-posting field",
+        yaxis_title="Median selected minus mean-unselected grade value",
+        showlegend=False,
+    )
+
+    return figure
+
+
 def build_content_source_concordance_chart(
     content_source_matrix: pd.DataFrame,
 ) -> go.Figure:
@@ -1598,6 +1964,17 @@ def build_exploration_charts(
         suggestion_selection_by_index=(
             build_suggestion_selection_by_index_chart(
                 inputs.suggestion_selection_summary
+            )
+        ),
+        readability_change_direction=build_readability_change_direction_chart(
+            inputs.field_readability_change_summary
+        ),
+        final_grade_bands=build_final_grade_bands_chart(
+            inputs.field_readability_target_summary
+        ),
+        selected_vs_unselected_readability=(
+            build_selected_vs_unselected_readability_chart(
+                inputs.selected_vs_unselected_readability_summary
             )
         ),
         content_source_concordance=build_content_source_concordance_chart(

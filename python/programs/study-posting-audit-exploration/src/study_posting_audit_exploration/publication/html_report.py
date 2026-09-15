@@ -269,6 +269,28 @@ _TEMPLATE = """<!doctype html>
   <div class="chart">{{ suggestion_selection_by_index_html | safe }}</div>
 </section>
 
+<section aria-labelledby="readability-heading">
+  <h2 id="readability-heading">Readability indicators</h2>
+  <p>
+    These charts use Flesch-Kincaid grade as one descriptive indicator.
+    Selected-to-final change is calculated as final minus selected.
+    Negative values indicate a lower final formula value; positive values
+    indicate a higher final formula value.
+  </p>
+  <p class="caution">
+    Lower or higher formula values are not automatically better or worse.
+    Titles are short text and have limited readability reliability.
+    Grade-level formulas do not establish comprehension, accuracy,
+    cultural appropriateness, layout quality, accessibility, usefulness,
+    or ethical adequacy. Sample counts and tolerances appear in hover text.
+  </p>
+  <div class="chart">{{ readability_change_direction_html | safe }}</div>
+  <div class="chart">{{ final_grade_bands_html | safe }}</div>
+  <div class="chart">
+    {{ selected_vs_unselected_readability_html | safe }}
+  </div>
+</section>
+
   <section aria-labelledby="attempts-heading">
     <h2 id="attempts-heading">Attempts and workflow timing</h2>
     <div class="chart">{{ attempt_outcomes_html | safe }}</div>
@@ -456,6 +478,18 @@ def render_html_report(
         ),
         suggestion_selection_by_index_html=_figure_html(
             charts.suggestion_selection_by_index,
+            include_plotlyjs=False,
+        ),
+        readability_change_direction_html=_figure_html(
+            charts.readability_change_direction,
+            include_plotlyjs=False,
+        ),
+        final_grade_bands_html=_figure_html(
+            charts.final_grade_bands,
+            include_plotlyjs=False,
+        ),
+        selected_vs_unselected_readability_html=_figure_html(
+            charts.selected_vs_unselected_readability,
             include_plotlyjs=False,
         ),
         attempt_outcomes_html=_figure_html(
