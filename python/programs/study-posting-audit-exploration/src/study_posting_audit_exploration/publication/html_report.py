@@ -230,6 +230,25 @@ _TEMPLATE = """<!doctype html>
     <div class="chart">{{ department_mix_html | safe }}</div>
   </section>
 
+  <section aria-labelledby="field-adoption-heading">
+  <h2 id="field-adoption-heading">AI field adoption and editing</h2>
+  <p>
+    These charts summarize completed AI attempts at the field level. An
+    offer means at least one suggestion was available for the field; a
+    selection means the author selected one offered suggestion.
+  </p>
+  <p class="caution">
+    Field populations and denominators can differ. Selection percentages use
+    attempts with an offer as the denominator. Editing outcomes use selected
+    attempts for that field. Edited-unclassified is kept separate from
+    replaced because no usable character ratio was available. These
+    descriptive outcomes do not establish writing quality, correctness,
+    usefulness, accessibility, or causal benefit.
+  </p>
+  <div class="chart">{{ field_suggestion_adoption_html | safe }}</div>
+  <div class="chart">{{ field_selected_outcomes_html | safe }}</div>
+</section>
+
   <section aria-labelledby="attempts-heading">
     <h2 id="attempts-heading">Attempts and workflow timing</h2>
     <div class="chart">{{ attempt_outcomes_html | safe }}</div>
@@ -401,6 +420,14 @@ def render_html_report(
         ),
         author_experience_days_html=_figure_html(
             charts.author_experience_days,
+            include_plotlyjs=False,
+        ),
+        field_suggestion_adoption_html=_figure_html(
+            charts.field_suggestion_adoption,
+            include_plotlyjs=False,
+        ),
+        field_selected_outcomes_html=_figure_html(
+            charts.field_selected_outcomes,
             include_plotlyjs=False,
         ),
         attempt_outcomes_html=_figure_html(

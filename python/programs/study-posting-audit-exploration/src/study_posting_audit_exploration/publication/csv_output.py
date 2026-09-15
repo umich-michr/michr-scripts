@@ -24,6 +24,7 @@ from study_posting_audit_exploration.models import (
     LoadedAuditReport,
 )
 from study_posting_audit_exploration.publication.charts import (
+    ExplorationChartInputs,
     build_exploration_charts,
 )
 from study_posting_audit_exploration.publication.html_report import (
@@ -262,18 +263,25 @@ def _write_staging_output(
         )
 
     charts = build_exploration_charts(
-        grouped_attempt_summary=tables.attempts.grouped_attempt_summary,
-        study_attempt_history_summary=(tables.overview.study_attempt_history_summary),
-        author_handoff_summary=tables.overview.author_handoff_summary,
-        attempt_start_experience_summary=(
-            tables.authors.attempt_start_experience_summary
-        ),
-        grouped_author_summary=tables.authors.grouped_author_summary,
-        current_author_experience_summary=(
-            tables.authors.current_author_experience_summary
-        ),
-        grouped_study_summary=tables.studies.grouped_study_summary,
-        content_source_matrix=(tables.attempts.content_source_concordance_matrix),
+        ExplorationChartInputs(
+            grouped_attempt_summary=(tables.attempts.grouped_attempt_summary),
+            study_attempt_history_summary=(
+                tables.overview.study_attempt_history_summary
+            ),
+            author_handoff_summary=(tables.overview.author_handoff_summary),
+            attempt_start_experience_summary=(
+                tables.authors.attempt_start_experience_summary
+            ),
+            current_author_experience_summary=(
+                tables.authors.current_author_experience_summary
+            ),
+            grouped_study_summary=(tables.studies.grouped_study_summary),
+            grouped_author_summary=(tables.authors.grouped_author_summary),
+            field_adoption_editing_summary=(
+                tables.fields.field_adoption_editing_summary
+            ),
+            content_source_matrix=(tables.attempts.content_source_concordance_matrix),
+        )
     )
 
     write_html_report(

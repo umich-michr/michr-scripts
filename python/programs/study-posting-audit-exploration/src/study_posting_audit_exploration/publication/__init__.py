@@ -1,6 +1,7 @@
 """Publication of exploration outputs."""
 
 from study_posting_audit_exploration.publication.charts import (
+    ExplorationChartInputs,
     ExplorationCharts,
     build_attempt_outcomes_chart,
     build_attempt_timing_chart,
@@ -13,6 +14,8 @@ from study_posting_audit_exploration.publication.charts import (
     build_content_source_concordance_chart,
     build_effective_author_role_chart,
     build_exploration_charts,
+    build_field_selected_outcomes_chart,
+    build_field_suggestion_adoption_chart,
     build_study_completion_pathways_chart,
 )
 from study_posting_audit_exploration.publication.csv_output import (
@@ -26,6 +29,7 @@ from study_posting_audit_exploration.publication.html_report import (
 from study_posting_audit_exploration.publication.manifest import manifest_filename
 
 __all__ = [
+    "ExplorationChartInputs",
     "ExplorationCharts",
     "KpiCard",
     "build_attempt_outcomes_chart",
@@ -39,6 +43,8 @@ __all__ = [
     "build_content_source_concordance_chart",
     "build_effective_author_role_chart",
     "build_exploration_charts",
+    "build_field_selected_outcomes_chart",
+    "build_field_suggestion_adoption_chart",
     "build_study_completion_pathways_chart",
     "manifest_filename",
     "publish_exploration",

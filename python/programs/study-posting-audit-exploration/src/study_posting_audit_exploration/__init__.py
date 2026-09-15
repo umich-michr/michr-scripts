@@ -72,6 +72,7 @@ from study_posting_audit_exploration.models import (
     ValidationSummary,
 )
 from study_posting_audit_exploration.publication import (
+    ExplorationChartInputs,
     ExplorationCharts,
     KpiCard,
     build_attempt_outcomes_chart,
@@ -79,6 +80,8 @@ from study_posting_audit_exploration.publication import (
     build_author_attempt_start_experience_chart,
     build_content_source_concordance_chart,
     build_exploration_charts,
+    build_field_selected_outcomes_chart,
+    build_field_suggestion_adoption_chart,
     publish_exploration,
     render_html_report,
     write_html_report,
@@ -99,6 +102,7 @@ __all__ = [
     "AuditExplorationError",
     "AuthorAnalysisTables",
     "DescriptiveStatistics",
+    "ExplorationChartInputs",
     "ExplorationCharts",
     "ExplorationConfigurationError",
     "ExplorationInputConfig",
@@ -134,6 +138,8 @@ __all__ = [
     "build_field_edit_readability_cross_summary",
     "build_field_readability_change_summary",
     "build_field_readability_target_summary",
+    "build_field_selected_outcomes_chart",
+    "build_field_suggestion_adoption_chart",
     "build_final_text_metric_summary",
     "build_grouped_attempt_summary",
     "build_grouped_author_summary",

@@ -83,6 +83,24 @@ _REQUIRED_GROUPED_AUTHOR_COLUMNS: tuple[str, ...] = (
     "distinct_author_count_classified_as_pi",
 )
 
+_REQUIRED_FIELD_ADOPTION_COLUMNS: tuple[str, ...] = (
+    "field_name",
+    "analysis_type",
+    "completed_ai_attempt_count",
+    "completed_ai_attempt_count_with_suggestion_offered",
+    "completed_ai_attempt_count_with_suggestion_selected",
+    "completed_ai_attempt_count_selected_and_exactly_retained",
+    "completed_ai_attempt_count_selected_and_cosmetically_changed",
+    "completed_ai_attempt_count_selected_and_lightly_edited",
+    "completed_ai_attempt_count_selected_and_moderately_edited",
+    "completed_ai_attempt_count_selected_and_heavily_edited",
+    "completed_ai_attempt_count_selected_and_unclassified_edit",
+    "completed_ai_attempt_count_selected_and_replaced",
+    "completed_ai_attempt_count_selected_then_cleared",
+    "completed_ai_attempt_count_unassisted",
+    "suggestion_selection_percentage_among_attempts_with_offer",
+)
+
 _ATTEMPT_RESULT_ORDER: tuple[str, ...] = (
     "COMPLETE",
     "AI_ERROR",
@@ -161,6 +179,63 @@ _ATTEMPT_START_EXPERIENCE_DEFINITION = (
     "Other studies created by the attempt author before that attempt's "
     "START_TIME. One author may contribute multiple attempt observations."
 )
+_FIELD_DISPLAY_LABELS: Mapping[str, str] = {
+    "title": "Title",
+    "about": "About",
+    "purpose": "Purpose",
+    "description": "Description",
+    "compensation": "Compensation",
+}
+
+_FIELD_EDIT_OUTCOMES: tuple[tuple[str, str], ...] = (
+    (
+        "completed_ai_attempt_count_selected_and_exactly_retained",
+        "Exactly retained",
+    ),
+    (
+        "completed_ai_attempt_count_selected_and_cosmetically_changed",
+        "Cosmetically changed",
+    ),
+    (
+        "completed_ai_attempt_count_selected_and_lightly_edited",
+        "Light edit",
+    ),
+    (
+        "completed_ai_attempt_count_selected_and_moderately_edited",
+        "Moderate edit",
+    ),
+    (
+        "completed_ai_attempt_count_selected_and_heavily_edited",
+        "Heavy edit",
+    ),
+    (
+        "completed_ai_attempt_count_selected_and_unclassified_edit",
+        "Edited, unclassified",
+    ),
+    (
+        "completed_ai_attempt_count_selected_and_replaced",
+        "Replaced",
+    ),
+    (
+        "completed_ai_attempt_count_selected_then_cleared",
+        "Cleared",
+    ),
+)
+
+
+@dataclass(frozen=True, slots=True)
+class ExplorationChartInputs:
+    """Aggregate-only DataFrames consumed by the HTML chart bundle."""
+
+    grouped_attempt_summary: pd.DataFrame
+    study_attempt_history_summary: pd.DataFrame
+    author_handoff_summary: pd.DataFrame
+    attempt_start_experience_summary: pd.DataFrame
+    current_author_experience_summary: pd.DataFrame
+    grouped_study_summary: pd.DataFrame
+    grouped_author_summary: pd.DataFrame
+    field_adoption_editing_summary: pd.DataFrame
+    content_source_matrix: pd.DataFrame
 
 
 @dataclass(frozen=True, slots=True)
@@ -180,6 +255,8 @@ class ExplorationCharts:
     author_pi_context: go.Figure
     author_appointment_schools: go.Figure
     pi_appointment_schools: go.Figure
+    field_suggestion_adoption: go.Figure
+    field_selected_outcomes: go.Figure
     content_source_concordance: go.Figure
 
 
@@ -940,6 +1017,208 @@ def build_author_appointment_context_chart(
     return figure
 
 
+def _field_label(field_name: object) -> str:
+    """Return one faculty-facing field label."""
+    normalized = str(field_name)
+
+    return _FIELD_DISPLAY_LABELS.get(
+        normalized,
+        normalized.replace("_", " ").title(),
+    )
+
+
+def _ordered_field_rows(
+    field_adoption_summary: pd.DataFrame,
+) -> pd.DataFrame:
+    """Return text-field rows in stable report order."""
+    rows = field_adoption_summary.loc[
+        field_adoption_summary["analysis_type"].isin(
+            {
+                "TEXT",
+                "COMPENSATION",
+            }
+        )
+    ].copy()
+    order = {
+        field_name: index for index, field_name in enumerate(_FIELD_DISPLAY_LABELS)
+    }
+    rows["_field_order"] = rows["field_name"].map(order).fillna(len(order))
+
+    return rows.sort_values(
+        by=[
+            "_field_order",
+            "field_name",
+        ],
+        kind="stable",
+    )
+
+
+def build_field_suggestion_adoption_chart(
+    field_adoption_summary: pd.DataFrame,
+) -> go.Figure:
+    """Return offered and selected completed-AI attempt counts by field."""
+    _require_columns(
+        field_adoption_summary,
+        required=_REQUIRED_FIELD_ADOPTION_COLUMNS,
+        frame_name="field_adoption_editing_summary",
+    )
+    rows = _ordered_field_rows(field_adoption_summary)
+
+    if rows.empty:
+        return _empty_figure(
+            title="AI suggestion offers and selections by field",
+            message="No text-field adoption aggregates are available.",
+        )
+
+    field_labels = [_field_label(value) for value in rows["field_name"].tolist()]
+    completed_counts = [
+        int(value) for value in rows["completed_ai_attempt_count"].tolist()
+    ]
+    offered_counts = [
+        int(value)
+        for value in rows["completed_ai_attempt_count_with_suggestion_offered"].tolist()
+    ]
+    selected_counts = [
+        int(value)
+        for value in rows[
+            "completed_ai_attempt_count_with_suggestion_selected"
+        ].tolist()
+    ]
+    selection_percentages = [
+        float(value) if not pd.isna(value) else None
+        for value in rows[
+            "suggestion_selection_percentage_among_attempts_with_offer"
+        ].tolist()
+    ]
+    customdata = [
+        [
+            completed_count,
+            offered_count,
+            selected_count,
+            selection_percentage,
+        ]
+        for (
+            completed_count,
+            offered_count,
+            selected_count,
+            selection_percentage,
+        ) in zip(
+            completed_counts,
+            offered_counts,
+            selected_counts,
+            selection_percentages,
+            strict=True,
+        )
+    ]
+    figure = go.Figure()
+    figure.add_bar(
+        name="Attempts with suggestion offered",
+        x=field_labels,
+        y=offered_counts,
+        customdata=customdata,
+        hovertemplate=(
+            "Field: %{x}<br>"
+            "Completed AI attempts: %{customdata[0]}<br>"
+            "Attempts with offer: %{customdata[1]}<br>"
+            "Attempts with selection: %{customdata[2]}<br>"
+            "Selection among attempts with offer: "
+            "%{customdata[3]:.1f}%"
+            "<extra>%{fullData.name}</extra>"
+        ),
+    )
+    figure.add_bar(
+        name="Attempts with suggestion selected",
+        x=field_labels,
+        y=selected_counts,
+        customdata=customdata,
+        hovertemplate=(
+            "Field: %{x}<br>"
+            "Completed AI attempts: %{customdata[0]}<br>"
+            "Attempts with offer: %{customdata[1]}<br>"
+            "Attempts with selection: %{customdata[2]}<br>"
+            "Selection among attempts with offer: "
+            "%{customdata[3]:.1f}%"
+            "<extra>%{fullData.name}</extra>"
+        ),
+    )
+    figure.update_layout(
+        title="AI suggestion offers and selections by field",
+        template="plotly_white",
+        barmode="group",
+        xaxis_title="Study-posting field",
+        yaxis_title="Completed AI attempt count",
+        legend_title_text="Adoption stage",
+    )
+
+    return figure
+
+
+def build_field_selected_outcomes_chart(
+    field_adoption_summary: pd.DataFrame,
+) -> go.Figure:
+    """Return selected-suggestion outcome counts by field."""
+    _require_columns(
+        field_adoption_summary,
+        required=_REQUIRED_FIELD_ADOPTION_COLUMNS,
+        frame_name="field_adoption_editing_summary",
+    )
+    rows = _ordered_field_rows(field_adoption_summary)
+
+    if rows.empty:
+        return _empty_figure(
+            title="Selected AI suggestion outcomes by field",
+            message="No text-field editing aggregates are available.",
+        )
+
+    field_labels = [_field_label(value) for value in rows["field_name"].tolist()]
+    selected_counts = [
+        int(value)
+        for value in rows[
+            "completed_ai_attempt_count_with_suggestion_selected"
+        ].tolist()
+    ]
+    scheme_note = (
+        "EXPLORATORY_CHARACTER_RATIO_10_30; edited-unclassified remains "
+        "separate from replaced."
+    )
+    figure = go.Figure()
+
+    for column_name, label in _FIELD_EDIT_OUTCOMES:
+        outcome_counts = [int(value) for value in rows[column_name].tolist()]
+        customdata = [
+            [
+                selected_count,
+                scheme_note,
+            ]
+            for selected_count in selected_counts
+        ]
+        figure.add_bar(
+            name=label,
+            x=field_labels,
+            y=outcome_counts,
+            customdata=customdata,
+            hovertemplate=(
+                "Field: %{x}<br>"
+                "Outcome: %{fullData.name}<br>"
+                "Completed AI attempts: %{y}<br>"
+                "Selected attempts for field: %{customdata[0]}<br>"
+                "Edit scheme: %{customdata[1]}"
+                "<extra></extra>"
+            ),
+        )
+
+    figure.update_layout(
+        title="Selected AI suggestion outcomes by field",
+        template="plotly_white",
+        barmode="stack",
+        xaxis_title="Study-posting field",
+        yaxis_title="Completed AI attempt count",
+        legend_title_text="Selected-suggestion outcome",
+    )
+
+    return figure
+
+
 def build_content_source_concordance_chart(
     content_source_matrix: pd.DataFrame,
 ) -> go.Figure:
@@ -1011,62 +1290,66 @@ def build_content_source_concordance_chart(
 
 
 def build_exploration_charts(
-    *,
-    grouped_attempt_summary: pd.DataFrame,
-    study_attempt_history_summary: pd.DataFrame,
-    author_handoff_summary: pd.DataFrame,
-    attempt_start_experience_summary: pd.DataFrame,
-    current_author_experience_summary: pd.DataFrame,
-    grouped_study_summary: pd.DataFrame,
-    grouped_author_summary: pd.DataFrame,
-    content_source_matrix: pd.DataFrame,
+    inputs: ExplorationChartInputs,
 ) -> ExplorationCharts:
     """Return all aggregate-only exploration figures."""
     return ExplorationCharts(
-        attempt_outcomes_by_mode=build_attempt_outcomes_chart(grouped_attempt_summary),
-        median_attempt_time_by_mode=build_attempt_timing_chart(grouped_attempt_summary),
-        study_completion_pathways=build_study_completion_pathways_chart(
-            study_attempt_history_summary
+        attempt_outcomes_by_mode=build_attempt_outcomes_chart(
+            inputs.grouped_attempt_summary
         ),
-        author_handoff_categories=build_author_handoff_chart(author_handoff_summary),
+        median_attempt_time_by_mode=build_attempt_timing_chart(
+            inputs.grouped_attempt_summary
+        ),
+        study_completion_pathways=build_study_completion_pathways_chart(
+            inputs.study_attempt_history_summary
+        ),
+        author_handoff_categories=build_author_handoff_chart(
+            inputs.author_handoff_summary
+        ),
         author_attempt_start_experience=(
             build_author_attempt_start_experience_chart(
-                attempt_start_experience_summary
+                inputs.attempt_start_experience_summary
             )
         ),
         author_experience_studies=build_author_experience_chart(
-            current_author_experience_summary,
+            inputs.current_author_experience_summary,
             metric_unit="studies",
         ),
         author_experience_days=build_author_experience_chart(
-            current_author_experience_summary,
+            inputs.current_author_experience_summary,
             metric_unit="days",
         ),
         completed_study_participant_mix=build_completed_study_mix_chart(
-            grouped_study_summary,
+            inputs.grouped_study_summary,
             dimension_name="STUDY_PARTICIPANT_TYPE",
             title="Completed studies by participant type",
         ),
         completed_study_department_mix=build_completed_study_mix_chart(
-            grouped_study_summary,
+            inputs.grouped_study_summary,
             dimension_name="STUDY_DEPARTMENT",
             title="Completed studies by department",
         ),
         effective_author_roles=build_effective_author_role_chart(
-            grouped_author_summary
+            inputs.grouped_author_summary
         ),
-        author_pi_context=build_author_pi_context_chart(grouped_author_summary),
+        author_pi_context=build_author_pi_context_chart(inputs.grouped_author_summary),
         author_appointment_schools=build_author_appointment_context_chart(
-            grouped_author_summary,
+            inputs.grouped_author_summary,
             dimension_name="AUTHOR_APPOINTMENT_SCHOOL",
             title="Author appointment schools",
         ),
         pi_appointment_schools=build_author_appointment_context_chart(
-            grouped_author_summary,
+            inputs.grouped_author_summary,
             dimension_name="PI_APPOINTMENT_SCHOOL",
             title="Principal-investigator appointment schools",
         ),
-        content_source_concordance=(
-            build_content_source_concordance_chart(content_source_matrix)
+        field_suggestion_adoption=build_field_suggestion_adoption_chart(
+            inputs.field_adoption_editing_summary
+        ),
+        field_selected_outcomes=build_field_selected_outcomes_chart(
+            inputs.field_adoption_editing_summary
+        ),
+        content_source_concordance=build_content_source_concordance_chart(
+            inputs.content_source_matrix
         ),
     )

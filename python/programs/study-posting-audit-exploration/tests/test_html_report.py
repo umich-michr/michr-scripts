@@ -5,6 +5,7 @@ import pytest
 
 from study_posting_audit_exploration import ExplorationInputError
 from study_posting_audit_exploration.publication import (
+    ExplorationChartInputs,
     ExplorationCharts,
     build_exploration_charts,
 )
@@ -216,6 +217,31 @@ def grouped_study_rows() -> pd.DataFrame:
     return pd.DataFrame.from_records(rows)
 
 
+def field_adoption_rows() -> pd.DataFrame:
+    """Return aggregate-only field-adoption rows."""
+    return pd.DataFrame.from_records(
+        [
+            {
+                "field_name": "title",
+                "analysis_type": "TEXT",
+                "completed_ai_attempt_count": 4,
+                "completed_ai_attempt_count_with_suggestion_offered": 4,
+                "completed_ai_attempt_count_with_suggestion_selected": 3,
+                "completed_ai_attempt_count_selected_and_exactly_retained": 1,
+                "completed_ai_attempt_count_selected_and_cosmetically_changed": 0,
+                "completed_ai_attempt_count_selected_and_lightly_edited": 1,
+                "completed_ai_attempt_count_selected_and_moderately_edited": 0,
+                "completed_ai_attempt_count_selected_and_heavily_edited": 0,
+                "completed_ai_attempt_count_selected_and_unclassified_edit": 1,
+                "completed_ai_attempt_count_selected_and_replaced": 0,
+                "completed_ai_attempt_count_selected_then_cleared": 0,
+                "completed_ai_attempt_count_unassisted": 1,
+                "suggestion_selection_percentage_among_attempts_with_offer": 75.0,
+            }
+        ]
+    )
+
+
 def content_rows() -> pd.DataFrame:
     """Return aggregate-only content-source rows."""
     return pd.DataFrame.from_records(
@@ -319,14 +345,17 @@ def grouped_author_rows() -> pd.DataFrame:
 def charts() -> ExplorationCharts:
     """Return synthetic aggregate-only chart bundle."""
     return build_exploration_charts(
-        grouped_attempt_summary=attempt_rows(),
-        study_attempt_history_summary=study_history_rows(),
-        author_handoff_summary=author_handoff_rows(),
-        attempt_start_experience_summary=attempt_start_experience_rows(),
-        grouped_author_summary=grouped_author_rows(),
-        current_author_experience_summary=current_author_experience_rows(),
-        grouped_study_summary=grouped_study_rows(),
-        content_source_matrix=content_rows(),
+        ExplorationChartInputs(
+            grouped_attempt_summary=attempt_rows(),
+            study_attempt_history_summary=study_history_rows(),
+            author_handoff_summary=author_handoff_rows(),
+            attempt_start_experience_summary=(attempt_start_experience_rows()),
+            current_author_experience_summary=(current_author_experience_rows()),
+            grouped_study_summary=grouped_study_rows(),
+            grouped_author_summary=grouped_author_rows(),
+            field_adoption_editing_summary=field_adoption_rows(),
+            content_source_matrix=content_rows(),
+        )
     )
 
 
@@ -381,6 +410,14 @@ def test_html_report_is_self_contained_and_accessible() -> None:
     assert "Completed studies by participant type" in html
     assert "Completed studies by department" in html
     assert "Other and missing categories are retained" in normalized_html
+
+    assert 'id="field-adoption-heading"' in html
+    assert "AI field adoption and editing" in html
+    assert "AI suggestion offers and selections by field" in html
+    assert "Selected AI suggestion outcomes by field" in html
+    assert "Field populations and denominators can differ" in normalized_html
+    assert "Edited-unclassified is kept separate from replaced" in normalized_html
+    assert "do not establish writing quality" in normalized_html
 
 
 def test_html_report_excludes_identifier_and_payload_values() -> None:

@@ -8,6 +8,7 @@ from study_posting_audit_exploration import (
     ExplorationValidationError,
 )
 from study_posting_audit_exploration.publication import (
+    ExplorationChartInputs,
     ExplorationCharts,
     build_attempt_outcomes_chart,
     build_attempt_timing_chart,
@@ -21,6 +22,10 @@ from study_posting_audit_exploration.publication import (
     build_effective_author_role_chart,
     build_exploration_charts,
     build_study_completion_pathways_chart,
+)
+from study_posting_audit_exploration.publication.charts import (
+    build_field_selected_outcomes_chart,
+    build_field_suggestion_adoption_chart,
 )
 
 
@@ -397,6 +402,67 @@ def grouped_author_rows() -> pd.DataFrame:
     return pd.DataFrame.from_records(rows)
 
 
+def field_adoption_rows() -> pd.DataFrame:
+    """Return synthetic aggregate-only field adoption rows."""
+    return pd.DataFrame.from_records(
+        [
+            {
+                "field_name": "title",
+                "analysis_type": "TEXT",
+                "completed_ai_attempt_count": 10,
+                "completed_ai_attempt_count_with_suggestion_offered": 9,
+                "completed_ai_attempt_count_with_suggestion_selected": 7,
+                "completed_ai_attempt_count_selected_and_exactly_retained": 2,
+                "completed_ai_attempt_count_selected_and_cosmetically_changed": 1,
+                "completed_ai_attempt_count_selected_and_lightly_edited": 1,
+                "completed_ai_attempt_count_selected_and_moderately_edited": 1,
+                "completed_ai_attempt_count_selected_and_heavily_edited": 1,
+                "completed_ai_attempt_count_selected_and_unclassified_edit": 1,
+                "completed_ai_attempt_count_selected_and_replaced": 0,
+                "completed_ai_attempt_count_selected_then_cleared": 0,
+                "completed_ai_attempt_count_unassisted": 3,
+                "suggestion_selection_percentage_among_attempts_with_offer": (
+                    100.0 * 7.0 / 9.0
+                ),
+            },
+            {
+                "field_name": "description",
+                "analysis_type": "TEXT",
+                "completed_ai_attempt_count": 10,
+                "completed_ai_attempt_count_with_suggestion_offered": 8,
+                "completed_ai_attempt_count_with_suggestion_selected": 5,
+                "completed_ai_attempt_count_selected_and_exactly_retained": 1,
+                "completed_ai_attempt_count_selected_and_cosmetically_changed": 1,
+                "completed_ai_attempt_count_selected_and_lightly_edited": 1,
+                "completed_ai_attempt_count_selected_and_moderately_edited": 0,
+                "completed_ai_attempt_count_selected_and_heavily_edited": 1,
+                "completed_ai_attempt_count_selected_and_unclassified_edit": 0,
+                "completed_ai_attempt_count_selected_and_replaced": 1,
+                "completed_ai_attempt_count_selected_then_cleared": 0,
+                "completed_ai_attempt_count_unassisted": 5,
+                "suggestion_selection_percentage_among_attempts_with_offer": 62.5,
+            },
+            {
+                "field_name": "lookupField",
+                "analysis_type": "LOOKUP",
+                "completed_ai_attempt_count": 10,
+                "completed_ai_attempt_count_with_suggestion_offered": 10,
+                "completed_ai_attempt_count_with_suggestion_selected": 8,
+                "completed_ai_attempt_count_selected_and_exactly_retained": 0,
+                "completed_ai_attempt_count_selected_and_cosmetically_changed": 0,
+                "completed_ai_attempt_count_selected_and_lightly_edited": 0,
+                "completed_ai_attempt_count_selected_and_moderately_edited": 0,
+                "completed_ai_attempt_count_selected_and_heavily_edited": 0,
+                "completed_ai_attempt_count_selected_and_unclassified_edit": 0,
+                "completed_ai_attempt_count_selected_and_replaced": 0,
+                "completed_ai_attempt_count_selected_then_cleared": 0,
+                "completed_ai_attempt_count_unassisted": 2,
+                "suggestion_selection_percentage_among_attempts_with_offer": 80.0,
+            },
+        ]
+    )
+
+
 def content_source_rows() -> pd.DataFrame:
     """Return synthetic aggregate-only concordance rows."""
     return pd.DataFrame.from_records(
@@ -575,6 +641,32 @@ def test_author_experience_chart_separates_units() -> None:
     assert list(days_figure.data[1].y) == [300.0, 180.0, 420.0, 360.0]
 
 
+def test_field_suggestion_adoption_chart_uses_explicit_denominator() -> None:
+    figure = build_field_suggestion_adoption_chart(field_adoption_rows())
+
+    assert figure.layout.title.text == ("AI suggestion offers and selections by field")
+    assert figure.layout.barmode == "group"
+    assert list(figure.data[0].x) == ["Title", "Description"]
+    assert list(figure.data[0].y) == [9, 8]
+    assert list(figure.data[1].y) == [7, 5]
+    assert figure.data[0].customdata[0][0] == 10
+    assert figure.data[0].customdata[0][3] == pytest.approx(100.0 * 7.0 / 9.0)
+    assert "Selection among attempts with offer" in str(figure.data[0].hovertemplate)
+
+
+def test_field_selected_outcomes_chart_preserves_unclassified() -> None:
+    figure = build_field_selected_outcomes_chart(field_adoption_rows())
+    traces_by_name = {str(trace.name): trace for trace in figure.data}
+
+    assert figure.layout.title.text == ("Selected AI suggestion outcomes by field")
+    assert figure.layout.barmode == "stack"
+    assert list(traces_by_name["Edited, unclassified"].y) == [1, 0]
+    assert list(traces_by_name["Replaced"].y) == [0, 1]
+    assert "edited-unclassified remains separate from replaced" in str(
+        traces_by_name["Edited, unclassified"].customdata[0][1]
+    )
+
+
 def test_content_source_chart_uses_all_attempt_population() -> None:
     figure = build_content_source_concordance_chart(content_source_rows())
     heatmap = figure.data[0]
@@ -587,14 +679,17 @@ def test_content_source_chart_uses_all_attempt_population() -> None:
 
 def test_chart_bundle_contains_all_figures() -> None:
     charts = build_exploration_charts(
-        grouped_attempt_summary=grouped_attempt_rows(),
-        study_attempt_history_summary=study_history_rows(),
-        author_handoff_summary=author_handoff_rows(),
-        attempt_start_experience_summary=attempt_start_experience_rows(),
-        current_author_experience_summary=current_author_experience_rows(),
-        grouped_study_summary=grouped_study_rows(),
-        content_source_matrix=content_source_rows(),
-        grouped_author_summary=grouped_author_rows(),
+        ExplorationChartInputs(
+            grouped_attempt_summary=grouped_attempt_rows(),
+            study_attempt_history_summary=study_history_rows(),
+            author_handoff_summary=author_handoff_rows(),
+            attempt_start_experience_summary=(attempt_start_experience_rows()),
+            current_author_experience_summary=(current_author_experience_rows()),
+            grouped_study_summary=grouped_study_rows(),
+            grouped_author_summary=grouped_author_rows(),
+            field_adoption_editing_summary=field_adoption_rows(),
+            content_source_matrix=content_source_rows(),
+        )
     )
 
     assert isinstance(charts, ExplorationCharts)
@@ -612,6 +707,8 @@ def test_chart_bundle_contains_all_figures() -> None:
     assert charts.author_pi_context.data
     assert charts.author_appointment_schools.data
     assert charts.pi_appointment_schools.data
+    assert charts.field_suggestion_adoption.data
+    assert charts.field_selected_outcomes.data
 
 
 def test_charts_return_accessible_empty_states() -> None:
@@ -626,6 +723,7 @@ def test_charts_return_accessible_empty_states() -> None:
     content_columns = content_source_rows().columns
     grouped_study_columns = grouped_study_rows().columns
     grouped_author_columns = grouped_author_rows().columns
+    field_adoption_columns = field_adoption_rows().columns
 
     attempt_figure = build_attempt_outcomes_chart(pd.DataFrame(columns=attempt_columns))
     study_figure = build_study_completion_pathways_chart(
@@ -656,6 +754,13 @@ def test_charts_return_accessible_empty_states() -> None:
         title="Author appointment schools",
     )
 
+    field_adoption_figure = build_field_suggestion_adoption_chart(
+        pd.DataFrame(columns=field_adoption_columns)
+    )
+    field_outcomes_figure = build_field_selected_outcomes_chart(
+        pd.DataFrame(columns=field_adoption_columns)
+    )
+
     assert attempt_figure.layout.annotations[0].text
     assert study_figure.layout.annotations[0].text
     assert handoff_figure.layout.annotations[0].text
@@ -666,6 +771,8 @@ def test_charts_return_accessible_empty_states() -> None:
     assert author_role_figure.layout.annotations[0].text
     assert author_pi_figure.layout.annotations[0].text
     assert author_appointment_figure.layout.annotations[0].text
+    assert field_adoption_figure.layout.annotations[0].text
+    assert field_outcomes_figure.layout.annotations[0].text
 
 
 @pytest.mark.parametrize(
@@ -759,6 +866,22 @@ def test_charts_return_accessible_empty_states() -> None:
             pd.DataFrame(
                 {
                     "author_population_name": ["ALL_AUTHORS"],
+                }
+            ),
+        ),
+        (
+            build_field_suggestion_adoption_chart,
+            pd.DataFrame(
+                {
+                    "field_name": ["title"],
+                }
+            ),
+        ),
+        (
+            build_field_selected_outcomes_chart,
+            pd.DataFrame(
+                {
+                    "field_name": ["title"],
                 }
             ),
         ),

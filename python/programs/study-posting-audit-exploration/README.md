@@ -172,6 +172,8 @@ aggregate analysis tables. It currently includes:
 - effective author roles and author-level principal-investigator context;
 - author and principal-investigator appointment-school context;
 - completed-study participant-type and department mix;
+- AI suggestion offers and selections by field;
+- selected-suggestion retention and edit outcomes by field;
 - attempt outcomes by authoring mode;
 - median attempt timing by authoring mode;
 - reported-versus-inferred content-source concordance;
@@ -187,6 +189,13 @@ counts author-attempt observations and can include one author more than once.
 Query-time charts count each distinct author at most once per metric and
 adoption group. Counts can differ across those charts because their analytical
 grains differ and because missing metric values are excluded.
+
+The field-adoption section uses completed AI attempt-and-field aggregates.
+Offer and selection counts can have different field-specific populations.
+Selection percentages use attempts with at least one offered suggestion as
+their denominator. Selected-suggestion outcomes retain
+`EDITED_UNCLASSIFIED` separately from `REPLACED`; they are descriptive and
+do not establish writing quality or causal benefit.
 
 The report embeds its Plotly JavaScript and does not require an external script
 service. It does not contain usernames, audit IDs, study numbers, source
@@ -353,7 +362,7 @@ Therefore:
 - generation time;
 - source report path and filenames;
 - source row counts;
-- published analysis row counts;- the metric-definition row count;
+- the metric-definition row count;
 - published analysis row counts;
 - output file count;
 - configured edit-intensity scheme;
