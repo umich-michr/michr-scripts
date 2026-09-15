@@ -12,6 +12,7 @@ from study_posting_audit_exploration.publication import (
     build_attempt_outcomes_chart,
     build_attempt_timing_chart,
     build_author_appointment_context_chart,
+    build_author_attempt_start_experience_chart,
     build_author_experience_chart,
     build_author_handoff_chart,
     build_author_pi_context_chart,
@@ -128,6 +129,47 @@ def author_handoff_rows() -> pd.DataFrame:
                 "completed_attempt_authoring_mode": "MANUAL",
                 "author_handoff_category": ("MIXED_COMPLETION_AND_OTHER_AUTHORS"),
                 "distinct_completed_study_count": 3,
+            },
+        ]
+    )
+
+
+def attempt_start_experience_rows() -> pd.DataFrame:
+    """Return synthetic attempt-start author experience rows."""
+    return pd.DataFrame.from_records(
+        [
+            {
+                "author_adoption_group": "ALL_AUTHORS",
+                "attempt_completion_group": "ALL",
+                "attempt_authoring_mode": "AI",
+                "experience_metric_name": (
+                    "prior_studies_created_before_attempt_start_count"
+                ),
+                "experience_metric_unit": "studies",
+                "author_attempt_count_with_nonmissing_metric": 6,
+                "median_author_attempt_value": 2.0,
+            },
+            {
+                "author_adoption_group": "ALL_AUTHORS",
+                "attempt_completion_group": "ALL",
+                "attempt_authoring_mode": "MANUAL",
+                "experience_metric_name": (
+                    "prior_studies_created_before_attempt_start_count"
+                ),
+                "experience_metric_unit": "studies",
+                "author_attempt_count_with_nonmissing_metric": 4,
+                "median_author_attempt_value": 5.0,
+            },
+            {
+                "author_adoption_group": "AI_ONLY",
+                "attempt_completion_group": "ALL",
+                "attempt_authoring_mode": "AI",
+                "experience_metric_name": (
+                    "prior_studies_created_before_attempt_start_count"
+                ),
+                "experience_metric_unit": "studies",
+                "author_attempt_count_with_nonmissing_metric": 3,
+                "median_author_attempt_value": 1.0,
             },
         ]
     )
@@ -471,6 +513,34 @@ def test_author_handoff_chart_aggregates_categories_by_mode() -> None:
     assert list(figure.data[3].y) == [0, 3]
 
 
+def test_author_attempt_start_experience_chart_uses_attempt_grain() -> None:
+    figure = build_author_attempt_start_experience_chart(
+        attempt_start_experience_rows()
+    )
+    bar = figure.data[0]
+
+    assert figure.layout.title.text == ("Median studies created before attempt start")
+    assert list(bar.x) == ["AI", "MANUAL"]
+    assert list(bar.y) == [2.0, 5.0]
+    assert [values[0] for values in bar.customdata] == [6, 4]
+    assert "Author-attempt observations with value" in str(bar.hovertemplate)
+    assert "Definition:" in str(bar.hovertemplate)
+
+
+def test_query_time_author_experience_tooltip_uses_author_grain() -> None:
+    figure = build_author_experience_chart(
+        current_author_experience_rows(),
+        metric_unit="days",
+    )
+    bar = figure.data[0]
+
+    assert "Distinct authors with value" in str(bar.hovertemplate)
+    assert "Unit:" in str(bar.hovertemplate)
+    assert "Definition:" in str(bar.hovertemplate)
+    assert bar.customdata[0][0] == 4
+    assert bar.customdata[0][1] == "days"
+
+
 def test_author_experience_chart_separates_units() -> None:
     studies_figure = build_author_experience_chart(
         current_author_experience_rows(),
@@ -520,6 +590,7 @@ def test_chart_bundle_contains_all_figures() -> None:
         grouped_attempt_summary=grouped_attempt_rows(),
         study_attempt_history_summary=study_history_rows(),
         author_handoff_summary=author_handoff_rows(),
+        attempt_start_experience_summary=attempt_start_experience_rows(),
         current_author_experience_summary=current_author_experience_rows(),
         grouped_study_summary=grouped_study_rows(),
         content_source_matrix=content_source_rows(),
@@ -531,6 +602,7 @@ def test_chart_bundle_contains_all_figures() -> None:
     assert charts.median_attempt_time_by_mode.data
     assert charts.study_completion_pathways.data
     assert charts.author_handoff_categories.data
+    assert charts.author_attempt_start_experience.data
     assert charts.author_experience_studies.data
     assert charts.author_experience_days.data
     assert charts.content_source_concordance.data
@@ -546,6 +618,10 @@ def test_charts_return_accessible_empty_states() -> None:
     attempt_columns = grouped_attempt_rows().columns
     study_columns = study_history_rows().columns
     handoff_columns = author_handoff_rows().columns
+    attempt_start_experience_columns = attempt_start_experience_rows().columns
+    attempt_start_experience_figure = build_author_attempt_start_experience_chart(
+        pd.DataFrame(columns=attempt_start_experience_columns)
+    )
     experience_columns = current_author_experience_rows().columns
     content_columns = content_source_rows().columns
     grouped_study_columns = grouped_study_rows().columns
@@ -583,6 +659,7 @@ def test_charts_return_accessible_empty_states() -> None:
     assert attempt_figure.layout.annotations[0].text
     assert study_figure.layout.annotations[0].text
     assert handoff_figure.layout.annotations[0].text
+    assert attempt_start_experience_figure.layout.annotations[0].text
     assert experience_figure.layout.annotations[0].text
     assert content_figure.layout.annotations[0].text
     assert study_mix_figure.layout.annotations[0].text
@@ -615,6 +692,14 @@ def test_charts_return_accessible_empty_states() -> None:
             pd.DataFrame(
                 {
                     "completed_attempt_authoring_mode": ["AI"],
+                }
+            ),
+        ),
+        (
+            build_author_attempt_start_experience_chart,
+            pd.DataFrame(
+                {
+                    "author_adoption_group": ["ALL_AUTHORS"],
                 }
             ),
         ),

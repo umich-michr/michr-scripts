@@ -105,6 +105,36 @@ def author_handoff_rows() -> pd.DataFrame:
     )
 
 
+def attempt_start_experience_rows() -> pd.DataFrame:
+    """Return aggregate-only attempt-start experience rows."""
+    return pd.DataFrame.from_records(
+        [
+            {
+                "author_adoption_group": "ALL_AUTHORS",
+                "attempt_completion_group": "ALL",
+                "attempt_authoring_mode": "AI",
+                "experience_metric_name": (
+                    "prior_studies_created_before_attempt_start_count"
+                ),
+                "experience_metric_unit": "studies",
+                "author_attempt_count_with_nonmissing_metric": 4,
+                "median_author_attempt_value": 2.0,
+            },
+            {
+                "author_adoption_group": "ALL_AUTHORS",
+                "attempt_completion_group": "ALL",
+                "attempt_authoring_mode": "MANUAL",
+                "experience_metric_name": (
+                    "prior_studies_created_before_attempt_start_count"
+                ),
+                "experience_metric_unit": "studies",
+                "author_attempt_count_with_nonmissing_metric": 3,
+                "median_author_attempt_value": 5.0,
+            },
+        ]
+    )
+
+
 def current_author_experience_rows() -> pd.DataFrame:
     """Return aggregate-only query-time author experience rows."""
     rows: list[dict[str, object]] = [
@@ -292,6 +322,7 @@ def charts() -> ExplorationCharts:
         grouped_attempt_summary=attempt_rows(),
         study_attempt_history_summary=study_history_rows(),
         author_handoff_summary=author_handoff_rows(),
+        attempt_start_experience_summary=attempt_start_experience_rows(),
         grouped_author_summary=grouped_author_rows(),
         current_author_experience_summary=current_author_experience_rows(),
         grouped_study_summary=grouped_study_rows(),
@@ -324,9 +355,18 @@ def test_html_report_is_self_contained_and_accessible() -> None:
 
     assert 'id="author-experience-heading"' in html
     assert "Author experience and activity" in html
+    assert "Median studies created before attempt start" in html
     assert "Median author experience at report query time: studies" in html
     assert "Median author experience at report query time: days" in html
-    assert "They are not attempt-time snapshots" in normalized_html
+    assert "These charts describe attempt authors" in normalized_html
+    assert "The first chart uses an author-attempt grain" in normalized_html
+    assert "The next two charts use a unique-author grain" in normalized_html
+    assert (
+        "Counts may differ because the attempt-start chart counts "
+        "author-attempt observations"
+    ) in normalized_html
+    assert "missing values can further reduce either count" in normalized_html
+    assert "not historical snapshots of individual attempts" in normalized_html
 
     assert 'id="author-context-heading"' in html
     assert "Author and principal-investigator context" in html

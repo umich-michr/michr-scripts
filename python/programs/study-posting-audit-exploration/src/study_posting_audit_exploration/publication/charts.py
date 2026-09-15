@@ -39,6 +39,16 @@ _REQUIRED_AUTHOR_HANDOFF_COLUMNS: tuple[str, ...] = (
     "distinct_completed_study_count",
 )
 
+_REQUIRED_ATTEMPT_START_EXPERIENCE_COLUMNS: tuple[str, ...] = (
+    "author_adoption_group",
+    "attempt_completion_group",
+    "attempt_authoring_mode",
+    "experience_metric_name",
+    "experience_metric_unit",
+    "author_attempt_count_with_nonmissing_metric",
+    "median_author_attempt_value",
+)
+
 _REQUIRED_CURRENT_AUTHOR_EXPERIENCE_COLUMNS: tuple[str, ...] = (
     "author_adoption_group",
     "experience_metric_name",
@@ -125,6 +135,33 @@ _AUTHOR_EXPERIENCE_METRIC_LABELS: Mapping[str, str] = {
     "login_history_span_days_as_of_report_query": "Login-history span",
 }
 
+_AUTHOR_EXPERIENCE_METRIC_DEFINITIONS: Mapping[str, str] = {
+    "total_studies_created_as_of_report_query_count": (
+        "Total studies created by the attempt author when the report query ran."
+    ),
+    "other_study_memberships_as_of_report_query_count": (
+        "Other study memberships held by the attempt author when the report "
+        "query ran, excluding the study being attempted."
+    ),
+    "distinct_login_days_as_of_report_query_count": (
+        "Distinct calendar days with a successful login across the history "
+        "available when the report query ran; multiple logins on one day count "
+        "once."
+    ),
+    "login_history_span_days_as_of_report_query": (
+        "Elapsed days between the earliest and latest successful login "
+        "timestamps available when the report query ran; this is not the number "
+        "of active login days."
+    ),
+}
+
+_ATTEMPT_START_EXPERIENCE_METRIC = "prior_studies_created_before_attempt_start_count"
+_ATTEMPT_START_EXPERIENCE_LABEL = "Studies created before attempt start"
+_ATTEMPT_START_EXPERIENCE_DEFINITION = (
+    "Other studies created by the attempt author before that attempt's "
+    "START_TIME. One author may contribute multiple attempt observations."
+)
+
 
 @dataclass(frozen=True, slots=True)
 class ExplorationCharts:
@@ -134,6 +171,7 @@ class ExplorationCharts:
     median_attempt_time_by_mode: go.Figure
     study_completion_pathways: go.Figure
     author_handoff_categories: go.Figure
+    author_attempt_start_experience: go.Figure
     author_experience_studies: go.Figure
     author_experience_days: go.Figure
     completed_study_participant_mix: go.Figure
@@ -406,6 +444,85 @@ def build_author_handoff_chart(
     return figure
 
 
+def build_author_attempt_start_experience_chart(
+    attempt_start_experience_summary: pd.DataFrame,
+) -> go.Figure:
+    """Return median prior-study experience at attempt start."""
+    _require_columns(
+        attempt_start_experience_summary,
+        required=_REQUIRED_ATTEMPT_START_EXPERIENCE_COLUMNS,
+        frame_name="attempt_start_experience_summary",
+    )
+    rows = attempt_start_experience_summary.loc[
+        attempt_start_experience_summary["author_adoption_group"].eq("ALL_AUTHORS")
+        & attempt_start_experience_summary["attempt_completion_group"].eq(_ALL)
+        & attempt_start_experience_summary["attempt_authoring_mode"].isin(
+            _AUTHORING_MODE_ORDER
+        )
+        & attempt_start_experience_summary["experience_metric_name"].eq(
+            _ATTEMPT_START_EXPERIENCE_METRIC
+        )
+    ].dropna(subset=["median_author_attempt_value"])
+
+    title = "Median studies created before attempt start"
+
+    if rows.empty:
+        return _empty_figure(
+            title=title,
+            message="No attempt-start author experience aggregates are available.",
+        )
+
+    rows_by_mode = {
+        str(row["attempt_authoring_mode"]): row
+        for row in rows.to_dict(orient="records")
+    }
+    medians = [
+        float(rows_by_mode[mode]["median_author_attempt_value"])
+        if mode in rows_by_mode
+        else 0.0
+        for mode in _AUTHORING_MODE_ORDER
+    ]
+    observation_counts = [
+        int(rows_by_mode[mode]["author_attempt_count_with_nonmissing_metric"])
+        if mode in rows_by_mode
+        else 0
+        for mode in _AUTHORING_MODE_ORDER
+    ]
+    figure = go.Figure(
+        data=[
+            go.Bar(
+                x=list(_AUTHORING_MODE_ORDER),
+                y=medians,
+                customdata=[
+                    [
+                        observation_count,
+                        _ATTEMPT_START_EXPERIENCE_DEFINITION,
+                    ]
+                    for observation_count in observation_counts
+                ],
+                hovertemplate=(
+                    "Attempt authoring mode: %{x}<br>"
+                    "Median prior studies: %{y:.2f}<br>"
+                    "Author-attempt observations with value: "
+                    "%{customdata[0]}<br>"
+                    "Unit: studies<br>"
+                    "Definition: %{customdata[1]}"
+                    "<extra></extra>"
+                ),
+            )
+        ]
+    )
+    figure.update_layout(
+        title=title,
+        template="plotly_white",
+        xaxis_title="Attempt authoring mode",
+        yaxis_title="Median prior studies created",
+        showlegend=False,
+    )
+
+    return figure
+
+
 def build_author_experience_chart(
     current_author_experience_summary: pd.DataFrame,
     *,
@@ -468,12 +585,19 @@ def build_author_experience_chart(
                 for group in _AUTHOR_ADOPTION_GROUP_ORDER
             ],
             customdata=[
-                counts_by_group.get(group, 0) for group in _AUTHOR_ADOPTION_GROUP_ORDER
+                [
+                    counts_by_group.get(group, 0),
+                    unit_label.lower(),
+                    _AUTHOR_EXPERIENCE_METRIC_DEFINITIONS[metric_name],
+                ]
+                for group in _AUTHOR_ADOPTION_GROUP_ORDER
             ],
             hovertemplate=(
-                "Adoption group: %{x}<br>"
+                "Author adoption group: %{x}<br>"
                 "Median: %{y:.2f}<br>"
-                "Authors with value: %{customdata}"
+                "Distinct authors with value: %{customdata[0]}<br>"
+                "Unit: %{customdata[1]}<br>"
+                "Definition: %{customdata[2]}"
                 "<extra>%{fullData.name}</extra>"
             ),
         )
@@ -891,6 +1015,7 @@ def build_exploration_charts(
     grouped_attempt_summary: pd.DataFrame,
     study_attempt_history_summary: pd.DataFrame,
     author_handoff_summary: pd.DataFrame,
+    attempt_start_experience_summary: pd.DataFrame,
     current_author_experience_summary: pd.DataFrame,
     grouped_study_summary: pd.DataFrame,
     grouped_author_summary: pd.DataFrame,
@@ -904,6 +1029,11 @@ def build_exploration_charts(
             study_attempt_history_summary
         ),
         author_handoff_categories=build_author_handoff_chart(author_handoff_summary),
+        author_attempt_start_experience=(
+            build_author_attempt_start_experience_chart(
+                attempt_start_experience_summary
+            )
+        ),
         author_experience_studies=build_author_experience_chart(
             current_author_experience_summary,
             metric_unit="studies",

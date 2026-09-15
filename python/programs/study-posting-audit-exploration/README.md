@@ -167,7 +167,8 @@ aggregate analysis tables. It currently includes:
 
 - executive key performance indicator cards;
 - study completion pathways and author-handoff categories;
-- author experience and activity summaries;
+- attempt-start experience at author-attempt grain;
+- query-time experience and activity at unique-author grain;
 - effective author roles and author-level principal-investigator context;
 - author and principal-investigator appointment-school context;
 - completed-study participant-type and department mix;
@@ -179,6 +180,13 @@ aggregate analysis tables. It currently includes:
 Appointment-school chart groups may overlap because an author or principal
 investigator can have more than one appointment. Those chart values are not
 intended to sum to 100 percent.
+
+The author-experience section describes attempt authors, not PI-specific
+experience unless the PI was also the attempt author. The attempt-start chart
+counts author-attempt observations and can include one author more than once.
+Query-time charts count each distinct author at most once per metric and
+adoption group. Counts can differ across those charts because their analytical
+grains differ and because missing metric values are excluded.
 
 The report embeds its Plotly JavaScript and does not require an external script
 service. It does not contain usernames, audit IDs, study numbers, source

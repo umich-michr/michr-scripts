@@ -265,6 +265,9 @@ def _write_staging_output(
         grouped_attempt_summary=tables.attempts.grouped_attempt_summary,
         study_attempt_history_summary=(tables.overview.study_attempt_history_summary),
         author_handoff_summary=tables.overview.author_handoff_summary,
+        attempt_start_experience_summary=(
+            tables.authors.attempt_start_experience_summary
+        ),
         grouped_author_summary=tables.authors.grouped_author_summary,
         current_author_experience_summary=(
             tables.authors.current_author_experience_summary

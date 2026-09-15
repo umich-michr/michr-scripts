@@ -154,15 +154,54 @@ _TEMPLATE = """<!doctype html>
   </section>
 
   <section aria-labelledby="author-experience-heading">
-    <h2 id="author-experience-heading">Author experience and activity</h2>
-    <p class="caution">
-      These author-grain medians describe values available when the report
-      query ran. They are not attempt-time snapshots and must not be
-      interpreted as causes of authoring-mode choice or study outcomes.
-    </p>
-    <div class="chart">{{ author_experience_studies_html | safe }}</div>
-    <div class="chart">{{ author_experience_days_html | safe }}</div>
-  </section>
+  <h2 id="author-experience-heading">Author experience and activity</h2>
+  <p>
+    These charts describe attempt authors, not experience measures for
+    named study principal investigators unless that principal investigator
+    was also the attempt author.
+  </p>
+
+  <h3>Experience at the start of an attempt</h3>
+  <p>
+    The first chart uses an author-attempt grain. Each attempt contributes
+    one observation: the number of other studies its author had created
+    before that attempt's start time. One author can therefore contribute
+    multiple observations, including observations to both AI and manual
+    bars.
+  </p>
+  <p class="caution">
+    Hover over a bar to see its attempt authoring mode, median prior-study
+    count, number of author-attempt observations with a value, unit, and
+    metric definition.
+  </p>
+  <div class="chart">
+    {{ author_attempt_start_experience_html | safe }}
+  </div>
+
+  <h3>Experience and activity when the report query ran</h3>
+  <p>
+    The next two charts use a unique-author grain. Each distinct attempt
+    author contributes at most once to each metric and adoption group.
+    Values include total studies created, other-study memberships,
+    distinct calendar login days, and elapsed days between the earliest and
+    latest available login timestamps when the report query ran. These are
+    not historical snapshots of individual attempts.
+  </p>
+  <p class="caution">
+    Counts may differ because the attempt-start chart counts author-attempt
+    observations, while query-time charts count distinct authors once per
+    metric; missing values can further reduce either count. Hover over a
+    bar to see the adoption group, median, distinct authors with a value,
+    unit, and metric definition.
+  </p>
+  <div class="chart">{{ author_experience_studies_html | safe }}</div>
+  <div class="chart">{{ author_experience_days_html | safe }}</div>
+
+  <p class="caution">
+    These descriptive medians must not be interpreted as causes of
+    authoring-mode choice or study outcomes.
+  </p>
+</section>
 
   <section aria-labelledby="author-context-heading">
     <h2 id="author-context-heading">
@@ -350,6 +389,10 @@ def render_html_report(
         ),
         author_handoffs_html=_figure_html(
             charts.author_handoff_categories,
+            include_plotlyjs=False,
+        ),
+        author_attempt_start_experience_html=_figure_html(
+            charts.author_attempt_start_experience,
             include_plotlyjs=False,
         ),
         author_experience_studies_html=_figure_html(
