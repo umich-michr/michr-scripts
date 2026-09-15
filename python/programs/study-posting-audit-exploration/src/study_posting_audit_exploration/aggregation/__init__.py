@@ -3,46 +3,65 @@
 import pandas as pd
 
 from study_posting_audit_exploration.aggregation.attempt_histories import (
+    AUTHOR_HANDOFF_COLUMNS,
+    STUDY_ATTEMPT_HISTORY_COLUMNS,
     build_author_handoff_summary,
     build_study_attempt_history_summary,
 )
 from study_posting_audit_exploration.aggregation.attempts import (
+    GROUPED_ATTEMPT_COLUMNS,
     build_grouped_attempt_summary,
 )
 from study_posting_audit_exploration.aggregation.authors import (
+    ATTEMPT_START_EXPERIENCE_COLUMNS,
+    CURRENT_AUTHOR_EXPERIENCE_COLUMNS,
+    GROUPED_AUTHOR_COLUMNS,
     build_attempt_start_experience_summary,
     build_current_author_experience_summary,
     build_grouped_author_summary,
 )
 from study_posting_audit_exploration.aggregation.compensation import (
+    COMPENSATION_ANALYSIS_COLUMNS,
     build_compensation_analysis_summary,
 )
 from study_posting_audit_exploration.aggregation.content_sources import (
+    CONTENT_SOURCE_CONCORDANCE_MATRIX_COLUMNS,
+    CONTENT_SOURCE_CONCORDANCE_SUMMARY_COLUMNS,
     build_content_source_concordance_matrix,
     build_content_source_concordance_summary,
 )
 from study_posting_audit_exploration.aggregation.fields import (
+    FIELD_ADOPTION_EDITING_COLUMNS,
     build_field_adoption_editing_summary,
 )
 from study_posting_audit_exploration.aggregation.final_readability import (
+    FIELD_READABILITY_TARGET_COLUMNS,
+    FINAL_TEXT_METRIC_COLUMNS,
     build_field_readability_target_summary,
     build_final_text_metric_summary,
 )
 from study_posting_audit_exploration.aggregation.nontext_fields import (
+    NONTEXT_FIELD_ADOPTION_COLUMNS,
     build_nontext_field_adoption_summary,
 )
 from study_posting_audit_exploration.aggregation.overview import (
+    OVERVIEW_COLUMNS,
     build_overview_summary,
 )
 from study_posting_audit_exploration.aggregation.readability import (
+    FIELD_EDIT_READABILITY_CROSS_COLUMNS,
+    FIELD_READABILITY_CHANGE_COLUMNS,
+    SELECTED_VS_UNSELECTED_READABILITY_COLUMNS,
     build_field_edit_readability_cross_summary,
     build_field_readability_change_summary,
     build_selected_vs_unselected_readability_summary,
 )
 from study_posting_audit_exploration.aggregation.studies import (
+    GROUPED_STUDY_COLUMNS,
     build_grouped_study_summary,
 )
 from study_posting_audit_exploration.aggregation.suggestions import (
+    SUGGESTION_SELECTION_COLUMNS,
     build_suggestion_selection_summary,
 )
 from study_posting_audit_exploration.models import (
@@ -54,6 +73,42 @@ from study_posting_audit_exploration.models import (
     ReadabilityAnalysisTables,
     StudyAnalysisTables,
 )
+
+AGGREGATE_OUTPUT_COLUMNS: dict[str, tuple[str, ...]] = {
+    "overview/overview_summary.csv": OVERVIEW_COLUMNS,
+    "overview/study_attempt_history_summary.csv": (STUDY_ATTEMPT_HISTORY_COLUMNS),
+    "overview/author_handoff_summary.csv": AUTHOR_HANDOFF_COLUMNS,
+    "attempts/grouped_attempt_summary.csv": GROUPED_ATTEMPT_COLUMNS,
+    "attempts/content_source_concordance_summary.csv": (
+        CONTENT_SOURCE_CONCORDANCE_SUMMARY_COLUMNS
+    ),
+    "attempts/content_source_concordance_matrix.csv": (
+        CONTENT_SOURCE_CONCORDANCE_MATRIX_COLUMNS
+    ),
+    "studies/grouped_study_summary.csv": GROUPED_STUDY_COLUMNS,
+    "authors/grouped_author_summary.csv": GROUPED_AUTHOR_COLUMNS,
+    "authors/attempt_start_experience_summary.csv": (ATTEMPT_START_EXPERIENCE_COLUMNS),
+    "authors/current_author_experience_summary.csv": (
+        CURRENT_AUTHOR_EXPERIENCE_COLUMNS
+    ),
+    "fields/field_adoption_editing_summary.csv": (FIELD_ADOPTION_EDITING_COLUMNS),
+    "fields/nontext_field_adoption_summary.csv": (NONTEXT_FIELD_ADOPTION_COLUMNS),
+    "fields/suggestion_selection_summary.csv": (SUGGESTION_SELECTION_COLUMNS),
+    "fields/compensation_analysis_summary.csv": (COMPENSATION_ANALYSIS_COLUMNS),
+    "readability/selected_vs_unselected_readability_summary.csv": (
+        SELECTED_VS_UNSELECTED_READABILITY_COLUMNS
+    ),
+    "readability/field_readability_change_summary.csv": (
+        FIELD_READABILITY_CHANGE_COLUMNS
+    ),
+    "readability/field_readability_target_summary.csv": (
+        FIELD_READABILITY_TARGET_COLUMNS
+    ),
+    "readability/field_edit_readability_cross_summary.csv": (
+        FIELD_EDIT_READABILITY_CROSS_COLUMNS
+    ),
+    "readability/final_text_metric_summary.csv": FINAL_TEXT_METRIC_COLUMNS,
+}
 
 
 def build_overview_tables(
@@ -194,6 +249,7 @@ def build_readability_analysis_tables(
 
 
 __all__ = [
+    "AGGREGATE_OUTPUT_COLUMNS",
     "AttemptAnalysisTables",
     "AuthorAnalysisTables",
     "FieldAnalysisTables",

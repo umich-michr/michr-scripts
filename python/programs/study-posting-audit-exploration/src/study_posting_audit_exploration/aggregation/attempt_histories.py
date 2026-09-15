@@ -9,7 +9,7 @@ _AI = "AI"
 _MANUAL = "MANUAL"
 _NOT_COMPLETED = "NOT_COMPLETED"
 
-_STUDY_ATTEMPT_HISTORY_COLUMNS: tuple[str, ...] = (
+STUDY_ATTEMPT_HISTORY_COLUMNS: tuple[str, ...] = (
     "final_completion_authoring_mode",
     "distinct_study_count",
     "study_count_with_no_completed_attempt",
@@ -35,7 +35,7 @@ _STUDY_ATTEMPT_HISTORY_COLUMNS: tuple[str, ...] = (
     "study_percentage_with_author_change_before_completion",
 )
 
-_AUTHOR_HANDOFF_COLUMNS: tuple[str, ...] = (
+AUTHOR_HANDOFF_COLUMNS: tuple[str, ...] = (
     "completed_attempt_authoring_mode",
     "preceding_attempt_authoring_mode",
     "preceding_attempt_result",
@@ -175,7 +175,7 @@ def build_study_attempt_history_summary(
 
     return pd.DataFrame.from_records(
         rows,
-        columns=list(_STUDY_ATTEMPT_HISTORY_COLUMNS),
+        columns=list(STUDY_ATTEMPT_HISTORY_COLUMNS),
     )
 
 
@@ -311,7 +311,7 @@ def build_author_handoff_summary(
     )
 
     if not rows:
-        return pd.DataFrame(columns=list(_AUTHOR_HANDOFF_COLUMNS))
+        return pd.DataFrame(columns=list(AUTHOR_HANDOFF_COLUMNS))
 
     detail = pd.DataFrame.from_records(rows)
     grouping_columns = [
@@ -331,5 +331,5 @@ def build_author_handoff_summary(
 
     return pd.DataFrame.from_records(
         summary_rows,
-        columns=list(_AUTHOR_HANDOFF_COLUMNS),
+        columns=list(AUTHOR_HANDOFF_COLUMNS),
     )

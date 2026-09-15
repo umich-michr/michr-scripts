@@ -20,7 +20,7 @@ _EDITED_CATEGORIES_WITH_USABLE_METRICS = frozenset(
     }
 )
 
-_FIELD_ADOPTION_EDITING_COLUMNS: tuple[str, ...] = (
+FIELD_ADOPTION_EDITING_COLUMNS: tuple[str, ...] = (
     "field_name",
     "analysis_type",
     "completed_ai_attempt_count",
@@ -208,5 +208,5 @@ def build_field_adoption_editing_summary(
 
     return pd.DataFrame.from_records(
         rows,
-        columns=list(_FIELD_ADOPTION_EDITING_COLUMNS),
+        columns=list(FIELD_ADOPTION_EDITING_COLUMNS),
     )

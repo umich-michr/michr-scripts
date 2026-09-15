@@ -101,13 +101,15 @@ days, and login-history span as of the report query.
 
 ## Current output
 
-A successful `analyze` run publishes 26 files: `report.html`, one JSON
-manifest, and 24 CSV files.
+A successful `analyze` run publishes 27 files: `report.html`, one JSON
+manifest, and 25 CSV files.
 
 ~~~~text
 exploration/
 ├── report.html
 ├── analysis_manifest.json
+├── definitions/
+│   └── metric_definitions.csv
 ├── analysis-audit-records/
 │   ├── study_attempt_author_history.csv
 │   ├── study_attempt_history.csv
@@ -140,6 +142,23 @@ exploration/
     ├── field_edit_readability_cross_summary.csv
     └── final_text_metric_summary.csv
 ~~~~
+
+### Metric definitions
+
+`definitions/metric_definitions.csv` is an identifier-free data dictionary
+covering every column in the current faculty-facing aggregate CSV files. It
+records:
+
+- a plain-language label and analytical unit;
+- calculation, numerator, and denominator definitions;
+- measurement units and value-selection rules;
+- missing-value treatment;
+- source output filenames and column names;
+- interpretation cautions.
+
+The file is generated deterministically from the aggregate output schemas.
+It does not include usernames, audit IDs, study numbers, source payloads,
+selected text, or final text.
 
 ### HTML report
 
@@ -326,6 +345,7 @@ Therefore:
 - generation time;
 - source report path and filenames;
 - source row counts;
+- published analysis row counts;- the metric-definition row count;
 - published analysis row counts;
 - output file count;
 - configured edit-intensity scheme;

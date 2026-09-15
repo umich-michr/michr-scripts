@@ -107,6 +107,7 @@ def _expected_paths(
     return {
         "manifest": output_directory / "analysis_manifest.json",
         "report": output_directory / "report.html",
+        "definitions": (output_directory / "definitions" / "metric_definitions.csv"),
         "field_audit": (audit_directory / "completed_ai_field_analysis.csv"),
         "readability_pairs": (audit_directory / "completed_ai_readability_pairs.csv"),
         "field_adoption": (fields_directory / "field_adoption_editing_summary.csv"),
@@ -136,7 +137,11 @@ def _assert_manifest(manifest: dict[str, object]) -> None:
     assert readability_counts["field_readability_change_summary"] > 0
     assert readability_counts["field_readability_target_summary"] > 0
     assert readability_counts["final_text_metric_summary"] > 0
-    assert manifest["output_file_count"] == 26
+    definition_counts = manifest["definition_row_counts"]
+
+    assert isinstance(definition_counts, dict)
+    assert definition_counts["metric_definitions"] > 0
+    assert manifest["output_file_count"] == 27
     assert manifest["warning_count"] == 0
 
 
@@ -151,6 +156,7 @@ def _assert_cli_paths_printed(
         f"Exploration directory: {output_directory}",
         f"Manifest: {paths['manifest']}",
         f"HTML report: {paths['report']}",
+        f"Metric definitions CSV: {paths['definitions']}",
         f"Completed AI field analysis CSV: {paths['field_audit']}",
         (f"Completed AI readability pairs CSV: {paths['readability_pairs']}"),
         (f"Field adoption and editing summary CSV: {paths['field_adoption']}"),
@@ -165,7 +171,7 @@ def _assert_cli_paths_printed(
         f"Field readability target summary CSV: {paths['target']}",
         f"Field edit/readability cross summary CSV: {paths['cross']}",
         f"Final text metric summary CSV: {paths['final_metric']}",
-        "Published files: 26",
+        "Published files: 27",
     )
 
     for expected_line in expected_lines:

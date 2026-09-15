@@ -31,7 +31,7 @@ _AUTHORING_MODES: tuple[str, ...] = (
     _MANUAL,
 )
 
-_GROUPED_AUTHOR_COLUMNS: tuple[str, ...] = (
+GROUPED_AUTHOR_COLUMNS: tuple[str, ...] = (
     "author_population_name",
     "attempt_completion_group",
     "attempt_authoring_mode",
@@ -51,7 +51,7 @@ _GROUPED_AUTHOR_COLUMNS: tuple[str, ...] = (
     "distinct_author_count_classified_as_pi",
 )
 
-_ATTEMPT_START_EXPERIENCE_COLUMNS: tuple[str, ...] = (
+ATTEMPT_START_EXPERIENCE_COLUMNS: tuple[str, ...] = (
     "author_adoption_group",
     "attempt_completion_group",
     "attempt_authoring_mode",
@@ -70,7 +70,7 @@ _ATTEMPT_START_EXPERIENCE_COLUMNS: tuple[str, ...] = (
     "experience_value_definition",
 )
 
-_CURRENT_AUTHOR_EXPERIENCE_COLUMNS: tuple[str, ...] = (
+CURRENT_AUTHOR_EXPERIENCE_COLUMNS: tuple[str, ...] = (
     "author_adoption_group",
     "experience_metric_name",
     "experience_metric_unit",
@@ -397,7 +397,7 @@ def build_grouped_author_summary(
 
     return pd.DataFrame.from_records(
         rows,
-        columns=list(_GROUPED_AUTHOR_COLUMNS),
+        columns=list(GROUPED_AUTHOR_COLUMNS),
     )
 
 
@@ -484,7 +484,7 @@ def build_attempt_start_experience_summary(
 
     return pd.DataFrame.from_records(
         rows,
-        columns=list(_ATTEMPT_START_EXPERIENCE_COLUMNS),
+        columns=list(ATTEMPT_START_EXPERIENCE_COLUMNS),
     )
 
 
@@ -545,5 +545,5 @@ def build_current_author_experience_summary(
 
     return pd.DataFrame.from_records(
         rows,
-        columns=list(_CURRENT_AUTHOR_EXPERIENCE_COLUMNS),
+        columns=list(CURRENT_AUTHOR_EXPERIENCE_COLUMNS),
     )

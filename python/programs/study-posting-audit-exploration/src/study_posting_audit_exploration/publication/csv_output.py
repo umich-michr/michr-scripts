@@ -7,7 +7,13 @@ import tempfile
 
 import pandas as pd
 
+from study_posting_audit_exploration.aggregation import (
+    AGGREGATE_OUTPUT_COLUMNS,
+)
 from study_posting_audit_exploration.config import ExplorationRunConfig
+from study_posting_audit_exploration.definitions import (
+    build_metric_definitions,
+)
 from study_posting_audit_exploration.errors import (
     ExplorationConfigurationError,
     ExplorationInputError,
@@ -30,6 +36,7 @@ from study_posting_audit_exploration.publication.manifest import (
 
 _REPORT_FILENAME = "report.html"
 
+_DEFINITIONS_DIRECTORY = "definitions"
 _ANALYSIS_AUDIT_DIRECTORY = "analysis-audit-records"
 _OVERVIEW_DIRECTORY = "overview"
 _ATTEMPTS_DIRECTORY = "attempts"
@@ -37,6 +44,8 @@ _STUDIES_DIRECTORY = "studies"
 _AUTHORS_DIRECTORY = "authors"
 _FIELDS_DIRECTORY = "fields"
 _READABILITY_DIRECTORY = "readability"
+
+_METRIC_DEFINITIONS_FILENAME = "metric_definitions.csv"
 
 _STUDY_ATTEMPT_AUTHOR_HISTORY_FILENAME = "study_attempt_author_history.csv"
 _STUDY_ATTEMPT_HISTORY_FILENAME = "study_attempt_history.csv"
@@ -73,7 +82,7 @@ _FIELD_EDIT_READABILITY_CROSS_SUMMARY_FILENAME = (
 )
 _FINAL_TEXT_METRIC_SUMMARY_FILENAME = "final_text_metric_summary.csv"
 
-_OUTPUT_FILE_COUNT = 26
+_OUTPUT_FILE_COUNT = 27
 
 
 def _write_frame(
@@ -220,6 +229,7 @@ def _write_staging_output(
 ) -> None:
     """Write all current exploration files into one staging directory."""
     for directory_name in (
+        _DEFINITIONS_DIRECTORY,
         _ANALYSIS_AUDIT_DIRECTORY,
         _OVERVIEW_DIRECTORY,
         _ATTEMPTS_DIRECTORY,
@@ -234,8 +244,16 @@ def _write_staging_output(
         tables=tables,
         staging_directory=staging_directory,
     )
+    metric_definitions_path = (
+        staging_directory / _DEFINITIONS_DIRECTORY / _METRIC_DEFINITIONS_FILENAME
+    )
     manifest_path = staging_directory / manifest_filename()
     report_path = staging_directory / _REPORT_FILENAME
+
+    _write_frame(
+        build_metric_definitions(AGGREGATE_OUTPUT_COLUMNS),
+        metric_definitions_path,
+    )
 
     for frame, path in output_frames:
         _write_frame(
@@ -268,6 +286,8 @@ def _write_staging_output(
         output_file_count=_OUTPUT_FILE_COUNT,
     )
 
+    _sync_file(metric_definitions_path)
+
     for _, path in output_frames:
         _sync_file(path)
 
@@ -279,6 +299,7 @@ def _publication_result(
     destination: Path,
 ) -> ExplorationPublication:
     """Return stable paths for a successfully published exploration."""
+    definitions_directory = destination / _DEFINITIONS_DIRECTORY
     audit_directory = destination / _ANALYSIS_AUDIT_DIRECTORY
     overview_directory = destination / _OVERVIEW_DIRECTORY
     attempts_directory = destination / _ATTEMPTS_DIRECTORY
@@ -291,6 +312,7 @@ def _publication_result(
         output_directory=destination,
         manifest_path=destination / manifest_filename(),
         report_path=destination / _REPORT_FILENAME,
+        metric_definitions_path=(definitions_directory / _METRIC_DEFINITIONS_FILENAME),
         study_attempt_author_history_path=(
             audit_directory / _STUDY_ATTEMPT_AUTHOR_HISTORY_FILENAME
         ),

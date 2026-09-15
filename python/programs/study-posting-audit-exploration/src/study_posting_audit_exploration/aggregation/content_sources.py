@@ -7,7 +7,7 @@ _ALL = "ALL"
 _COMPLETE = "COMPLETE"
 _INCOMPLETE = "INCOMPLETE"
 
-_SUMMARY_COLUMNS: tuple[str, ...] = (
+CONTENT_SOURCE_CONCORDANCE_SUMMARY_COLUMNS: tuple[str, ...] = (
     "attempt_completion_group",
     "ai_attempt_count",
     "ai_attempt_count_with_both_content_source_values",
@@ -21,7 +21,7 @@ _SUMMARY_COLUMNS: tuple[str, ...] = (
     "comparison_normalization_rule",
 )
 
-_MATRIX_COLUMNS: tuple[str, ...] = (
+CONTENT_SOURCE_CONCORDANCE_MATRIX_COLUMNS: tuple[str, ...] = (
     "attempt_completion_group",
     "reported_study_content_source",
     "inferred_study_content_source",
@@ -166,7 +166,7 @@ def build_content_source_concordance_summary(
 
     return pd.DataFrame.from_records(
         rows,
-        columns=list(_SUMMARY_COLUMNS),
+        columns=list(CONTENT_SOURCE_CONCORDANCE_SUMMARY_COLUMNS),
     )
 
 
@@ -256,5 +256,5 @@ def build_content_source_concordance_matrix(
 
     return pd.DataFrame.from_records(
         rows,
-        columns=list(_MATRIX_COLUMNS),
+        columns=list(CONTENT_SOURCE_CONCORDANCE_MATRIX_COLUMNS),
     )

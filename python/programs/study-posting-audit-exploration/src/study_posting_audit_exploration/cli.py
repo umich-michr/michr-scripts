@@ -306,6 +306,7 @@ def _print_publication(
         ("Exploration directory", published.output_directory),
         ("Manifest", published.manifest_path),
         ("HTML report", published.report_path),
+        ("Metric definitions CSV", published.metric_definitions_path),
         (
             "Completed AI field analysis CSV",
             published.completed_ai_field_analysis_path,

@@ -16,7 +16,7 @@ _COMPENSATION_KINDS: tuple[str, ...] = (
 )
 _FLESCH_KINCAID_GRADE = "flesch_kincaid_grade"
 
-_COMPENSATION_ANALYSIS_COLUMNS: tuple[str, ...] = (
+COMPENSATION_ANALYSIS_COLUMNS: tuple[str, ...] = (
     "compensation_suggestion_kind",
     "completed_ai_attempt_count_with_suggestion",
     "offered_suggestion_count",
@@ -306,5 +306,5 @@ def build_compensation_analysis_summary(
 
     return pd.DataFrame.from_records(
         rows,
-        columns=list(_COMPENSATION_ANALYSIS_COLUMNS),
+        columns=list(COMPENSATION_ANALYSIS_COLUMNS),
     )

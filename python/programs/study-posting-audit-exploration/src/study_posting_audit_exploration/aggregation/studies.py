@@ -12,7 +12,7 @@ _MANUAL = "MANUAL"
 _NOT_COMPLETED = "NOT_COMPLETED"
 _MISSING = "MISSING"
 
-_GROUPED_STUDY_COLUMNS: tuple[str, ...] = (
+GROUPED_STUDY_COLUMNS: tuple[str, ...] = (
     "study_population_name",
     "final_completion_authoring_mode",
     "grouping_dimension_1_name",
@@ -455,5 +455,5 @@ def build_grouped_study_summary(
 
     return pd.DataFrame.from_records(
         rows,
-        columns=list(_GROUPED_STUDY_COLUMNS),
+        columns=list(GROUPED_STUDY_COLUMNS),
     )

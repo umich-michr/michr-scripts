@@ -10,7 +10,7 @@ import pandas as pd
 from study_posting_audit_exploration.errors import ExplorationValidationError
 from study_posting_audit_exploration.statistics import describe_numeric
 
-_NONTEXT_FIELD_ADOPTION_COLUMNS: tuple[str, ...] = (
+NONTEXT_FIELD_ADOPTION_COLUMNS: tuple[str, ...] = (
     "field_name",
     "analysis_type",
     "completed_ai_attempt_count",
@@ -258,5 +258,5 @@ def build_nontext_field_adoption_summary(
 
     return pd.DataFrame.from_records(
         rows,
-        columns=list(_NONTEXT_FIELD_ADOPTION_COLUMNS),
+        columns=list(NONTEXT_FIELD_ADOPTION_COLUMNS),
     )

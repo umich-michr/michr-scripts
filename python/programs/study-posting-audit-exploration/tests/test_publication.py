@@ -5,6 +5,8 @@ import pandas as pd
 import pytest
 
 from study_posting_audit_exploration import (
+    AGGREGATE_OUTPUT_COLUMNS,
+    METRIC_DEFINITION_COLUMNS,
     AppointmentQualityFinding,
     AttemptHistoryTables,
     ExplorationConfigurationError,
@@ -217,6 +219,7 @@ def _publication_paths(
     return (
         publication.manifest_path,
         publication.report_path,
+        publication.metric_definitions_path,
         publication.study_attempt_author_history_path,
         publication.study_attempt_history_path,
         publication.author_history_path,
@@ -309,7 +312,7 @@ def test_publish_exploration_writes_atomic_html_output(
     )
 
     assert publication.output_directory == output_directory
-    assert publication.output_file_count == 26
+    assert publication.output_file_count == 27
 
     for path in _publication_paths(publication):
         assert path.is_file()
@@ -318,6 +321,11 @@ def test_publish_exploration_writes_atomic_html_output(
 
     _assert_derived_outputs(publication)
     _assert_html_privacy(publication)
+    metric_definitions = read_published_csv(publication.metric_definitions_path)
+    assert tuple(metric_definitions.columns) == METRIC_DEFINITION_COLUMNS
+    assert len(metric_definitions) == sum(
+        len(columns) for columns in AGGREGATE_OUTPUT_COLUMNS.values()
+    )
 
 
 def test_manifest_contains_readability_analysis_counts(
@@ -348,7 +356,8 @@ def test_manifest_contains_readability_analysis_counts(
         > 0
     )
     assert manifest["readability_analysis_row_counts"]["final_text_metric_summary"] > 0
-    assert manifest["output_file_count"] == 26
+    assert manifest["definition_row_counts"]["metric_definitions"] > 0
+    assert manifest["output_file_count"] == 27
     assert manifest["warning_count"] == 0
     assert manifest_filename() == "analysis_manifest.json"
 

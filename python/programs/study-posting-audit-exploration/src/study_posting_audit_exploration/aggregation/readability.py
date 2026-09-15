@@ -25,7 +25,7 @@ _READABILITY_MEASURES: tuple[str, ...] = (
     ),
 )
 
-_SELECTED_VS_UNSELECTED_COLUMNS: tuple[str, ...] = (
+SELECTED_VS_UNSELECTED_READABILITY_COLUMNS: tuple[str, ...] = (
     "field_name",
     "readability_measure_name",
     "completed_ai_attempt_count_with_selected_and_unselected_suggestions",
@@ -42,7 +42,7 @@ _SELECTED_VS_UNSELECTED_COLUMNS: tuple[str, ...] = (
     "equality_tolerance",
 )
 
-_FIELD_READABILITY_CHANGE_COLUMNS: tuple[str, ...] = (
+FIELD_READABILITY_CHANGE_COLUMNS: tuple[str, ...] = (
     "field_name",
     "readability_measure_name",
     "paired_selected_final_attempt_count",
@@ -63,7 +63,7 @@ _FIELD_READABILITY_CHANGE_COLUMNS: tuple[str, ...] = (
     "short_text_readability_caution",
 )
 
-_FIELD_EDIT_READABILITY_CROSS_COLUMNS: tuple[str, ...] = (
+FIELD_EDIT_READABILITY_CROSS_COLUMNS: tuple[str, ...] = (
     "field_name",
     "edit_intensity_threshold_scheme_name",
     "edit_intensity_category",
@@ -253,7 +253,7 @@ def build_selected_vs_unselected_readability_summary(
 
     return pd.DataFrame.from_records(
         rows,
-        columns=list(_SELECTED_VS_UNSELECTED_COLUMNS),
+        columns=list(SELECTED_VS_UNSELECTED_READABILITY_COLUMNS),
     )
 
 
@@ -327,7 +327,7 @@ def build_field_readability_change_summary(
 
     return pd.DataFrame.from_records(
         rows,
-        columns=list(_FIELD_READABILITY_CHANGE_COLUMNS),
+        columns=list(FIELD_READABILITY_CHANGE_COLUMNS),
     )
 
 
@@ -419,5 +419,5 @@ def build_field_edit_readability_cross_summary(
 
     return pd.DataFrame.from_records(
         rows,
-        columns=list(_FIELD_EDIT_READABILITY_CROSS_COLUMNS),
+        columns=list(FIELD_EDIT_READABILITY_CROSS_COLUMNS),
     )

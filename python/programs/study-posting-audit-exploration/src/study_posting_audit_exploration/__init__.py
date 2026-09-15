@@ -1,6 +1,7 @@
 """Exploratory analysis of normalized study-posting audit reports."""
 
 from study_posting_audit_exploration.aggregation import (
+    AGGREGATE_OUTPUT_COLUMNS,
     build_attempt_analysis_tables,
     build_attempt_start_experience_summary,
     build_author_analysis_tables,
@@ -30,6 +31,12 @@ from study_posting_audit_exploration.aggregation import (
 from study_posting_audit_exploration.config import (
     ExplorationInputConfig,
     ExplorationRunConfig,
+)
+from study_posting_audit_exploration.definitions import (
+    AGGREGATE_FILE_ORDER,
+    METRIC_DEFINITION_COLUMNS,
+    MetricDefinition,
+    build_metric_definitions,
 )
 from study_posting_audit_exploration.derivation import (
     EDIT_INTENSITY_THRESHOLD_SCHEME,
@@ -81,7 +88,10 @@ from study_posting_audit_exploration.validation import validate_audit_report
 __version__ = "0.1.0"
 
 __all__ = [
+    "AGGREGATE_FILE_ORDER",
+    "AGGREGATE_OUTPUT_COLUMNS",
     "EDIT_INTENSITY_THRESHOLD_SCHEME",
+    "METRIC_DEFINITION_COLUMNS",
     "AppointmentQualityFinding",
     "AttemptAnalysisTables",
     "AttemptHistoryTables",
@@ -98,6 +108,7 @@ __all__ = [
     "FieldAnalysisTables",
     "KpiCard",
     "LoadedAuditReport",
+    "MetricDefinition",
     "OverviewTables",
     "ReadabilityAnalysisTables",
     "StudyAnalysisTables",
@@ -125,6 +136,7 @@ __all__ = [
     "build_grouped_attempt_summary",
     "build_grouped_author_summary",
     "build_grouped_study_summary",
+    "build_metric_definitions",
     "build_nontext_field_adoption_summary",
     "build_overview_summary",
     "build_overview_tables",

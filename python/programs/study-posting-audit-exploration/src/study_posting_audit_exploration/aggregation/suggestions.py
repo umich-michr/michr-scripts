@@ -9,7 +9,7 @@ import pandas as pd
 
 from study_posting_audit_exploration.errors import ExplorationValidationError
 
-_SUGGESTION_SELECTION_COLUMNS: tuple[str, ...] = (
+SUGGESTION_SELECTION_COLUMNS: tuple[str, ...] = (
     "field_name",
     "suggestion_kind",
     "suggestion_index",
@@ -249,5 +249,5 @@ def build_suggestion_selection_summary(
 
     return pd.DataFrame.from_records(
         rows,
-        columns=list(_SUGGESTION_SELECTION_COLUMNS),
+        columns=list(SUGGESTION_SELECTION_COLUMNS),
     )

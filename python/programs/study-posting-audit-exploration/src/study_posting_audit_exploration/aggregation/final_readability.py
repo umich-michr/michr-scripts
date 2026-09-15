@@ -29,7 +29,7 @@ _FINAL_METRICS: tuple[tuple[str, str], ...] = (
     ),
 )
 
-_FIELD_READABILITY_TARGET_COLUMNS: tuple[str, ...] = (
+FIELD_READABILITY_TARGET_COLUMNS: tuple[str, ...] = (
     "attempt_authoring_mode",
     "field_name",
     "readability_measure_name",
@@ -43,7 +43,7 @@ _FIELD_READABILITY_TARGET_COLUMNS: tuple[str, ...] = (
     "target_interpretation_note",
 )
 
-_FINAL_TEXT_METRIC_COLUMNS: tuple[str, ...] = (
+FINAL_TEXT_METRIC_COLUMNS: tuple[str, ...] = (
     "attempt_authoring_mode",
     "field_name",
     "compensation_selected_suggestion_kind",
@@ -156,7 +156,7 @@ def build_field_readability_target_summary(
 
     return pd.DataFrame.from_records(
         rows,
-        columns=list(_FIELD_READABILITY_TARGET_COLUMNS),
+        columns=list(FIELD_READABILITY_TARGET_COLUMNS),
     )
 
 
@@ -279,5 +279,5 @@ def build_final_text_metric_summary(
 
     return pd.DataFrame.from_records(
         rows,
-        columns=list(_FINAL_TEXT_METRIC_COLUMNS),
+        columns=list(FINAL_TEXT_METRIC_COLUMNS),
     )

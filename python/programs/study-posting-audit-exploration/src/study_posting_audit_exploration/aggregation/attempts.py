@@ -9,7 +9,7 @@ from study_posting_audit_exploration.statistics import describe_numeric
 _ALL = "ALL"
 _MISSING_GROUP_VALUE = "MISSING"
 
-_GROUPED_ATTEMPT_COLUMNS: tuple[str, ...] = (
+GROUPED_ATTEMPT_COLUMNS: tuple[str, ...] = (
     "attempt_completion_group",
     "attempt_result",
     "attempt_authoring_mode",
@@ -349,5 +349,5 @@ def build_grouped_attempt_summary(
 
     return pd.DataFrame.from_records(
         rows,
-        columns=list(_GROUPED_ATTEMPT_COLUMNS),
+        columns=list(GROUPED_ATTEMPT_COLUMNS),
     )

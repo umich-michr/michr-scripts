@@ -140,6 +140,7 @@ class ExplorationPublication:
     output_directory: Path
     manifest_path: Path
     report_path: Path
+    metric_definitions_path: Path
     study_attempt_author_history_path: Path
     study_attempt_history_path: Path
     author_history_path: Path

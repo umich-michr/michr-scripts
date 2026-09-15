@@ -4,7 +4,13 @@ from datetime import UTC, datetime
 import json
 from pathlib import Path
 
+from study_posting_audit_exploration.aggregation import (
+    AGGREGATE_OUTPUT_COLUMNS,
+)
 from study_posting_audit_exploration.config import ExplorationRunConfig
+from study_posting_audit_exploration.definitions import (
+    build_metric_definitions,
+)
 from study_posting_audit_exploration.models import (
     ExplorationAnalysisTables,
     LoadedAuditReport,
@@ -35,6 +41,7 @@ def write_manifest(
     author_tables = tables.authors
     field_tables = tables.fields
     readability_tables = tables.readability
+    metric_definitions = build_metric_definitions(AGGREGATE_OUTPUT_COLUMNS)
 
     content = {
         "analysis_program_version": _PROGRAM_VERSION,
@@ -49,6 +56,9 @@ def write_manifest(
             "records": len(report.records),
             "ai_assistance_metrics": len(report.ai_assistance_metrics),
             "readability_metrics": len(report.readability_metrics),
+        },
+        "definition_row_counts": {
+            "metric_definitions": len(metric_definitions),
         },
         "analysis_audit_record_row_counts": {
             "study_attempt_author_history": len(histories.study_attempt_author_history),

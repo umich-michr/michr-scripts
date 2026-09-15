@@ -10,7 +10,7 @@ _AI_ERROR = "AI_ERROR"
 _AI_ERROR_WITHOUT_STACK_TRACE = "AI_ERROR_WITHOUT_STACK_TRACE"
 _USER_DROPPED = "USER_DROPPED"
 
-_OVERVIEW_COLUMNS: tuple[str, ...] = (
+OVERVIEW_COLUMNS: tuple[str, ...] = (
     "overview_section_name",
     "overview_metric_name",
     "overview_metric_label",
@@ -426,5 +426,5 @@ def build_overview_summary(
 
     return pd.DataFrame.from_records(
         rows,
-        columns=list(_OVERVIEW_COLUMNS),
+        columns=list(OVERVIEW_COLUMNS),
     )
