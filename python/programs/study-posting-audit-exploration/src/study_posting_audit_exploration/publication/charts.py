@@ -16,7 +16,18 @@ _REQUIRED_ATTEMPT_COLUMNS: tuple[str, ...] = (
     "grouping_dimension_1_name",
     "grouping_dimension_2_name",
     "attempt_count",
+    "attempt_count_with_nonmissing_study_info_page_time",
+    "attempt_count_missing_study_info_page_time",
+    "percentile_25_study_info_page_minutes",
+    "median_study_info_page_minutes",
+    "percentile_75_study_info_page_minutes",
+    "percentile_90_study_info_page_minutes",
+    "attempt_count_with_nonmissing_total_attempt_time",
+    "attempt_count_missing_total_attempt_time",
+    "percentile_25_total_attempt_minutes",
     "median_total_attempt_minutes",
+    "percentile_75_total_attempt_minutes",
+    "percentile_90_total_attempt_minutes",
 )
 
 _REQUIRED_CONTENT_SOURCE_COLUMNS: tuple[str, ...] = (
@@ -30,7 +41,11 @@ _REQUIRED_STUDY_HISTORY_COLUMNS: tuple[str, ...] = (
     "final_completion_authoring_mode",
     "distinct_study_count",
     "study_count_with_preceding_incomplete_attempts",
+    "minimum_minutes_first_attempt_to_completion",
     "median_minutes_first_attempt_to_completion",
+    "average_minutes_first_attempt_to_completion",
+    "standard_deviation_minutes_first_attempt_to_completion",
+    "maximum_minutes_first_attempt_to_completion",
 )
 
 _REQUIRED_AUTHOR_HANDOFF_COLUMNS: tuple[str, ...] = (
@@ -337,7 +352,8 @@ class ExplorationCharts:
     """Aggregate-only figures for the HTML report."""
 
     attempt_outcomes_by_mode: go.Figure
-    median_attempt_time_by_mode: go.Figure
+    attempt_timing_distribution_by_mode: go.Figure
+    study_completion_timing_by_mode: go.Figure
     study_completion_pathways: go.Figure
     author_handoff_categories: go.Figure
     author_attempt_start_experience: go.Figure
@@ -452,45 +468,263 @@ def build_attempt_outcomes_chart(
     return figure
 
 
+def _authoring_mode_rows(
+    grouped_attempt_summary: pd.DataFrame,
+) -> pd.DataFrame:
+    """Return aggregate attempt rows grouped only by authoring mode."""
+    return grouped_attempt_summary.loc[
+        grouped_attempt_summary["grouping_dimension_1_name"].eq("AUTHORING_MODE")
+        & grouped_attempt_summary["grouping_dimension_2_name"].eq("NONE")
+        & grouped_attempt_summary["attempt_authoring_mode"].isin(_AUTHORING_MODE_ORDER)
+    ].copy()
+
+
 def build_attempt_timing_chart(
     grouped_attempt_summary: pd.DataFrame,
 ) -> go.Figure:
-    """Return median total attempt time by authoring mode."""
+    """Return attempt timing distributions by authoring mode and measure."""
     _require_columns(
         grouped_attempt_summary,
         required=_REQUIRED_ATTEMPT_COLUMNS,
         frame_name="grouped_attempt_summary",
     )
-    rows = grouped_attempt_summary.loc[
-        grouped_attempt_summary["grouping_dimension_1_name"].eq("AUTHORING_MODE")
-        & grouped_attempt_summary["attempt_authoring_mode"].ne(_ALL)
-    ]
-    rows = rows.dropna(subset=["median_total_attempt_minutes"])
+    rows = _authoring_mode_rows(grouped_attempt_summary)
 
-    if rows.empty:
+    timing_specs = (
+        (
+            "Study-information-page time",
+            "attempt_count_with_nonmissing_study_info_page_time",
+            "attempt_count_missing_study_info_page_time",
+            "percentile_25_study_info_page_minutes",
+            "median_study_info_page_minutes",
+            "percentile_75_study_info_page_minutes",
+            "percentile_90_study_info_page_minutes",
+        ),
+        (
+            "Total attempt time",
+            "attempt_count_with_nonmissing_total_attempt_time",
+            "attempt_count_missing_total_attempt_time",
+            "percentile_25_total_attempt_minutes",
+            "median_total_attempt_minutes",
+            "percentile_75_total_attempt_minutes",
+            "percentile_90_total_attempt_minutes",
+        ),
+    )
+    available = rows.dropna(
+        subset=[
+            "median_study_info_page_minutes",
+            "median_total_attempt_minutes",
+        ],
+        how="all",
+    )
+
+    if available.empty:
         return _empty_figure(
-            title="Median total attempt time by authoring mode",
+            title="Attempt timing distributions by authoring mode",
             message="No attempt timing aggregates are available.",
         )
 
-    values_by_mode: Mapping[str, float] = {
-        str(row["attempt_authoring_mode"]): float(row["median_total_attempt_minutes"])
+    rows_by_mode = {
+        str(row["attempt_authoring_mode"]): row
+        for row in available.to_dict(orient="records")
+    }
+    figure = go.Figure()
+
+    for (
+        label,
+        nonmissing_column,
+        missing_column,
+        percentile_25_column,
+        median_column,
+        percentile_75_column,
+        percentile_90_column,
+    ) in timing_specs:
+        modes: list[str] = []
+        medians: list[float] = []
+        lower_errors: list[float] = []
+        upper_errors: list[float] = []
+        customdata: list[list[object]] = []
+
+        for mode in _AUTHORING_MODE_ORDER:
+            row = rows_by_mode.get(mode)
+
+            if row is None or pd.isna(row[median_column]):
+                continue
+
+            median = float(row[median_column])
+            percentile_25 = (
+                float(row[percentile_25_column])
+                if not pd.isna(row[percentile_25_column])
+                else median
+            )
+            percentile_75 = (
+                float(row[percentile_75_column])
+                if not pd.isna(row[percentile_75_column])
+                else median
+            )
+            percentile_90 = (
+                float(row[percentile_90_column])
+                if not pd.isna(row[percentile_90_column])
+                else None
+            )
+            modes.append(mode)
+            medians.append(median)
+            lower_errors.append(max(median - percentile_25, 0.0))
+            upper_errors.append(max(percentile_75 - median, 0.0))
+            customdata.append(
+                [
+                    int(row[nonmissing_column]),
+                    int(row[missing_column]),
+                    percentile_25,
+                    percentile_75,
+                    percentile_90,
+                ]
+            )
+
+        if not modes:
+            continue
+
+        figure.add_bar(
+            name=label,
+            x=modes,
+            y=medians,
+            error_y={
+                "type": "data",
+                "symmetric": False,
+                "array": upper_errors,
+                "arrayminus": lower_errors,
+                "visible": True,
+            },
+            customdata=customdata,
+            hovertemplate=(
+                "Authoring mode: %{x}<br>"
+                "Timing measure: %{fullData.name}<br>"
+                "Median minutes: %{y:.2f}<br>"
+                "25th percentile: %{customdata[2]:.2f}<br>"
+                "75th percentile: %{customdata[3]:.2f}<br>"
+                "90th percentile: %{customdata[4]:.2f}<br>"
+                "Attempts with timing value: %{customdata[0]}<br>"
+                "Attempts missing timing value: %{customdata[1]}"
+                "<extra></extra>"
+            ),
+        )
+
+    if not figure.data:
+        return _empty_figure(
+            title="Attempt timing distributions by authoring mode",
+            message="No attempt timing aggregates are available.",
+        )
+
+    figure.update_layout(
+        title="Attempt timing distributions by authoring mode",
+        template="plotly_white",
+        barmode="group",
+        xaxis_title="Authoring mode",
+        yaxis_title="Median minutes; error bars show 25th-75th percentiles",
+        legend_title_text="Attempt timing measure",
+    )
+
+    return figure
+
+
+def build_study_completion_timing_chart(
+    study_attempt_history_summary: pd.DataFrame,
+) -> go.Figure:
+    """Return first-attempt-to-completion timing by final authoring mode."""
+    _require_columns(
+        study_attempt_history_summary,
+        required=_REQUIRED_STUDY_HISTORY_COLUMNS,
+        frame_name="study_attempt_history_summary",
+    )
+    rows = study_attempt_history_summary.loc[
+        study_attempt_history_summary["final_completion_authoring_mode"].isin(
+            _AUTHORING_MODE_ORDER
+        )
+    ].dropna(subset=["median_minutes_first_attempt_to_completion"])
+
+    if rows.empty:
+        return _empty_figure(
+            title="Time from first attempt to study completion",
+            message="No completed-study timing aggregates are available.",
+        )
+
+    rows_by_mode = {
+        str(row["final_completion_authoring_mode"]): row
         for row in rows.to_dict(orient="records")
     }
+    modes: list[str] = []
+    medians: list[float] = []
+    lower_errors: list[float] = []
+    upper_errors: list[float] = []
+    customdata: list[list[object]] = []
+
+    for mode in _AUTHORING_MODE_ORDER:
+        row = rows_by_mode.get(mode)
+
+        if row is None:
+            continue
+
+        minimum = float(row["minimum_minutes_first_attempt_to_completion"])
+        median = float(row["median_minutes_first_attempt_to_completion"])
+        maximum = float(row["maximum_minutes_first_attempt_to_completion"])
+        average = float(row["average_minutes_first_attempt_to_completion"])
+        standard_deviation = row[
+            "standard_deviation_minutes_first_attempt_to_completion"
+        ]
+        modes.append(mode)
+        medians.append(median)
+        lower_errors.append(max(median - minimum, 0.0))
+        upper_errors.append(max(maximum - median, 0.0))
+        customdata.append(
+            [
+                int(row["distinct_study_count"]),
+                int(row["study_count_with_preceding_incomplete_attempts"]),
+                minimum,
+                average,
+                (
+                    float(standard_deviation)
+                    if not pd.isna(standard_deviation)
+                    else None
+                ),
+                maximum,
+            ]
+        )
+
     figure = go.Figure(
         data=[
             go.Bar(
-                x=list(_AUTHORING_MODE_ORDER),
-                y=[values_by_mode.get(mode, 0.0) for mode in _AUTHORING_MODE_ORDER],
-                hovertemplate=("Mode: %{x}<br>Median minutes: %{y:.2f}<extra></extra>"),
+                x=modes,
+                y=medians,
+                error_y={
+                    "type": "data",
+                    "symmetric": False,
+                    "array": upper_errors,
+                    "arrayminus": lower_errors,
+                    "visible": True,
+                },
+                customdata=customdata,
+                hovertemplate=(
+                    "Final completion mode: %{x}<br>"
+                    "Median minutes from first attempt to completion: "
+                    "%{y:.2f}<br>"
+                    "Minimum: %{customdata[2]:.2f}<br>"
+                    "Average: %{customdata[3]:.2f}<br>"
+                    "Standard deviation: %{customdata[4]:.2f}<br>"
+                    "Maximum: %{customdata[5]:.2f}<br>"
+                    "Completed studies: %{customdata[0]}<br>"
+                    "Studies with preceding incomplete attempts: "
+                    "%{customdata[1]}"
+                    "<extra></extra>"
+                ),
             )
         ]
     )
     figure.update_layout(
-        title="Median total attempt time by authoring mode",
+        title="Time from first attempt to study completion",
         template="plotly_white",
-        xaxis_title="Authoring mode",
-        yaxis_title="Median total attempt minutes",
+        xaxis_title="Final completion authoring mode",
+        yaxis_title="Median minutes; error bars show minimum-maximum",
+        showlegend=False,
     )
 
     return figure
@@ -1904,8 +2138,11 @@ def build_exploration_charts(
         attempt_outcomes_by_mode=build_attempt_outcomes_chart(
             inputs.grouped_attempt_summary
         ),
-        median_attempt_time_by_mode=build_attempt_timing_chart(
+        attempt_timing_distribution_by_mode=build_attempt_timing_chart(
             inputs.grouped_attempt_summary
+        ),
+        study_completion_timing_by_mode=build_study_completion_timing_chart(
+            inputs.study_attempt_history_summary
         ),
         study_completion_pathways=build_study_completion_pathways_chart(
             inputs.study_attempt_history_summary

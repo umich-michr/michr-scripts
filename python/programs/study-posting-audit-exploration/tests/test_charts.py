@@ -22,6 +22,7 @@ from study_posting_audit_exploration.publication import (
     build_effective_author_role_chart,
     build_exploration_charts,
     build_study_completion_pathways_chart,
+    build_study_completion_timing_chart,
     build_suggestion_selection_by_index_chart,
     build_suggestion_selection_by_kind_chart,
 )
@@ -44,7 +45,18 @@ def grouped_attempt_rows() -> pd.DataFrame:
                 "grouping_dimension_1_name": "ATTEMPT_RESULT",
                 "grouping_dimension_2_name": "AUTHORING_MODE",
                 "attempt_count": 4,
+                "attempt_count_with_nonmissing_study_info_page_time": 4,
+                "attempt_count_missing_study_info_page_time": 0,
+                "percentile_25_study_info_page_minutes": 1.0,
+                "median_study_info_page_minutes": 2.0,
+                "percentile_75_study_info_page_minutes": 3.0,
+                "percentile_90_study_info_page_minutes": 4.0,
+                "attempt_count_with_nonmissing_total_attempt_time": 4,
+                "attempt_count_missing_total_attempt_time": 0,
+                "percentile_25_total_attempt_minutes": 2.0,
                 "median_total_attempt_minutes": 3.0,
+                "percentile_75_total_attempt_minutes": 4.0,
+                "percentile_90_total_attempt_minutes": 5.0,
             },
             {
                 "attempt_result": "USER_DROPPED",
@@ -52,7 +64,18 @@ def grouped_attempt_rows() -> pd.DataFrame:
                 "grouping_dimension_1_name": "ATTEMPT_RESULT",
                 "grouping_dimension_2_name": "AUTHORING_MODE",
                 "attempt_count": 2,
+                "attempt_count_with_nonmissing_study_info_page_time": 2,
+                "attempt_count_missing_study_info_page_time": 0,
+                "percentile_25_study_info_page_minutes": 0.5,
+                "median_study_info_page_minutes": 0.75,
+                "percentile_75_study_info_page_minutes": 1.0,
+                "percentile_90_study_info_page_minutes": 1.25,
+                "attempt_count_with_nonmissing_total_attempt_time": 2,
+                "attempt_count_missing_total_attempt_time": 0,
+                "percentile_25_total_attempt_minutes": 0.75,
                 "median_total_attempt_minutes": 1.0,
+                "percentile_75_total_attempt_minutes": 1.25,
+                "percentile_90_total_attempt_minutes": 1.5,
             },
             {
                 "attempt_result": "COMPLETE",
@@ -60,7 +83,18 @@ def grouped_attempt_rows() -> pd.DataFrame:
                 "grouping_dimension_1_name": "ATTEMPT_RESULT",
                 "grouping_dimension_2_name": "AUTHORING_MODE",
                 "attempt_count": 3,
+                "attempt_count_with_nonmissing_study_info_page_time": 3,
+                "attempt_count_missing_study_info_page_time": 0,
+                "percentile_25_study_info_page_minutes": 2.0,
+                "median_study_info_page_minutes": 3.0,
+                "percentile_75_study_info_page_minutes": 4.0,
+                "percentile_90_study_info_page_minutes": 5.0,
+                "attempt_count_with_nonmissing_total_attempt_time": 3,
+                "attempt_count_missing_total_attempt_time": 0,
+                "percentile_25_total_attempt_minutes": 4.0,
                 "median_total_attempt_minutes": 5.0,
+                "percentile_75_total_attempt_minutes": 6.0,
+                "percentile_90_total_attempt_minutes": 7.0,
             },
             {
                 "attempt_result": "ALL",
@@ -68,7 +102,18 @@ def grouped_attempt_rows() -> pd.DataFrame:
                 "grouping_dimension_1_name": "AUTHORING_MODE",
                 "grouping_dimension_2_name": "NONE",
                 "attempt_count": 6,
+                "attempt_count_with_nonmissing_study_info_page_time": 5,
+                "attempt_count_missing_study_info_page_time": 1,
+                "percentile_25_study_info_page_minutes": 1.0,
+                "median_study_info_page_minutes": 2.0,
+                "percentile_75_study_info_page_minutes": 3.0,
+                "percentile_90_study_info_page_minutes": 4.0,
+                "attempt_count_with_nonmissing_total_attempt_time": 6,
+                "attempt_count_missing_total_attempt_time": 0,
+                "percentile_25_total_attempt_minutes": 1.5,
                 "median_total_attempt_minutes": 2.5,
+                "percentile_75_total_attempt_minutes": 4.0,
+                "percentile_90_total_attempt_minutes": 5.0,
             },
             {
                 "attempt_result": "ALL",
@@ -76,7 +121,18 @@ def grouped_attempt_rows() -> pd.DataFrame:
                 "grouping_dimension_1_name": "AUTHORING_MODE",
                 "grouping_dimension_2_name": "NONE",
                 "attempt_count": 3,
+                "attempt_count_with_nonmissing_study_info_page_time": 2,
+                "attempt_count_missing_study_info_page_time": 1,
+                "percentile_25_study_info_page_minutes": 2.0,
+                "median_study_info_page_minutes": 3.0,
+                "percentile_75_study_info_page_minutes": 4.0,
+                "percentile_90_study_info_page_minutes": 5.0,
+                "attempt_count_with_nonmissing_total_attempt_time": 3,
+                "attempt_count_missing_total_attempt_time": 0,
+                "percentile_25_total_attempt_minutes": 4.0,
                 "median_total_attempt_minutes": 5.0,
+                "percentile_75_total_attempt_minutes": 7.0,
+                "percentile_90_total_attempt_minutes": 8.0,
             },
         ]
     )
@@ -89,25 +145,41 @@ def study_history_rows() -> pd.DataFrame:
             "final_completion_authoring_mode": "ALL",
             "distinct_study_count": 10,
             "study_count_with_preceding_incomplete_attempts": 4,
+            "minimum_minutes_first_attempt_to_completion": 5.0,
             "median_minutes_first_attempt_to_completion": 20.0,
+            "average_minutes_first_attempt_to_completion": 25.0,
+            "standard_deviation_minutes_first_attempt_to_completion": 10.0,
+            "maximum_minutes_first_attempt_to_completion": 60.0,
         },
         {
             "final_completion_authoring_mode": "AI",
             "distinct_study_count": 6,
             "study_count_with_preceding_incomplete_attempts": 2,
+            "minimum_minutes_first_attempt_to_completion": 5.0,
             "median_minutes_first_attempt_to_completion": 15.0,
+            "average_minutes_first_attempt_to_completion": 18.0,
+            "standard_deviation_minutes_first_attempt_to_completion": 6.0,
+            "maximum_minutes_first_attempt_to_completion": 35.0,
         },
         {
             "final_completion_authoring_mode": "MANUAL",
             "distinct_study_count": 4,
             "study_count_with_preceding_incomplete_attempts": 2,
+            "minimum_minutes_first_attempt_to_completion": 10.0,
             "median_minutes_first_attempt_to_completion": 30.0,
+            "average_minutes_first_attempt_to_completion": 35.0,
+            "standard_deviation_minutes_first_attempt_to_completion": 12.0,
+            "maximum_minutes_first_attempt_to_completion": 70.0,
         },
         {
             "final_completion_authoring_mode": "NOT_COMPLETED",
             "distinct_study_count": 2,
             "study_count_with_preceding_incomplete_attempts": 2,
+            "minimum_minutes_first_attempt_to_completion": None,
             "median_minutes_first_attempt_to_completion": None,
+            "average_minutes_first_attempt_to_completion": None,
+            "standard_deviation_minutes_first_attempt_to_completion": None,
+            "maximum_minutes_first_attempt_to_completion": None,
         },
     ]
 
@@ -724,12 +796,53 @@ def test_attempt_outcomes_chart_uses_aggregate_counts() -> None:
     assert list(figure.data[0].y) == [4, 3]
 
 
-def test_attempt_timing_chart_uses_authoring_mode_medians() -> None:
+def test_attempt_timing_chart_shows_two_timing_distributions() -> None:
     figure = build_attempt_timing_chart(grouped_attempt_rows())
+    traces = {str(trace.name): trace for trace in figure.data}
 
-    assert figure.layout.title.text == "Median total attempt time by authoring mode"
-    assert list(figure.data[0].x) == ["AI", "MANUAL"]
-    assert list(figure.data[0].y) == [2.5, 5.0]
+    assert figure.layout.title.text == (
+        "Attempt timing distributions by authoring mode"
+    )
+    assert figure.layout.barmode == "group"
+    assert list(traces["Study-information-page time"].x) == [
+        "AI",
+        "MANUAL",
+    ]
+    assert list(traces["Study-information-page time"].y) == [2.0, 3.0]
+    assert list(traces["Study-information-page time"].error_y.arrayminus) == [
+        1.0,
+        1.0,
+    ]
+    assert list(traces["Study-information-page time"].error_y.array) == [
+        1.0,
+        1.0,
+    ]
+    assert list(traces["Total attempt time"].y) == [2.5, 5.0]
+    assert [list(value[:2]) for value in traces["Total attempt time"].customdata] == [
+        [6, 0],
+        [3, 0],
+    ]
+    assert "90th percentile" in str(traces["Total attempt time"].hovertemplate)
+    assert "Attempts missing timing value" in str(
+        traces["Total attempt time"].hovertemplate
+    )
+
+
+def test_study_completion_timing_chart_uses_completed_study_range() -> None:
+    figure = build_study_completion_timing_chart(study_history_rows())
+    bar = figure.data[0]
+
+    assert figure.layout.title.text == ("Time from first attempt to study completion")
+    assert list(bar.x) == ["AI", "MANUAL"]
+    assert list(bar.y) == [15.0, 30.0]
+    assert list(bar.error_y.arrayminus) == [10.0, 20.0]
+    assert list(bar.error_y.array) == [20.0, 40.0]
+    assert [list(value[:2]) for value in bar.customdata] == [
+        [6, 2],
+        [4, 2],
+    ]
+    assert "Standard deviation" in str(bar.hovertemplate)
+    assert "Studies with preceding incomplete attempts" in str(bar.hovertemplate)
 
 
 def test_study_completion_pathways_chart_uses_completed_modes() -> None:
@@ -969,7 +1082,8 @@ def test_chart_bundle_contains_all_figures() -> None:
 
     assert isinstance(charts, ExplorationCharts)
     assert charts.attempt_outcomes_by_mode.data
-    assert charts.median_attempt_time_by_mode.data
+    assert charts.attempt_timing_distribution_by_mode.data
+    assert charts.study_completion_timing_by_mode.data
     assert charts.study_completion_pathways.data
     assert charts.author_handoff_categories.data
     assert charts.author_attempt_start_experience.data
@@ -989,6 +1103,19 @@ def test_chart_bundle_contains_all_figures() -> None:
     assert charts.readability_change_direction.data
     assert charts.final_grade_bands.data
     assert charts.selected_vs_unselected_readability.data
+
+
+def assert_timing_charts_have_accessible_empty_states() -> None:
+    """Assert both workflow-timing charts provide empty-state text."""
+    attempt_timing_figure = build_attempt_timing_chart(
+        pd.DataFrame(columns=grouped_attempt_rows().columns)
+    )
+    study_timing_figure = build_study_completion_timing_chart(
+        pd.DataFrame(columns=study_history_rows().columns)
+    )
+
+    assert attempt_timing_figure.layout.annotations[0].text
+    assert study_timing_figure.layout.annotations[0].text
 
 
 def test_charts_return_accessible_empty_states() -> None:
@@ -1061,6 +1188,7 @@ def test_charts_return_accessible_empty_states() -> None:
     )
 
     assert attempt_figure.layout.annotations[0].text
+    assert_timing_charts_have_accessible_empty_states()
     assert study_figure.layout.annotations[0].text
     assert handoff_figure.layout.annotations[0].text
     assert attempt_start_experience_figure.layout.annotations[0].text
@@ -1087,6 +1215,14 @@ def test_charts_return_accessible_empty_states() -> None:
             pd.DataFrame(
                 {
                     "attempt_result": ["COMPLETE"],
+                }
+            ),
+        ),
+        (
+            build_study_completion_timing_chart,
+            pd.DataFrame(
+                {
+                    "final_completion_authoring_mode": ["AI"],
                 }
             ),
         ),

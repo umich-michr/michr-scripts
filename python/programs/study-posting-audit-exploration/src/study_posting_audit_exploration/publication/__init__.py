@@ -20,6 +20,7 @@ from study_posting_audit_exploration.publication.charts import (
     build_readability_change_direction_chart,
     build_selected_vs_unselected_readability_chart,
     build_study_completion_pathways_chart,
+    build_study_completion_timing_chart,
     build_suggestion_selection_by_index_chart,
     build_suggestion_selection_by_kind_chart,
 )
@@ -54,6 +55,7 @@ __all__ = [
     "build_readability_change_direction_chart",
     "build_selected_vs_unselected_readability_chart",
     "build_study_completion_pathways_chart",
+    "build_study_completion_timing_chart",
     "build_suggestion_selection_by_index_chart",
     "build_suggestion_selection_by_kind_chart",
     "manifest_filename",

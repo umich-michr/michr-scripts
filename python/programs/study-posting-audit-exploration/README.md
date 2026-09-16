@@ -179,7 +179,12 @@ aggregate analysis tables. It currently includes:
 - observed final Flesch-Kincaid grade bands by field and mode;
 - selected versus mean-unselected Flesch-Kincaid differences;
 - attempt outcomes by authoring mode;
-- median attempt timing by authoring mode;
+- study-information-page and total-attempt timing distributions by authoring
+  mode, including medians, interquartile ranges, 90th percentiles, and missing
+  counts;
+- first-attempt-to-completion timing by final authoring mode, including
+  medians, observed ranges, averages, standard deviations, completed-study
+  counts, and preceding-incomplete-attempt counts;
 - reported-versus-inferred content-source concordance;
 - privacy and interpretation cautions.
 
@@ -216,6 +221,16 @@ neither direction is automatically better. Final grade bands include only
 observed nonblank final texts. Titles carry a short-text reliability
 caution. Readability formulas do not establish comprehension, accuracy,
 accessibility, usefulness, cultural appropriateness, or ethical adequacy.
+
+The workflow-timing section separates study-information-page time from total
+attempt time and distinguishes attempt-level timing from study-level elapsed
+time between the first recorded attempt and completion. Attempt timing shows
+medians with 25th-to-75th-percentile error bars and reports 90th percentiles
+and missing counts in hover text. Study completion timing shows medians with
+observed minimum-to-maximum ranges because the current aggregate contract does
+not publish study-level quartiles. Long elapsed times can include pauses or
+work outside the application and do not establish author effort, efficiency,
+quality, or a causal effect of authoring mode.
 
 The report embeds its Plotly JavaScript and does not require an external script
 service. It does not contain usernames, audit IDs, study numbers, source

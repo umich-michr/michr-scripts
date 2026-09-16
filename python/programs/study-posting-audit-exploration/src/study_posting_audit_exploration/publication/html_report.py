@@ -293,8 +293,27 @@ _TEMPLATE = """<!doctype html>
 
   <section aria-labelledby="attempts-heading">
     <h2 id="attempts-heading">Attempts and workflow timing</h2>
+    <p>
+      Attempt-level timing separates time on the study-information page from
+      total elapsed attempt time. Bars show medians and the error bars show the
+      25th through 75th percentiles.
+    </p>
+    <p>
+      Study-level completion timing starts at the first recorded attempt for a
+      study and ends at its unique completed attempt. Its error bars show the
+      observed minimum through maximum because the current aggregate contract
+      does not publish study-level quartiles.
+    </p>
+    <p class="caution">
+      Missing timing values are excluded from timing distributions and are
+      reported in hover text where available. Long elapsed times may include
+      pauses or work outside the application. These descriptive timings do not
+      establish author effort, efficiency, quality, or a causal effect of
+      authoring mode.
+    </p>
     <div class="chart">{{ attempt_outcomes_html | safe }}</div>
     <div class="chart">{{ attempt_timing_html | safe }}</div>
+    <div class="chart">{{ study_completion_timing_html | safe }}</div>
   </section>
 
   <section aria-labelledby="content-source-heading">
@@ -497,7 +516,11 @@ def render_html_report(
             include_plotlyjs=False,
         ),
         attempt_timing_html=_figure_html(
-            charts.median_attempt_time_by_mode,
+            charts.attempt_timing_distribution_by_mode,
+            include_plotlyjs=False,
+        ),
+        study_completion_timing_html=_figure_html(
+            charts.study_completion_timing_by_mode,
             include_plotlyjs=False,
         ),
         effective_author_roles_html=_figure_html(

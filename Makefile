@@ -250,10 +250,10 @@ lint-fix:
 	$(RUN) ruff check --fix $(LINT_DIRS)
 
 typecheck:
-	@$(call for_each_member,MYPYPATH=src $(RUN) mypy --config-file $(CURDIR)/pyproject.toml src tests)
+	@$(call for_each_member,MYPYPATH=src $(RUN) mypy --config-file "$(CURDIR)/pyproject.toml" src tests)
 	@echo ""
 	@echo "==> tools"
-	@$(RUN) mypy --config-file $(CURDIR)/pyproject.toml tools
+	@$(RUN) mypy --config-file "$(CURDIR)/pyproject.toml" tools
 
 docs-check:
 	$(RUN) python tools/check_docs_sync.py

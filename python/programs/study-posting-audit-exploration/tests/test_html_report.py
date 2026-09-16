@@ -47,7 +47,18 @@ def attempt_rows() -> pd.DataFrame:
                 "grouping_dimension_1_name": "ATTEMPT_RESULT",
                 "grouping_dimension_2_name": "AUTHORING_MODE",
                 "attempt_count": 4,
+                "attempt_count_with_nonmissing_study_info_page_time": 4,
+                "attempt_count_missing_study_info_page_time": 0,
+                "percentile_25_study_info_page_minutes": 1.0,
+                "median_study_info_page_minutes": 2.0,
+                "percentile_75_study_info_page_minutes": 3.0,
+                "percentile_90_study_info_page_minutes": 4.0,
+                "attempt_count_with_nonmissing_total_attempt_time": 4,
+                "attempt_count_missing_total_attempt_time": 0,
+                "percentile_25_total_attempt_minutes": 2.0,
                 "median_total_attempt_minutes": 3.0,
+                "percentile_75_total_attempt_minutes": 4.0,
+                "percentile_90_total_attempt_minutes": 5.0,
             },
             {
                 "attempt_result": "ALL",
@@ -55,7 +66,18 @@ def attempt_rows() -> pd.DataFrame:
                 "grouping_dimension_1_name": "AUTHORING_MODE",
                 "grouping_dimension_2_name": "NONE",
                 "attempt_count": 4,
+                "attempt_count_with_nonmissing_study_info_page_time": 3,
+                "attempt_count_missing_study_info_page_time": 1,
+                "percentile_25_study_info_page_minutes": 1.0,
+                "median_study_info_page_minutes": 2.0,
+                "percentile_75_study_info_page_minutes": 3.0,
+                "percentile_90_study_info_page_minutes": 4.0,
+                "attempt_count_with_nonmissing_total_attempt_time": 4,
+                "attempt_count_missing_total_attempt_time": 0,
+                "percentile_25_total_attempt_minutes": 2.0,
                 "median_total_attempt_minutes": 3.0,
+                "percentile_75_total_attempt_minutes": 4.0,
+                "percentile_90_total_attempt_minutes": 5.0,
             },
         ]
     )
@@ -69,13 +91,21 @@ def study_history_rows() -> pd.DataFrame:
                 "final_completion_authoring_mode": "AI",
                 "distinct_study_count": 4,
                 "study_count_with_preceding_incomplete_attempts": 1,
+                "minimum_minutes_first_attempt_to_completion": 4.0,
                 "median_minutes_first_attempt_to_completion": 12.0,
+                "average_minutes_first_attempt_to_completion": 14.0,
+                "standard_deviation_minutes_first_attempt_to_completion": 5.0,
+                "maximum_minutes_first_attempt_to_completion": 24.0,
             },
             {
                 "final_completion_authoring_mode": "MANUAL",
                 "distinct_study_count": 3,
                 "study_count_with_preceding_incomplete_attempts": 2,
+                "minimum_minutes_first_attempt_to_completion": 6.0,
                 "median_minutes_first_attempt_to_completion": 18.0,
+                "average_minutes_first_attempt_to_completion": 22.0,
+                "standard_deviation_minutes_first_attempt_to_completion": 8.0,
+                "maximum_minutes_first_attempt_to_completion": 40.0,
             },
         ]
     )
@@ -510,6 +540,24 @@ def test_html_report_is_self_contained_and_accessible() -> None:
     assert "Field populations and denominators can differ" in normalized_html
     assert "Edited-unclassified is kept separate from replaced" in normalized_html
     assert "do not establish writing quality" in normalized_html
+
+
+def test_html_report_explains_workflow_timing() -> None:
+    """Verify attempt-level and study-level timing interpretation."""
+    html = render_html_report(
+        overview_summary=overview_rows(),
+        charts=charts(),
+    )
+    normalized_html = " ".join(html.split())
+
+    assert 'id="attempts-heading"' in html
+    assert "Attempts and workflow timing" in html
+    assert "Attempt timing distributions by authoring mode" in html
+    assert "Time from first attempt to study completion" in html
+    assert "25th through 75th percentiles" in normalized_html
+    assert "observed minimum through maximum" in normalized_html
+    assert "Long elapsed times may include pauses" in normalized_html
+    assert "do not establish author effort, efficiency" in normalized_html
 
 
 def test_html_report_explains_suggestion_choice_denominators() -> None:
