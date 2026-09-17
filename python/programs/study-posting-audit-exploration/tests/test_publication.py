@@ -244,6 +244,7 @@ def _publication_paths(
         publication.field_readability_target_summary_path,
         publication.field_edit_readability_cross_summary_path,
         publication.final_text_metric_summary_path,
+        publication.candidate_research_questions_path,
     )
 
 
@@ -312,7 +313,7 @@ def test_publish_exploration_writes_atomic_html_output(
     )
 
     assert publication.output_directory == output_directory
-    assert publication.output_file_count == 27
+    assert publication.output_file_count == 28
 
     for path in _publication_paths(publication):
         assert path.is_file()
@@ -322,7 +323,22 @@ def test_publish_exploration_writes_atomic_html_output(
     _assert_derived_outputs(publication)
     _assert_html_privacy(publication)
     metric_definitions = read_published_csv(publication.metric_definitions_path)
+    research_questions = read_published_csv(
+        publication.candidate_research_questions_path
+    )
     assert tuple(metric_definitions.columns) == METRIC_DEFINITION_COLUMNS
+    assert tuple(research_questions.columns) == (
+        "research_question_id",
+        "research_question",
+        "primary_analytical_unit",
+        "comparison_or_grouping",
+        "outcome_or_measure",
+        "supporting_output_files",
+        "interpretation_cautions",
+        "priority_tier",
+        "analysis_status",
+    )
+    assert len(research_questions) == 14
     assert len(metric_definitions) == sum(
         len(columns) for columns in AGGREGATE_OUTPUT_COLUMNS.values()
     )
@@ -357,7 +373,8 @@ def test_manifest_contains_readability_analysis_counts(
     )
     assert manifest["readability_analysis_row_counts"]["final_text_metric_summary"] > 0
     assert manifest["definition_row_counts"]["metric_definitions"] > 0
-    assert manifest["output_file_count"] == 27
+    assert manifest["research_row_counts"]["candidate_research_questions"] == 14
+    assert manifest["output_file_count"] == 28
     assert manifest["warning_count"] == 0
     assert manifest_filename() == "analysis_manifest.json"
 

@@ -103,6 +103,7 @@ def _expected_paths(
     audit_directory = output_directory / "analysis-audit-records"
     fields_directory = output_directory / "fields"
     readability_directory = output_directory / "readability"
+    research_directory = output_directory / "research"
 
     return {
         "manifest": output_directory / "analysis_manifest.json",
@@ -121,6 +122,7 @@ def _expected_paths(
         "target": (readability_directory / "field_readability_target_summary.csv"),
         "cross": (readability_directory / "field_edit_readability_cross_summary.csv"),
         "final_metric": (readability_directory / "final_text_metric_summary.csv"),
+        "research_questions": (research_directory / "candidate_research_questions.csv"),
     }
 
 
@@ -141,7 +143,11 @@ def _assert_manifest(manifest: dict[str, object]) -> None:
 
     assert isinstance(definition_counts, dict)
     assert definition_counts["metric_definitions"] > 0
-    assert manifest["output_file_count"] == 27
+    research_counts = manifest["research_row_counts"]
+
+    assert isinstance(research_counts, dict)
+    assert research_counts["candidate_research_questions"] == 14
+    assert manifest["output_file_count"] == 28
     assert manifest["warning_count"] == 0
 
 
@@ -171,7 +177,8 @@ def _assert_cli_paths_printed(
         f"Field readability target summary CSV: {paths['target']}",
         f"Field edit/readability cross summary CSV: {paths['cross']}",
         f"Final text metric summary CSV: {paths['final_metric']}",
-        "Published files: 27",
+        f"Candidate research questions CSV: {paths['research_questions']}",
+        "Published files: 28",
     )
 
     for expected_line in expected_lines:

@@ -101,8 +101,8 @@ days, and login-history span as of the report query.
 
 ## Current output
 
-A successful `analyze` run publishes 27 files: `report.html`, one JSON
-manifest, and 25 CSV files.
+A successful `analyze` run publishes 28 files: `report.html`, one JSON
+manifest, and 26 CSV files.
 
 ~~~~text
 exploration/
@@ -135,12 +135,14 @@ exploration/
 │   ├── nontext_field_adoption_summary.csv
 │   ├── suggestion_selection_summary.csv
 │   └── compensation_analysis_summary.csv
-└── readability/
-    ├── selected_vs_unselected_readability_summary.csv
-    ├── field_readability_change_summary.csv
-    ├── field_readability_target_summary.csv
-    ├── field_edit_readability_cross_summary.csv
-    └── final_text_metric_summary.csv
+├── readability/
+│   ├── selected_vs_unselected_readability_summary.csv
+│   ├── field_readability_change_summary.csv
+│   ├── field_readability_target_summary.csv
+│   ├── field_edit_readability_cross_summary.csv
+│   └── final_text_metric_summary.csv
+└── research/
+    └── candidate_research_questions.csv
 ~~~~
 
 ### Metric definitions
@@ -401,6 +403,26 @@ Therefore:
 - missing or blank final-text rates require a future non-sensitive field-presence
   indicator in the normalized report contract.
 
+### Candidate research questions
+
+`research/candidate_research_questions.csv` is a deterministic, identifier-free
+catalog of descriptive questions supported by the published aggregate outputs.
+It records:
+
+- a stable research-question ID and plain-language question;
+- the primary analytical unit;
+- the comparison or grouping;
+- the outcome or measure;
+- supporting published output files;
+- interpretation cautions;
+- a priority tier and readiness status.
+
+The catalog is generated from code rather than inferred from source records.
+It is not an aggregate metric table and is therefore not included in
+`definitions/metric_definitions.csv`. Questions marked `DESCRIPTIVE_READY`
+identify analyses supported by current outputs; they do not imply causal,
+inferential, or individual-level conclusions.
+
 ### Manifest
 
 `analysis_manifest.json` records:
@@ -410,6 +432,7 @@ Therefore:
 - source report path and filenames;
 - source row counts;
 - the metric-definition row count;
+- the candidate-research-question row count;
 - published analysis row counts;
 - output file count;
 - configured edit-intensity scheme;

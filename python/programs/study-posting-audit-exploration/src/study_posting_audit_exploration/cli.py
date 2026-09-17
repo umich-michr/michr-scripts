@@ -351,6 +351,10 @@ def _print_publication(
             "Final text metric summary CSV",
             published.final_text_metric_summary_path,
         ),
+        (
+            "Candidate research questions CSV",
+            published.candidate_research_questions_path,
+        ),
     ):
         print(f"{label}: {value}", file=output)
 

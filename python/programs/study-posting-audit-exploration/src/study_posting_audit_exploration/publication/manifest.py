@@ -15,6 +15,9 @@ from study_posting_audit_exploration.models import (
     ExplorationAnalysisTables,
     LoadedAuditReport,
 )
+from study_posting_audit_exploration.research import (
+    build_candidate_research_questions,
+)
 
 _MANIFEST_FILENAME = "analysis_manifest.json"
 _PROGRAM_VERSION = "0.1.0"
@@ -42,6 +45,7 @@ def write_manifest(
     field_tables = tables.fields
     readability_tables = tables.readability
     metric_definitions = build_metric_definitions(AGGREGATE_OUTPUT_COLUMNS)
+    candidate_questions = build_candidate_research_questions()
 
     content = {
         "analysis_program_version": _PROGRAM_VERSION,
@@ -59,6 +63,9 @@ def write_manifest(
         },
         "definition_row_counts": {
             "metric_definitions": len(metric_definitions),
+        },
+        "research_row_counts": {
+            "candidate_research_questions": len(candidate_questions),
         },
         "analysis_audit_record_row_counts": {
             "study_attempt_author_history": len(histories.study_attempt_author_history),

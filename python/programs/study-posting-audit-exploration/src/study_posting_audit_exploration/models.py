@@ -165,4 +165,5 @@ class ExplorationPublication:
     field_readability_target_summary_path: Path
     field_edit_readability_cross_summary_path: Path
     final_text_metric_summary_path: Path
+    candidate_research_questions_path: Path
     output_file_count: int

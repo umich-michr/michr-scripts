@@ -93,6 +93,11 @@ from study_posting_audit_exploration.publication import (
     render_html_report,
     write_html_report,
 )
+from study_posting_audit_exploration.research import (
+    CANDIDATE_RESEARCH_QUESTION_COLUMNS,
+    CandidateResearchQuestion,
+    build_candidate_research_questions,
+)
 from study_posting_audit_exploration.statistics import describe_numeric
 from study_posting_audit_exploration.validation import validate_audit_report
 
@@ -101,6 +106,7 @@ __version__ = "0.1.0"
 __all__ = [
     "AGGREGATE_FILE_ORDER",
     "AGGREGATE_OUTPUT_COLUMNS",
+    "CANDIDATE_RESEARCH_QUESTION_COLUMNS",
     "EDIT_INTENSITY_THRESHOLD_SCHEME",
     "METRIC_DEFINITION_COLUMNS",
     "AppointmentQualityFinding",
@@ -108,6 +114,7 @@ __all__ = [
     "AttemptHistoryTables",
     "AuditExplorationError",
     "AuthorAnalysisTables",
+    "CandidateResearchQuestion",
     "DescriptiveStatistics",
     "ExplorationChartInputs",
     "ExplorationCharts",
@@ -134,6 +141,7 @@ __all__ = [
     "build_author_analysis_tables",
     "build_author_attempt_start_experience_chart",
     "build_author_handoff_summary",
+    "build_candidate_research_questions",
     "build_compensation_analysis_summary",
     "build_content_source_concordance_chart",
     "build_content_source_concordance_matrix",

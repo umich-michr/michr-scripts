@@ -34,6 +34,9 @@ from study_posting_audit_exploration.publication.manifest import (
     manifest_filename,
     write_manifest,
 )
+from study_posting_audit_exploration.research import (
+    build_candidate_research_questions,
+)
 
 _REPORT_FILENAME = "report.html"
 
@@ -45,6 +48,7 @@ _STUDIES_DIRECTORY = "studies"
 _AUTHORS_DIRECTORY = "authors"
 _FIELDS_DIRECTORY = "fields"
 _READABILITY_DIRECTORY = "readability"
+_RESEARCH_DIRECTORY = "research"
 
 _METRIC_DEFINITIONS_FILENAME = "metric_definitions.csv"
 
@@ -83,7 +87,9 @@ _FIELD_EDIT_READABILITY_CROSS_SUMMARY_FILENAME = (
 )
 _FINAL_TEXT_METRIC_SUMMARY_FILENAME = "final_text_metric_summary.csv"
 
-_OUTPUT_FILE_COUNT = 27
+_CANDIDATE_RESEARCH_QUESTIONS_FILENAME = "candidate_research_questions.csv"
+
+_OUTPUT_FILE_COUNT = 28
 
 
 def _write_frame(
@@ -238,6 +244,7 @@ def _write_staging_output(
         _AUTHORS_DIRECTORY,
         _FIELDS_DIRECTORY,
         _READABILITY_DIRECTORY,
+        _RESEARCH_DIRECTORY,
     ):
         (staging_directory / directory_name).mkdir()
 
@@ -250,10 +257,17 @@ def _write_staging_output(
     )
     manifest_path = staging_directory / manifest_filename()
     report_path = staging_directory / _REPORT_FILENAME
+    candidate_questions_path = (
+        staging_directory / _RESEARCH_DIRECTORY / _CANDIDATE_RESEARCH_QUESTIONS_FILENAME
+    )
 
     _write_frame(
         build_metric_definitions(AGGREGATE_OUTPUT_COLUMNS),
         metric_definitions_path,
+    )
+    _write_frame(
+        build_candidate_research_questions(),
+        candidate_questions_path,
     )
 
     for frame, path in output_frames:
@@ -311,6 +325,7 @@ def _write_staging_output(
     )
 
     _sync_file(metric_definitions_path)
+    _sync_file(candidate_questions_path)
 
     for _, path in output_frames:
         _sync_file(path)
@@ -331,6 +346,7 @@ def _publication_result(
     authors_directory = destination / _AUTHORS_DIRECTORY
     fields_directory = destination / _FIELDS_DIRECTORY
     readability_directory = destination / _READABILITY_DIRECTORY
+    research_directory = destination / _RESEARCH_DIRECTORY
 
     return ExplorationPublication(
         output_directory=destination,
@@ -402,6 +418,9 @@ def _publication_result(
         ),
         final_text_metric_summary_path=(
             readability_directory / _FINAL_TEXT_METRIC_SUMMARY_FILENAME
+        ),
+        candidate_research_questions_path=(
+            research_directory / _CANDIDATE_RESEARCH_QUESTIONS_FILENAME
         ),
         output_file_count=_OUTPUT_FILE_COUNT,
     )
