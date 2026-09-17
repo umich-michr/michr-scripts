@@ -323,6 +323,46 @@ _EDIT_INTENSITY_LABELS: Mapping[str, str] = {
     "UNASSISTED": "Unassisted",
 }
 
+_EDIT_INTENSITY_RULES: Mapping[str, str] = {
+    "EXACT": "Final text exactly matched the selected suggestion",
+    "COSMETIC": "Only cosmetic normalization changed",
+    "LIGHT_EDIT": "Character edit ratio at or below 10%",
+    "MODERATE_EDIT": "Character edit ratio above 10% and at or below 30%",
+    "HEAVY_EDIT": "Character edit ratio above 30%",
+    "EDITED_UNCLASSIFIED": (
+        "Edited, but usable character measurements were unavailable"
+    ),
+    "REPLACED": "Final text replaced the selected suggestion",
+    "CLEARED": "Selected suggestion was removed and final text was blank",
+    "UNASSISTED": "No AI suggestion was selected",
+}
+
+_CONSENSUS_DIRECTION_EXPLANATIONS: Mapping[str, str] = {
+    "CONSENSUS_GRADE_LEVEL_DECREASE": (
+        "Grade-level formulas agreed on a downward direction"
+    ),
+    "NO_MATERIAL_CHANGE": ("Formula changes stayed within the configured tolerance"),
+    "CONSENSUS_GRADE_LEVEL_INCREASE": (
+        "Grade-level formulas agreed on an upward direction"
+    ),
+    "MIXED_FORMULA_DIRECTION": ("Grade-level formulas did not agree on direction"),
+}
+
+_CONSENSUS_DIRECTION_CAUTIONS: Mapping[str, str] = {
+    "CONSENSUS_GRADE_LEVEL_DECREASE": (
+        "A decrease is directional, not evidence of better writing"
+    ),
+    "NO_MATERIAL_CHANGE": (
+        "No material formula change does not establish comprehension"
+    ),
+    "CONSENSUS_GRADE_LEVEL_INCREASE": (
+        "An increase is directional, not evidence of worse writing"
+    ),
+    "MIXED_FORMULA_DIRECTION": (
+        "Mixed direction is not the same as no material change"
+    ),
+}
+
 _GRADE_BAND_SERIES: tuple[tuple[str, str], ...] = (
     (
         "attempt_count_at_or_below_grade_6",
@@ -2012,15 +2052,16 @@ def _edit_intensity_group_label(
     *,
     field_name: object,
     edit_intensity_category: object,
+    population_count: int,
 ) -> str:
-    """Return one stable field and edit-intensity label."""
+    """Return one stable field, edit-intensity, and sample-size label."""
     category = str(edit_intensity_category)
     category_label = _EDIT_INTENSITY_LABELS.get(
         category,
         category.replace("_", " ").title(),
     )
 
-    return f"{_field_label(field_name)} — {category_label}"
+    return f"{_field_label(field_name)} — {category_label} (N={population_count})"
 
 
 def build_edit_readability_relationship_chart(
@@ -2075,10 +2116,30 @@ def build_edit_readability_relationship_chart(
         .drop_duplicates()
         .to_dict(orient="records")
     )
+    population_by_group = (
+        rows.groupby(
+            [
+                "field_name",
+                "edit_intensity_category",
+            ],
+            sort=False,
+            dropna=False,
+        )["completed_ai_attempt_count"]
+        .first()
+        .to_dict()
+    )
     group_labels = [
         _edit_intensity_group_label(
             field_name=row["field_name"],
             edit_intensity_category=row["edit_intensity_category"],
+            population_count=int(
+                population_by_group[
+                    (
+                        row["field_name"],
+                        row["edit_intensity_category"],
+                    )
+                ]
+            ),
         )
         for row in groups
     ]
@@ -2109,24 +2170,48 @@ def build_edit_readability_relationship_chart(
 
             if row is None:
                 percentages.append(0.0)
+                category_rule = _EDIT_INTENSITY_RULES.get(
+                    intensity,
+                    "See the report's edit-category definitions",
+                )
                 customdata.append(
                     [
+                        _field_label(field_name),
+                        _EDIT_INTENSITY_LABELS.get(
+                            intensity,
+                            intensity.replace("_", " ").title(),
+                        ),
+                        category_rule,
+                        _CONSENSUS_DIRECTION_EXPLANATIONS[direction],
                         0,
                         0,
+                        0.0,
                         None,
-                        None,
-                        None,
-                        "No aggregate row for this direction",
+                        _CONSENSUS_DIRECTION_CAUTIONS[direction],
                     ]
                 )
                 continue
 
             percentage = row["percentage_within_edit_intensity_category"]
             percentages.append(float(percentage) if not pd.isna(percentage) else 0.0)
+            population_count = int(row["completed_ai_attempt_count"])
+            direction_count = int(
+                row["completed_ai_attempt_count_with_selected_final_pair"]
+            )
             customdata.append(
                 [
-                    int(row["completed_ai_attempt_count"]),
-                    int(row["completed_ai_attempt_count_with_selected_final_pair"]),
+                    _field_label(field_name),
+                    _EDIT_INTENSITY_LABELS.get(
+                        intensity,
+                        intensity.replace("_", " ").title(),
+                    ),
+                    _EDIT_INTENSITY_RULES.get(
+                        intensity,
+                        "See the report's edit-category definitions",
+                    ),
+                    _CONSENSUS_DIRECTION_EXPLANATIONS[direction],
+                    population_count,
+                    direction_count,
                     (float(percentage) if not pd.isna(percentage) else None),
                     (
                         float(
@@ -2143,12 +2228,7 @@ def build_edit_readability_relationship_chart(
                         )
                         else None
                     ),
-                    (
-                        float(row["median_consensus_grade_level_change"])
-                        if not pd.isna(row["median_consensus_grade_level_change"])
-                        else None
-                    ),
-                    str(row["edit_intensity_threshold_scheme_name"]),
+                    _CONSENSUS_DIRECTION_CAUTIONS[direction],
                 ]
             )
 
@@ -2158,18 +2238,20 @@ def build_edit_readability_relationship_chart(
             y=percentages,
             customdata=customdata,
             hovertemplate=(
-                "Field and edit intensity: %{x}<br>"
-                "Readability direction: %{fullData.name}<br>"
-                "Percentage within edit intensity: %{y:.1f}%<br>"
-                "Completed AI field population: %{customdata[0]}<br>"
-                "Paired selected-final attempts in direction: "
-                "%{customdata[1]}<br>"
-                "Published percentage: %{customdata[2]:.1f}%<br>"
-                "Median Flesch-Kincaid final minus selected: "
-                "%{customdata[3]:.2f}<br>"
-                "Median consensus direction value: "
-                "%{customdata[4]:.2f}<br>"
-                "Edit-intensity scheme: %{customdata[5]}"
+                "Field: %{customdata[0]}<br>"
+                "Edit category: %{customdata[1]}<br>"
+                "Edit rule: %{customdata[2]}<br>"
+                "<br>"
+                "Readability result: %{customdata[3]}<br>"
+                "Fields in this group: %{customdata[4]}<br>"
+                "Fields with this result: %{customdata[5]}<br>"
+                "Share of this group: %{customdata[6]:.1f}% "
+                "(%{customdata[5]} of %{customdata[4]})<br>"
+                "<br>"
+                "Median Flesch-Kincaid change: "
+                "%{customdata[7]:.2f} grade levels<br>"
+                "Calculation: final text minus selected suggestion<br>"
+                "Interpretation: %{customdata[8]}"
                 "<extra></extra>"
             ),
         )

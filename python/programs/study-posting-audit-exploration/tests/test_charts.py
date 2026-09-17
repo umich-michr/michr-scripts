@@ -1088,15 +1088,25 @@ def test_edit_readability_chart_preserves_categories_and_denominators() -> None:
     )
     assert figure.layout.barmode == "stack"
     assert list(decreased.x) == [
-        "Title — Light edit",
-        "Description — Edited, unclassified",
+        "Title — Light edit (N=5)",
+        "Description — Edited, unclassified (N=4)",
     ]
     assert list(decreased.y) == [40.0, 0.0]
     assert list(mixed.y) == [0.0, 50.0]
-    assert list(decreased.customdata[0][:3]) == [5, 2, 40.0]
-    assert decreased.customdata[0][5] == ("EXPLORATORY_CHARACTER_RATIO_10_30")
-    assert "Completed AI field population" in str(decreased.hovertemplate)
-    assert "Paired selected-final attempts in direction" in str(decreased.hovertemplate)
+    assert list(decreased.customdata[0][:4]) == [
+        "Title",
+        "Light edit",
+        "Character edit ratio at or below 10%",
+        "Grade-level formulas agreed on a downward direction",
+    ]
+    assert list(decreased.customdata[0][4:7]) == [5, 2, 40.0]
+    hovertemplate = str(decreased.hovertemplate)
+    assert "Fields in this group" in hovertemplate
+    assert "Fields with this result" in hovertemplate
+    assert "Share of this group" in hovertemplate
+    assert "final text minus selected suggestion" in hovertemplate
+    assert "Median consensus direction value" not in hovertemplate
+    assert "Published percentage" not in hovertemplate
 
 
 def test_content_source_chart_uses_all_attempt_population() -> None:

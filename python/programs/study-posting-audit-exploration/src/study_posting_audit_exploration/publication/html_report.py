@@ -291,18 +291,80 @@ _TEMPLATE = """<!doctype html>
   </div>
   <h3>Edit intensity and readability direction</h3>
   <p>
-    This chart crosses the operational edit-intensity category with the
-    consensus direction across four grade-level formulas. Percentages use all
-    completed AI attempt-and-field rows in each edit-intensity category as the
-    denominator; only rows with a selected-and-final readability pair
-    contribute to a direction.
+    This chart explores whether the size of a selected-suggestion edit is
+    associated with the direction of grade-level formula changes. It is
+    descriptive and does not establish whether an edit improved the text.
+  </p>
+
+  <h4>How edit size is classified</h4>
+  <p>
+    The character edit ratio is the character edit distance divided by the
+    longer character count of the selected suggestion or final text. Character
+    edit distance counts the minimum insertions, deletions, and substitutions
+    needed to transform the selected suggestion into the final text.
+  </p>
+  <ul>
+    <li><strong>Exact:</strong> final text exactly matched the selected
+      suggestion.</li>
+    <li><strong>Cosmetic:</strong> only cosmetic normalization changed.</li>
+    <li><strong>Light edit:</strong> character edit ratio at or below 10%.</li>
+    <li><strong>Moderate edit:</strong> ratio above 10% and at or below
+      30%.</li>
+    <li><strong>Heavy edit:</strong> ratio above 30%.</li>
+    <li><strong>Edited, unclassified:</strong> edited, but usable character
+      measurements were unavailable.</li>
+    <li><strong>Replaced:</strong> final text replaced the selected
+      suggestion.</li>
+    <li><strong>Cleared:</strong> selected suggestion was removed and final
+      text was blank.</li>
+    <li><strong>Unassisted:</strong> no AI suggestion was selected.</li>
+  </ul>
+  <p class="caution">
+    These are project-specific exploratory character-edit bands using 10% and
+    30% thresholds. The technical scheme ID is
+    <code>EXPLORATORY_CHARACTER_RATIO_10_30</code>. The bands describe edit
+    size, not writing quality.
+  </p>
+
+  <h4>How readability direction is classified</h4>
+  <p>
+    Consensus uses Flesch-Kincaid grade, Automated Readability Index,
+    Coleman-Liau Index, and Gunning Fog.
+  </p>
+  <ul>
+    <li><strong>Consensus decrease:</strong> the grade-level formulas agreed on
+      a downward direction for material change.</li>
+    <li><strong>No material change:</strong> formula changes stayed within the
+      configured tolerance.</li>
+    <li><strong>Consensus increase:</strong> the grade-level formulas agreed on
+      an upward direction for material change.</li>
+    <li><strong>Mixed formula direction:</strong> the formulas did not agree on
+      direction. Mixed direction is not the same as no material change.</li>
+  </ul>
+
+  <h4>How to read a bar</h4>
+  <p>
+    Each bar represents one study-posting field and one edit category. The
+    label includes the total group size as <strong>N</strong>. Colored sections
+    show the share assigned to each readability result. Only fields with usable
+    selected-and-final readability pairs receive a direction. If the colored
+    sections total less than 100%, the unfilled remainder represents fields
+    without a usable pair. Always inspect the counts in hover text: a 100%
+    section based on one field is less stable than one based on many fields.
+  </p>
+  <p>
+    <strong>Worked example:</strong> if a group contains five light-edited
+    descriptions and one is classified as consensus decrease, that section is
+    20% (1 of 5). A median Flesch-Kincaid change of -0.59 means the middle
+    final-minus-selected indicator in that result group was 0.59 grade levels
+    lower. It does not show that the final text was better or easier to
+    understand.
   </p>
   <p class="caution">
-    Edit-intensity categories use the exploratory
-    EXPLORATORY_CHARACTER_RATIO_10_30 scheme. Edited-unclassified remains
-    separate from replaced. Consensus decrease, increase, no material change,
-    and mixed direction are descriptive categories: none establishes better or
-    worse writing, comprehension, accessibility, usefulness, or causal effect.
+    Lower is not automatically better, and higher is not automatically worse.
+    Grade-level formulas do not establish comprehension, accuracy,
+    accessibility, usefulness, cultural appropriateness, writing quality, or
+    causal benefit.
   </p>
   <div class="chart">
     {{ edit_readability_relationship_html | safe }}

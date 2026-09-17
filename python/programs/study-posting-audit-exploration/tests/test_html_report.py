@@ -637,11 +637,22 @@ def test_html_report_explains_readability_indicators() -> None:
         "Lower or higher formula values are not automatically better" in normalized_html
     )
     assert "Titles are short text" in normalized_html
-    assert "Sample counts and tolerances appear in hover text" in (normalized_html)
+    assert "Sample counts and tolerances appear in hover text" in normalized_html
+
     assert "Edit intensity and consensus grade-level direction" in html
-    assert "all completed AI attempt-and-field rows" in normalized_html
-    assert "Edited-unclassified remains separate from replaced" in normalized_html
-    assert "none establishes better or worse writing" in normalized_html
+    assert "How edit size is classified" in html
+    assert "How readability direction is classified" in html
+    assert "How to read a bar" in html
+    assert "Worked example" in html
+    assert "character edit ratio at or below 10%" in normalized_html
+    assert "ratio above 10% and at or below 30%" in normalized_html
+    assert "ratio above 30%" in normalized_html
+    assert "EXPLORATORY_CHARACTER_RATIO_10_30" in html
+    assert "Mixed direction is not the same as no material change" in (normalized_html)
+    assert "unfilled remainder represents fields without a usable pair" in (
+        normalized_html
+    )
+    assert "Lower is not automatically better" in normalized_html
 
 
 def test_html_report_excludes_identifier_and_payload_values() -> None:

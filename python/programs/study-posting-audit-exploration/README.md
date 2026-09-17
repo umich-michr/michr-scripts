@@ -236,12 +236,23 @@ mode.
 The edit-intensity/readability chart uses
 `field_edit_readability_cross_summary.csv` only. It shows consensus
 grade-level direction percentages within each field and operational
-edit-intensity category. The denominator is every completed AI
-attempt-and-field row in that edit-intensity category, while only rows with
-selected-and-final readability pairs contribute to a direction.
-`EDITED_UNCLASSIFIED` remains distinct from `REPLACED`. The exploratory
-edit-intensity scheme and readability directions do not establish writing
-quality, comprehension, accessibility, usefulness, or causal benefit.
+edit-intensity category. Bar labels include the group sample size, and hover
+text gives the edit rule, numerator, denominator, percentage, and median
+Flesch-Kincaid final-minus-selected change.
+
+The project-specific character-edit bands use 10% and 30% thresholds:
+light edits are at or below 10%, moderate edits are above 10% and at or below
+30%, and heavy edits are above 30%. The technical scheme ID is
+`EXPLORATORY_CHARACTER_RATIO_10_30`. These exploratory categories describe
+edit size and are not writing-quality standards.
+
+The denominator is every completed AI attempt-and-field row in the field/edit
+category, while only rows with selected-and-final readability pairs contribute
+to a direction. An unfilled portion of a bar represents rows without a usable
+pair. `EDITED_UNCLASSIFIED` remains distinct from `REPLACED`. Mixed formula
+direction is not the same as no material change. Readability direction does not
+establish writing quality, comprehension, accessibility, usefulness, or causal
+benefit.
 
 The report embeds its Plotly JavaScript and does not require an external script
 service. It does not contain usernames, audit IDs, study numbers, source
