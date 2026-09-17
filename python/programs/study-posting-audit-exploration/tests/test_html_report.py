@@ -597,10 +597,9 @@ def test_html_report_explains_workflow_timing() -> None:
     assert 'id="attempts-heading"' in html
     assert "Attempts and workflow timing" in html
     assert "Attempt timing distributions by authoring mode" in html
-    assert "Time from first attempt to study completion" in html
+    assert "Time from first attempt to study completion" not in html
     assert "25th through 75th percentiles" in normalized_html
-    assert "observed minimum through maximum" in normalized_html
-    assert "Long elapsed times may include pauses" in normalized_html
+    assert "observed minimum through maximum" not in normalized_html
     assert "do not establish author effort, efficiency" in normalized_html
 
 

@@ -404,7 +404,6 @@ class ExplorationCharts:
 
     attempt_outcomes_by_mode: go.Figure
     attempt_timing_distribution_by_mode: go.Figure
-    study_completion_timing_by_mode: go.Figure
     study_completion_pathways: go.Figure
     author_handoff_categories: go.Figure
     author_attempt_start_experience: go.Figure
@@ -674,109 +673,6 @@ def build_attempt_timing_chart(
         xaxis_title="Authoring mode",
         yaxis_title="Median minutes; error bars show 25th-75th percentiles",
         legend_title_text="Attempt timing measure",
-    )
-
-    return figure
-
-
-def build_study_completion_timing_chart(
-    study_attempt_history_summary: pd.DataFrame,
-) -> go.Figure:
-    """Return first-attempt-to-completion timing by final authoring mode."""
-    _require_columns(
-        study_attempt_history_summary,
-        required=_REQUIRED_STUDY_HISTORY_COLUMNS,
-        frame_name="study_attempt_history_summary",
-    )
-    rows = study_attempt_history_summary.loc[
-        study_attempt_history_summary["final_completion_authoring_mode"].isin(
-            _AUTHORING_MODE_ORDER
-        )
-    ].dropna(subset=["median_minutes_first_attempt_to_completion"])
-
-    if rows.empty:
-        return _empty_figure(
-            title="Time from first attempt to study completion",
-            message="No completed-study timing aggregates are available.",
-        )
-
-    rows_by_mode = {
-        str(row["final_completion_authoring_mode"]): row
-        for row in rows.to_dict(orient="records")
-    }
-    modes: list[str] = []
-    medians: list[float] = []
-    lower_errors: list[float] = []
-    upper_errors: list[float] = []
-    customdata: list[list[object]] = []
-
-    for mode in _AUTHORING_MODE_ORDER:
-        row = rows_by_mode.get(mode)
-
-        if row is None:
-            continue
-
-        minimum = float(row["minimum_minutes_first_attempt_to_completion"])
-        median = float(row["median_minutes_first_attempt_to_completion"])
-        maximum = float(row["maximum_minutes_first_attempt_to_completion"])
-        average = float(row["average_minutes_first_attempt_to_completion"])
-        standard_deviation = row[
-            "standard_deviation_minutes_first_attempt_to_completion"
-        ]
-        modes.append(mode)
-        medians.append(median)
-        lower_errors.append(max(median - minimum, 0.0))
-        upper_errors.append(max(maximum - median, 0.0))
-        customdata.append(
-            [
-                int(row["distinct_study_count"]),
-                int(row["study_count_with_preceding_incomplete_attempts"]),
-                minimum,
-                average,
-                (
-                    float(standard_deviation)
-                    if not pd.isna(standard_deviation)
-                    else None
-                ),
-                maximum,
-            ]
-        )
-
-    figure = go.Figure(
-        data=[
-            go.Bar(
-                x=modes,
-                y=medians,
-                error_y={
-                    "type": "data",
-                    "symmetric": False,
-                    "array": upper_errors,
-                    "arrayminus": lower_errors,
-                    "visible": True,
-                },
-                customdata=customdata,
-                hovertemplate=(
-                    "Final completion mode: %{x}<br>"
-                    "Median minutes from first attempt to completion: "
-                    "%{y:.2f}<br>"
-                    "Minimum: %{customdata[2]:.2f}<br>"
-                    "Average: %{customdata[3]:.2f}<br>"
-                    "Standard deviation: %{customdata[4]:.2f}<br>"
-                    "Maximum: %{customdata[5]:.2f}<br>"
-                    "Completed studies: %{customdata[0]}<br>"
-                    "Studies with preceding incomplete attempts: "
-                    "%{customdata[1]}"
-                    "<extra></extra>"
-                ),
-            )
-        ]
-    )
-    figure.update_layout(
-        title="Time from first attempt to study completion",
-        template="plotly_white",
-        xaxis_title="Final completion authoring mode",
-        yaxis_title="Median minutes; error bars show minimum-maximum",
-        showlegend=False,
     )
 
     return figure
@@ -2370,9 +2266,6 @@ def build_exploration_charts(
         ),
         attempt_timing_distribution_by_mode=build_attempt_timing_chart(
             inputs.grouped_attempt_summary
-        ),
-        study_completion_timing_by_mode=build_study_completion_timing_chart(
-            inputs.study_attempt_history_summary
         ),
         study_completion_pathways=build_study_completion_pathways_chart(
             inputs.study_attempt_history_summary

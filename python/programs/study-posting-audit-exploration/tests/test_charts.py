@@ -23,7 +23,6 @@ from study_posting_audit_exploration.publication import (
     build_effective_author_role_chart,
     build_exploration_charts,
     build_study_completion_pathways_chart,
-    build_study_completion_timing_chart,
     build_suggestion_selection_by_index_chart,
     build_suggestion_selection_by_kind_chart,
 )
@@ -872,23 +871,6 @@ def test_attempt_timing_chart_shows_two_timing_distributions() -> None:
     )
 
 
-def test_study_completion_timing_chart_uses_completed_study_range() -> None:
-    figure = build_study_completion_timing_chart(study_history_rows())
-    bar = figure.data[0]
-
-    assert figure.layout.title.text == ("Time from first attempt to study completion")
-    assert list(bar.x) == ["AI", "MANUAL"]
-    assert list(bar.y) == [15.0, 30.0]
-    assert list(bar.error_y.arrayminus) == [10.0, 20.0]
-    assert list(bar.error_y.array) == [20.0, 40.0]
-    assert [list(value[:2]) for value in bar.customdata] == [
-        [6, 2],
-        [4, 2],
-    ]
-    assert "Standard deviation" in str(bar.hovertemplate)
-    assert "Studies with preceding incomplete attempts" in str(bar.hovertemplate)
-
-
 def test_study_completion_pathways_chart_uses_completed_modes() -> None:
     figure = build_study_completion_pathways_chart(study_history_rows())
 
@@ -1150,7 +1132,6 @@ def test_chart_bundle_contains_all_figures() -> None:
     assert isinstance(charts, ExplorationCharts)
     assert charts.attempt_outcomes_by_mode.data
     assert charts.attempt_timing_distribution_by_mode.data
-    assert charts.study_completion_timing_by_mode.data
     assert charts.study_completion_pathways.data
     assert charts.author_handoff_categories.data
     assert charts.author_attempt_start_experience.data
@@ -1173,23 +1154,19 @@ def test_chart_bundle_contains_all_figures() -> None:
     assert charts.edit_readability_relationship.data
 
 
-def assert_timing_charts_have_accessible_empty_states() -> None:
-    """Assert both workflow-timing charts provide empty-state text."""
-    attempt_timing_figure = build_attempt_timing_chart(
-        pd.DataFrame(columns=grouped_attempt_rows().columns)
-    )
-    study_timing_figure = build_study_completion_timing_chart(
-        pd.DataFrame(columns=study_history_rows().columns)
-    )
-
-    assert attempt_timing_figure.layout.annotations[0].text
-    assert study_timing_figure.layout.annotations[0].text
-
-
 def assert_edit_readability_chart_has_accessible_empty_state() -> None:
     """Assert the edit/readability chart provides empty-state text."""
     figure = build_edit_readability_relationship_chart(
         pd.DataFrame(columns=edit_readability_cross_rows().columns)
+    )
+
+    assert figure.layout.annotations[0].text
+
+
+def assert_attempt_timing_chart_has_accessible_empty_state() -> None:
+    """Assert the attempt-timing chart provides empty-state text."""
+    figure = build_attempt_timing_chart(
+        pd.DataFrame(columns=grouped_attempt_rows().columns)
     )
 
     assert figure.layout.annotations[0].text
@@ -1265,7 +1242,7 @@ def test_charts_return_accessible_empty_states() -> None:
     )
 
     assert attempt_figure.layout.annotations[0].text
-    assert_timing_charts_have_accessible_empty_states()
+    assert_attempt_timing_chart_has_accessible_empty_state()
     assert study_figure.layout.annotations[0].text
     assert handoff_figure.layout.annotations[0].text
     assert attempt_start_experience_figure.layout.annotations[0].text
@@ -1293,14 +1270,6 @@ def test_charts_return_accessible_empty_states() -> None:
             pd.DataFrame(
                 {
                     "attempt_result": ["COMPLETE"],
-                }
-            ),
-        ),
-        (
-            build_study_completion_timing_chart,
-            pd.DataFrame(
-                {
-                    "final_completion_authoring_mode": ["AI"],
                 }
             ),
         ),

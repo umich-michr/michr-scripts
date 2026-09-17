@@ -186,9 +186,6 @@ aggregate analysis tables. It currently includes:
 - study-information-page and total-attempt timing distributions by authoring
   mode, including medians, interquartile ranges, 90th percentiles, and missing
   counts;
-- first-attempt-to-completion timing by final authoring mode, including
-  medians, observed ranges, averages, standard deviations, completed-study
-  counts, and preceding-incomplete-attempt counts;
 - reported-versus-inferred content-source concordance;
 - privacy and interpretation cautions.
 
@@ -227,14 +224,14 @@ caution. Readability formulas do not establish comprehension, accuracy,
 accessibility, usefulness, cultural appropriateness, or ethical adequacy.
 
 The workflow-timing section separates study-information-page time from total
-attempt time and distinguishes attempt-level timing from study-level elapsed
-time between the first recorded attempt and completion. Attempt timing shows
-medians with 25th-to-75th-percentile error bars and reports 90th percentiles
-and missing counts in hover text. Study completion timing shows medians with
-observed minimum-to-maximum ranges because the current aggregate contract does
-not publish study-level quartiles. Long elapsed times can include pauses or
-work outside the application and do not establish author effort, efficiency,
-quality, or a causal effect of authoring mode.
+attempt time. It shows medians with 25th-to-75th-percentile error bars and
+reports 90th percentiles and missing counts in hover text. The HTML does not
+chart first-attempt-to-completion minimum-to-maximum ranges because long
+calendar-time outliers compress typical values and can be misread as active
+work duration. The underlying study-level timing aggregates remain available
+in `overview/study_attempt_history_summary.csv`. Attempt timings do not
+establish author effort, efficiency, quality, or a causal effect of authoring
+mode.
 
 The edit-intensity/readability chart uses
 `field_edit_readability_cross_summary.csv` only. It shows consensus
