@@ -19,6 +19,7 @@ from study_posting_audit_exploration.publication import (
     build_author_pi_context_chart,
     build_completed_study_mix_chart,
     build_content_source_concordance_chart,
+    build_edit_readability_relationship_chart,
     build_effective_author_role_chart,
     build_exploration_charts,
     build_study_completion_pathways_chart,
@@ -712,6 +713,49 @@ def selected_comparison_rows() -> pd.DataFrame:
     )
 
 
+def edit_readability_cross_rows() -> pd.DataFrame:
+    """Return synthetic edit-intensity/readability-direction rows."""
+    scheme = "EXPLORATORY_CHARACTER_RATIO_10_30"
+
+    return pd.DataFrame.from_records(
+        [
+            {
+                "field_name": "title",
+                "edit_intensity_threshold_scheme_name": scheme,
+                "edit_intensity_category": "LIGHT_EDIT",
+                "readability_direction_category": ("CONSENSUS_GRADE_LEVEL_DECREASE"),
+                "completed_ai_attempt_count": 5,
+                "completed_ai_attempt_count_with_selected_final_pair": 2,
+                "percentage_within_edit_intensity_category": 40.0,
+                ("median_flesch_kincaid_grade_change_final_minus_selected"): -0.6,
+                "median_consensus_grade_level_change": -1.0,
+            },
+            {
+                "field_name": "title",
+                "edit_intensity_threshold_scheme_name": scheme,
+                "edit_intensity_category": "LIGHT_EDIT",
+                "readability_direction_category": "NO_MATERIAL_CHANGE",
+                "completed_ai_attempt_count": 5,
+                "completed_ai_attempt_count_with_selected_final_pair": 1,
+                "percentage_within_edit_intensity_category": 20.0,
+                ("median_flesch_kincaid_grade_change_final_minus_selected"): 0.0,
+                "median_consensus_grade_level_change": 0.0,
+            },
+            {
+                "field_name": "description",
+                "edit_intensity_threshold_scheme_name": scheme,
+                "edit_intensity_category": "EDITED_UNCLASSIFIED",
+                "readability_direction_category": ("MIXED_FORMULA_DIRECTION"),
+                "completed_ai_attempt_count": 4,
+                "completed_ai_attempt_count_with_selected_final_pair": 2,
+                "percentage_within_edit_intensity_category": 50.0,
+                ("median_flesch_kincaid_grade_change_final_minus_selected"): 0.25,
+                "median_consensus_grade_level_change": 0.0,
+            },
+        ]
+    )
+
+
 def content_source_rows() -> pd.DataFrame:
     """Return synthetic aggregate-only concordance rows."""
     return pd.DataFrame.from_records(
@@ -1051,6 +1095,28 @@ def test_selected_vs_unselected_chart_uses_comparable_attempts() -> None:
     assert len(figure.layout.shapes) == 1
 
 
+def test_edit_readability_chart_preserves_categories_and_denominators() -> None:
+    figure = build_edit_readability_relationship_chart(edit_readability_cross_rows())
+    traces = {str(trace.name): trace for trace in figure.data}
+    decreased = traces["Consensus grade-level decrease"]
+    mixed = traces["Mixed formula direction"]
+
+    assert figure.layout.title.text == (
+        "Edit intensity and consensus grade-level direction"
+    )
+    assert figure.layout.barmode == "stack"
+    assert list(decreased.x) == [
+        "Title — Light edit",
+        "Description — Edited, unclassified",
+    ]
+    assert list(decreased.y) == [40.0, 0.0]
+    assert list(mixed.y) == [0.0, 50.0]
+    assert list(decreased.customdata[0][:3]) == [5, 2, 40.0]
+    assert decreased.customdata[0][5] == ("EXPLORATORY_CHARACTER_RATIO_10_30")
+    assert "Completed AI field population" in str(decreased.hovertemplate)
+    assert "Paired selected-final attempts in direction" in str(decreased.hovertemplate)
+
+
 def test_content_source_chart_uses_all_attempt_population() -> None:
     figure = build_content_source_concordance_chart(content_source_rows())
     heatmap = figure.data[0]
@@ -1076,6 +1142,7 @@ def test_chart_bundle_contains_all_figures() -> None:
             field_readability_change_summary=readability_change_rows(),
             field_readability_target_summary=readability_target_rows(),
             selected_vs_unselected_readability_summary=(selected_comparison_rows()),
+            field_edit_readability_cross_summary=edit_readability_cross_rows(),
             content_source_matrix=content_source_rows(),
         )
     )
@@ -1103,6 +1170,7 @@ def test_chart_bundle_contains_all_figures() -> None:
     assert charts.readability_change_direction.data
     assert charts.final_grade_bands.data
     assert charts.selected_vs_unselected_readability.data
+    assert charts.edit_readability_relationship.data
 
 
 def assert_timing_charts_have_accessible_empty_states() -> None:
@@ -1116,6 +1184,15 @@ def assert_timing_charts_have_accessible_empty_states() -> None:
 
     assert attempt_timing_figure.layout.annotations[0].text
     assert study_timing_figure.layout.annotations[0].text
+
+
+def assert_edit_readability_chart_has_accessible_empty_state() -> None:
+    """Assert the edit/readability chart provides empty-state text."""
+    figure = build_edit_readability_relationship_chart(
+        pd.DataFrame(columns=edit_readability_cross_rows().columns)
+    )
+
+    assert figure.layout.annotations[0].text
 
 
 def test_charts_return_accessible_empty_states() -> None:
@@ -1205,6 +1282,7 @@ def test_charts_return_accessible_empty_states() -> None:
     assert readability_change_figure.layout.annotations[0].text
     assert readability_target_figure.layout.annotations[0].text
     assert selected_comparison_figure.layout.annotations[0].text
+    assert_edit_readability_chart_has_accessible_empty_state()
 
 
 @pytest.mark.parametrize(
@@ -1359,6 +1437,14 @@ def test_charts_return_accessible_empty_states() -> None:
         ),
         (
             build_selected_vs_unselected_readability_chart,
+            pd.DataFrame(
+                {
+                    "field_name": ["title"],
+                }
+            ),
+        ),
+        (
+            build_edit_readability_relationship_chart,
             pd.DataFrame(
                 {
                     "field_name": ["title"],

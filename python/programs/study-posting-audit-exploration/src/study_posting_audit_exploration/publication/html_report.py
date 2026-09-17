@@ -289,6 +289,24 @@ _TEMPLATE = """<!doctype html>
   <div class="chart">
     {{ selected_vs_unselected_readability_html | safe }}
   </div>
+  <h3>Edit intensity and readability direction</h3>
+  <p>
+    This chart crosses the operational edit-intensity category with the
+    consensus direction across four grade-level formulas. Percentages use all
+    completed AI attempt-and-field rows in each edit-intensity category as the
+    denominator; only rows with a selected-and-final readability pair
+    contribute to a direction.
+  </p>
+  <p class="caution">
+    Edit-intensity categories use the exploratory
+    EXPLORATORY_CHARACTER_RATIO_10_30 scheme. Edited-unclassified remains
+    separate from replaced. Consensus decrease, increase, no material change,
+    and mixed direction are descriptive categories: none establishes better or
+    worse writing, comprehension, accessibility, usefulness, or causal effect.
+  </p>
+  <div class="chart">
+    {{ edit_readability_relationship_html | safe }}
+  </div>
 </section>
 
   <section aria-labelledby="attempts-heading">
@@ -509,6 +527,10 @@ def render_html_report(
         ),
         selected_vs_unselected_readability_html=_figure_html(
             charts.selected_vs_unselected_readability,
+            include_plotlyjs=False,
+        ),
+        edit_readability_relationship_html=_figure_html(
+            charts.edit_readability_relationship,
             include_plotlyjs=False,
         ),
         attempt_outcomes_html=_figure_html(

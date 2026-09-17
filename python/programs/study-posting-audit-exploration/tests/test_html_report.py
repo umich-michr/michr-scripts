@@ -360,6 +360,49 @@ def selected_comparison_rows() -> pd.DataFrame:
     )
 
 
+def edit_readability_cross_rows() -> pd.DataFrame:
+    """Return synthetic edit-intensity/readability-direction rows."""
+    scheme = "EXPLORATORY_CHARACTER_RATIO_10_30"
+
+    return pd.DataFrame.from_records(
+        [
+            {
+                "field_name": "title",
+                "edit_intensity_threshold_scheme_name": scheme,
+                "edit_intensity_category": "LIGHT_EDIT",
+                "readability_direction_category": ("CONSENSUS_GRADE_LEVEL_DECREASE"),
+                "completed_ai_attempt_count": 5,
+                "completed_ai_attempt_count_with_selected_final_pair": 2,
+                "percentage_within_edit_intensity_category": 40.0,
+                ("median_flesch_kincaid_grade_change_final_minus_selected"): -0.6,
+                "median_consensus_grade_level_change": -1.0,
+            },
+            {
+                "field_name": "title",
+                "edit_intensity_threshold_scheme_name": scheme,
+                "edit_intensity_category": "LIGHT_EDIT",
+                "readability_direction_category": "NO_MATERIAL_CHANGE",
+                "completed_ai_attempt_count": 5,
+                "completed_ai_attempt_count_with_selected_final_pair": 1,
+                "percentage_within_edit_intensity_category": 20.0,
+                ("median_flesch_kincaid_grade_change_final_minus_selected"): 0.0,
+                "median_consensus_grade_level_change": 0.0,
+            },
+            {
+                "field_name": "description",
+                "edit_intensity_threshold_scheme_name": scheme,
+                "edit_intensity_category": "EDITED_UNCLASSIFIED",
+                "readability_direction_category": ("MIXED_FORMULA_DIRECTION"),
+                "completed_ai_attempt_count": 4,
+                "completed_ai_attempt_count_with_selected_final_pair": 2,
+                "percentage_within_edit_intensity_category": 50.0,
+                ("median_flesch_kincaid_grade_change_final_minus_selected"): 0.25,
+                "median_consensus_grade_level_change": 0.0,
+            },
+        ]
+    )
+
+
 def content_rows() -> pd.DataFrame:
     """Return aggregate-only content-source rows."""
     return pd.DataFrame.from_records(
@@ -476,6 +519,7 @@ def charts() -> ExplorationCharts:
             field_readability_change_summary=readability_change_rows(),
             field_readability_target_summary=readability_target_rows(),
             selected_vs_unselected_readability_summary=(selected_comparison_rows()),
+            field_edit_readability_cross_summary=edit_readability_cross_rows(),
             content_source_matrix=content_rows(),
         )
     )
@@ -595,6 +639,10 @@ def test_html_report_explains_readability_indicators() -> None:
     )
     assert "Titles are short text" in normalized_html
     assert "Sample counts and tolerances appear in hover text" in (normalized_html)
+    assert "Edit intensity and consensus grade-level direction" in html
+    assert "all completed AI attempt-and-field rows" in normalized_html
+    assert "Edited-unclassified remains separate from replaced" in normalized_html
+    assert "none establishes better or worse writing" in normalized_html
 
 
 def test_html_report_excludes_identifier_and_payload_values() -> None:

@@ -170,6 +170,18 @@ _REQUIRED_SELECTED_COMPARISON_COLUMNS: tuple[str, ...] = (
     "equality_tolerance",
 )
 
+_REQUIRED_EDIT_READABILITY_CROSS_COLUMNS: tuple[str, ...] = (
+    "field_name",
+    "edit_intensity_threshold_scheme_name",
+    "edit_intensity_category",
+    "readability_direction_category",
+    "completed_ai_attempt_count",
+    "completed_ai_attempt_count_with_selected_final_pair",
+    "percentage_within_edit_intensity_category",
+    "median_flesch_kincaid_grade_change_final_minus_selected",
+    "median_consensus_grade_level_change",
+)
+
 _ATTEMPT_RESULT_ORDER: tuple[str, ...] = (
     "COMPLETE",
     "AI_ERROR",
@@ -273,6 +285,44 @@ _READABILITY_DIRECTION_SERIES: tuple[tuple[str, str], ...] = (
     ),
 )
 
+_CONSENSUS_DIRECTION_ORDER: tuple[str, ...] = (
+    "CONSENSUS_GRADE_LEVEL_DECREASE",
+    "NO_MATERIAL_CHANGE",
+    "CONSENSUS_GRADE_LEVEL_INCREASE",
+    "MIXED_FORMULA_DIRECTION",
+)
+
+_CONSENSUS_DIRECTION_LABELS: Mapping[str, str] = {
+    "CONSENSUS_GRADE_LEVEL_DECREASE": "Consensus grade-level decrease",
+    "NO_MATERIAL_CHANGE": "No material change",
+    "CONSENSUS_GRADE_LEVEL_INCREASE": "Consensus grade-level increase",
+    "MIXED_FORMULA_DIRECTION": "Mixed formula direction",
+}
+
+_EDIT_INTENSITY_ORDER: tuple[str, ...] = (
+    "EXACT",
+    "COSMETIC",
+    "LIGHT_EDIT",
+    "MODERATE_EDIT",
+    "HEAVY_EDIT",
+    "EDITED_UNCLASSIFIED",
+    "REPLACED",
+    "CLEARED",
+    "UNASSISTED",
+)
+
+_EDIT_INTENSITY_LABELS: Mapping[str, str] = {
+    "EXACT": "Exact",
+    "COSMETIC": "Cosmetic",
+    "LIGHT_EDIT": "Light edit",
+    "MODERATE_EDIT": "Moderate edit",
+    "HEAVY_EDIT": "Heavy edit",
+    "EDITED_UNCLASSIFIED": "Edited, unclassified",
+    "REPLACED": "Replaced",
+    "CLEARED": "Cleared",
+    "UNASSISTED": "Unassisted",
+}
+
 _GRADE_BAND_SERIES: tuple[tuple[str, str], ...] = (
     (
         "attempt_count_at_or_below_grade_6",
@@ -344,6 +394,7 @@ class ExplorationChartInputs:
     field_readability_change_summary: pd.DataFrame
     field_readability_target_summary: pd.DataFrame
     selected_vs_unselected_readability_summary: pd.DataFrame
+    field_edit_readability_cross_summary: pd.DataFrame
     content_source_matrix: pd.DataFrame
 
 
@@ -372,6 +423,7 @@ class ExplorationCharts:
     readability_change_direction: go.Figure
     final_grade_bands: go.Figure
     selected_vs_unselected_readability: go.Figure
+    edit_readability_relationship: go.Figure
     content_source_concordance: go.Figure
 
 
@@ -2060,6 +2112,184 @@ def build_selected_vs_unselected_readability_chart(
     return figure
 
 
+def _edit_intensity_group_label(
+    *,
+    field_name: object,
+    edit_intensity_category: object,
+) -> str:
+    """Return one stable field and edit-intensity label."""
+    category = str(edit_intensity_category)
+    category_label = _EDIT_INTENSITY_LABELS.get(
+        category,
+        category.replace("_", " ").title(),
+    )
+
+    return f"{_field_label(field_name)} — {category_label}"
+
+
+def build_edit_readability_relationship_chart(
+    field_edit_readability_cross_summary: pd.DataFrame,
+) -> go.Figure:
+    """Return readability-direction percentages by edit intensity."""
+    _require_columns(
+        field_edit_readability_cross_summary,
+        required=_REQUIRED_EDIT_READABILITY_CROSS_COLUMNS,
+        frame_name="field_edit_readability_cross_summary",
+    )
+
+    if field_edit_readability_cross_summary.empty:
+        return _empty_figure(
+            title="Edit intensity and consensus grade-level direction",
+            message=(
+                "No edit-intensity and readability-direction aggregates are available."
+            ),
+        )
+
+    rows = field_edit_readability_cross_summary.copy()
+    field_order = {
+        field_name: index for index, field_name in enumerate(_FIELD_DISPLAY_LABELS)
+    }
+    intensity_order = {
+        category: index for index, category in enumerate(_EDIT_INTENSITY_ORDER)
+    }
+    rows["_field_order"] = rows["field_name"].map(field_order).fillna(len(field_order))
+    rows["_intensity_order"] = (
+        rows["edit_intensity_category"]
+        .map(intensity_order)
+        .fillna(len(intensity_order))
+    )
+    rows = rows.sort_values(
+        by=[
+            "_field_order",
+            "field_name",
+            "_intensity_order",
+            "edit_intensity_category",
+            "readability_direction_category",
+        ],
+        kind="stable",
+    )
+
+    groups = (
+        rows[
+            [
+                "field_name",
+                "edit_intensity_category",
+            ]
+        ]
+        .drop_duplicates()
+        .to_dict(orient="records")
+    )
+    group_labels = [
+        _edit_intensity_group_label(
+            field_name=row["field_name"],
+            edit_intensity_category=row["edit_intensity_category"],
+        )
+        for row in groups
+    ]
+    rows_by_key = {
+        (
+            str(row["field_name"]),
+            str(row["edit_intensity_category"]),
+            str(row["readability_direction_category"]),
+        ): row
+        for row in rows.to_dict(orient="records")
+    }
+    figure = go.Figure()
+
+    for direction in _CONSENSUS_DIRECTION_ORDER:
+        percentages: list[float] = []
+        customdata: list[list[object]] = []
+
+        for group in groups:
+            field_name = str(group["field_name"])
+            intensity = str(group["edit_intensity_category"])
+            row = rows_by_key.get(
+                (
+                    field_name,
+                    intensity,
+                    direction,
+                )
+            )
+
+            if row is None:
+                percentages.append(0.0)
+                customdata.append(
+                    [
+                        0,
+                        0,
+                        None,
+                        None,
+                        None,
+                        "No aggregate row for this direction",
+                    ]
+                )
+                continue
+
+            percentage = row["percentage_within_edit_intensity_category"]
+            percentages.append(float(percentage) if not pd.isna(percentage) else 0.0)
+            customdata.append(
+                [
+                    int(row["completed_ai_attempt_count"]),
+                    int(row["completed_ai_attempt_count_with_selected_final_pair"]),
+                    (float(percentage) if not pd.isna(percentage) else None),
+                    (
+                        float(
+                            row[
+                                "median_flesch_kincaid_grade_change_"
+                                "final_minus_selected"
+                            ]
+                        )
+                        if not pd.isna(
+                            row[
+                                "median_flesch_kincaid_grade_change_"
+                                "final_minus_selected"
+                            ]
+                        )
+                        else None
+                    ),
+                    (
+                        float(row["median_consensus_grade_level_change"])
+                        if not pd.isna(row["median_consensus_grade_level_change"])
+                        else None
+                    ),
+                    str(row["edit_intensity_threshold_scheme_name"]),
+                ]
+            )
+
+        figure.add_bar(
+            name=_CONSENSUS_DIRECTION_LABELS[direction],
+            x=group_labels,
+            y=percentages,
+            customdata=customdata,
+            hovertemplate=(
+                "Field and edit intensity: %{x}<br>"
+                "Readability direction: %{fullData.name}<br>"
+                "Percentage within edit intensity: %{y:.1f}%<br>"
+                "Completed AI field population: %{customdata[0]}<br>"
+                "Paired selected-final attempts in direction: "
+                "%{customdata[1]}<br>"
+                "Published percentage: %{customdata[2]:.1f}%<br>"
+                "Median Flesch-Kincaid final minus selected: "
+                "%{customdata[3]:.2f}<br>"
+                "Median consensus direction value: "
+                "%{customdata[4]:.2f}<br>"
+                "Edit-intensity scheme: %{customdata[5]}"
+                "<extra></extra>"
+            ),
+        )
+
+    figure.update_layout(
+        title="Edit intensity and consensus grade-level direction",
+        template="plotly_white",
+        barmode="stack",
+        xaxis_title="Study-posting field and edit-intensity category",
+        yaxis_title="Percentage within edit-intensity category",
+        legend_title_text="Consensus grade-level direction",
+    )
+
+    return figure
+
+
 def build_content_source_concordance_chart(
     content_source_matrix: pd.DataFrame,
 ) -> go.Figure:
@@ -2212,6 +2442,11 @@ def build_exploration_charts(
         selected_vs_unselected_readability=(
             build_selected_vs_unselected_readability_chart(
                 inputs.selected_vs_unselected_readability_summary
+            )
+        ),
+        edit_readability_relationship=(
+            build_edit_readability_relationship_chart(
+                inputs.field_edit_readability_cross_summary
             )
         ),
         content_source_concordance=build_content_source_concordance_chart(

@@ -178,6 +178,8 @@ aggregate analysis tables. It currently includes:
 - selected-to-final Flesch-Kincaid direction by field;
 - observed final Flesch-Kincaid grade bands by field and mode;
 - selected versus mean-unselected Flesch-Kincaid differences;
+- edit-intensity and consensus grade-level direction relationships using
+  aggregate attempt-and-field percentages;
 - attempt outcomes by authoring mode;
 - study-information-page and total-attempt timing distributions by authoring
   mode, including medians, interquartile ranges, 90th percentiles, and missing
@@ -231,6 +233,16 @@ observed minimum-to-maximum ranges because the current aggregate contract does
 not publish study-level quartiles. Long elapsed times can include pauses or
 work outside the application and do not establish author effort, efficiency,
 quality, or a causal effect of authoring mode.
+
+The edit-intensity/readability chart uses
+`field_edit_readability_cross_summary.csv` only. It shows consensus
+grade-level direction percentages within each field and operational
+edit-intensity category. The denominator is every completed AI
+attempt-and-field row in that edit-intensity category, while only rows with
+selected-and-final readability pairs contribute to a direction.
+`EDITED_UNCLASSIFIED` remains distinct from `REPLACED`. The exploratory
+edit-intensity scheme and readability directions do not establish writing
+quality, comprehension, accessibility, usefulness, or causal benefit.
 
 The report embeds its Plotly JavaScript and does not require an external script
 service. It does not contain usernames, audit IDs, study numbers, source

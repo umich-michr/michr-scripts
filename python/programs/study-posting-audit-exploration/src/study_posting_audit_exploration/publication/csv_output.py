@@ -290,6 +290,9 @@ def _write_staging_output(
             selected_vs_unselected_readability_summary=(
                 tables.readability.selected_vs_unselected_readability_summary
             ),
+            field_edit_readability_cross_summary=(
+                tables.readability.field_edit_readability_cross_summary
+            ),
             content_source_matrix=(tables.attempts.content_source_concordance_matrix),
         )
     )
