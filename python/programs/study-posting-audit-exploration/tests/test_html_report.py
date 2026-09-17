@@ -632,6 +632,13 @@ def test_html_report_explains_readability_indicators() -> None:
     assert "Selected-to-final Flesch-Kincaid direction by field" in html
     assert "Observed final Flesch-Kincaid grade bands" in html
     assert "Selected versus mean-unselected Flesch-Kincaid difference" in html
+    assert "Selected versus unselected suggestions" in html
+    assert "exactly one selected suggestion" in normalized_html
+    assert "at least one unselected suggestion" in normalized_html
+    assert "usable readability values for both" in normalized_html
+    assert "An omitted field means no observations met" in normalized_html
+    assert "does not mean the field was absent from the audit" in normalized_html
+    assert "comparable-attempt count in hover text" in normalized_html
     assert "final minus selected" in normalized_html
     assert (
         "Lower or higher formula values are not automatically better" in normalized_html

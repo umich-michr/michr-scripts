@@ -286,6 +286,21 @@ _TEMPLATE = """<!doctype html>
   </p>
   <div class="chart">{{ readability_change_direction_html | safe }}</div>
   <div class="chart">{{ final_grade_bands_html | safe }}</div>
+  <h3>Selected versus unselected suggestions</h3>
+  <p>
+    This comparison uses completed AI attempts only. A field appears only when
+    at least one attempt has exactly one selected suggestion, at least one
+    unselected suggestion, and usable readability values for both. For each
+    eligible attempt, the selected suggestion is compared with the mean of its
+    unselected suggestions.
+  </p>
+  <p class="caution">
+    An omitted field means no observations met all comparison requirements. It
+    does not mean the field was absent from the audit, lacked final text, lacked
+    AI suggestions, or was excluded from other readability analyses. Always
+    check the comparable-attempt count in hover text; different fields can have
+    different eligible sample sizes.
+  </p>
   <div class="chart">
     {{ selected_vs_unselected_readability_html | safe }}
   </div>

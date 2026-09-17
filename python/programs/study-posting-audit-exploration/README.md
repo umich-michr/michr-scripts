@@ -223,6 +223,15 @@ observed nonblank final texts. Titles carry a short-text reliability
 caution. Readability formulas do not establish comprehension, accuracy,
 accessibility, usefulness, cultural appropriateness, or ethical adequacy.
 
+The selected-versus-unselected comparison has a narrower completed-AI
+population than final-text charts. A field appears only when an attempt has
+exactly one selected suggestion, at least one unselected suggestion, and usable
+readability values for both. For each eligible attempt, the selected suggestion
+is compared with the mean of its unselected suggestions. An omitted field means
+no observations met every comparison requirement; it does not mean the field
+was absent from the audit, lacked final text, or was omitted from other
+readability analyses. Comparable-attempt counts are included in hover text.
+
 The workflow-timing section separates study-information-page time from total
 attempt time. It shows medians with 25th-to-75th-percentile error bars and
 reports 90th percentiles and missing counts in hover text. The HTML does not
