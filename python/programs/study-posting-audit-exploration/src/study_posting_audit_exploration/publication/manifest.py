@@ -38,6 +38,7 @@ def write_manifest(
 ) -> None:
     """Write the minimal deterministic-shape analysis manifest."""
     histories = tables.histories
+    quality_tables = tables.quality
     overview_tables = tables.overview
     attempt_tables = tables.attempts
     study_tables = tables.studies
@@ -66,6 +67,9 @@ def write_manifest(
         },
         "research_row_counts": {
             "candidate_research_questions": len(candidate_questions),
+        },
+        "quality_analysis_row_counts": {
+            "data_quality_summary": len(quality_tables.data_quality_summary),
         },
         "analysis_audit_record_row_counts": {
             "study_attempt_author_history": len(histories.study_attempt_author_history),
@@ -143,7 +147,12 @@ def write_manifest(
         "output_file_count": output_file_count,
         "edit_intensity_threshold_scheme": (config.edit_intensity_threshold_scheme),
         "readability_unchanged_tolerance": (config.readability_unchanged_tolerance),
-        "warning_count": len(study_tables.appointment_quality_findings),
+        "warning_count": int(
+            quality_tables.data_quality_summary.loc[
+                quality_tables.data_quality_summary["severity_level"].eq("WARNING"),
+                "affected_attempt_count",
+            ].sum()
+        ),
     }
     path.write_text(
         json.dumps(

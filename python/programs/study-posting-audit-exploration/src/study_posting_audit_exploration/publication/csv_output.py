@@ -41,6 +41,7 @@ from study_posting_audit_exploration.research import (
 _REPORT_FILENAME = "report.html"
 
 _DEFINITIONS_DIRECTORY = "definitions"
+_QUALITY_DIRECTORY = "quality"
 _ANALYSIS_AUDIT_DIRECTORY = "analysis-audit-records"
 _OVERVIEW_DIRECTORY = "overview"
 _ATTEMPTS_DIRECTORY = "attempts"
@@ -51,6 +52,7 @@ _READABILITY_DIRECTORY = "readability"
 _RESEARCH_DIRECTORY = "research"
 
 _METRIC_DEFINITIONS_FILENAME = "metric_definitions.csv"
+_DATA_QUALITY_SUMMARY_FILENAME = "data_quality_summary.csv"
 
 _STUDY_ATTEMPT_AUTHOR_HISTORY_FILENAME = "study_attempt_author_history.csv"
 _STUDY_ATTEMPT_HISTORY_FILENAME = "study_attempt_history.csv"
@@ -92,7 +94,7 @@ _FINAL_TEXT_METRIC_SUMMARY_FILENAME = "final_text_metric_summary.csv"
 
 _CANDIDATE_RESEARCH_QUESTIONS_FILENAME = "candidate_research_questions.csv"
 
-_OUTPUT_FILE_COUNT = 29
+_OUTPUT_FILE_COUNT = 30
 
 
 def _write_frame(
@@ -121,6 +123,7 @@ def _output_frames(
     staging_directory: Path,
 ) -> tuple[tuple[pd.DataFrame, Path], ...]:
     """Return every DataFrame and stable staging path."""
+    quality_directory = staging_directory / _QUALITY_DIRECTORY
     audit_directory = staging_directory / _ANALYSIS_AUDIT_DIRECTORY
     overview_directory = staging_directory / _OVERVIEW_DIRECTORY
     attempts_directory = staging_directory / _ATTEMPTS_DIRECTORY
@@ -130,6 +133,10 @@ def _output_frames(
     readability_directory = staging_directory / _READABILITY_DIRECTORY
 
     return (
+        (
+            tables.quality.data_quality_summary,
+            quality_directory / _DATA_QUALITY_SUMMARY_FILENAME,
+        ),
         (
             tables.histories.study_attempt_author_history,
             audit_directory / _STUDY_ATTEMPT_AUTHOR_HISTORY_FILENAME,
@@ -244,6 +251,7 @@ def _write_staging_output(
     """Write all current exploration files into one staging directory."""
     for directory_name in (
         _DEFINITIONS_DIRECTORY,
+        _QUALITY_DIRECTORY,
         _ANALYSIS_AUDIT_DIRECTORY,
         _OVERVIEW_DIRECTORY,
         _ATTEMPTS_DIRECTORY,
@@ -349,6 +357,7 @@ def _publication_result(
 ) -> ExplorationPublication:
     """Return stable paths for a successfully published exploration."""
     definitions_directory = destination / _DEFINITIONS_DIRECTORY
+    quality_directory = destination / _QUALITY_DIRECTORY
     audit_directory = destination / _ANALYSIS_AUDIT_DIRECTORY
     overview_directory = destination / _OVERVIEW_DIRECTORY
     attempts_directory = destination / _ATTEMPTS_DIRECTORY
@@ -363,6 +372,7 @@ def _publication_result(
         manifest_path=destination / manifest_filename(),
         report_path=destination / _REPORT_FILENAME,
         metric_definitions_path=(definitions_directory / _METRIC_DEFINITIONS_FILENAME),
+        data_quality_summary_path=(quality_directory / _DATA_QUALITY_SUMMARY_FILENAME),
         study_attempt_author_history_path=(
             audit_directory / _STUDY_ATTEMPT_AUTHOR_HISTORY_FILENAME
         ),

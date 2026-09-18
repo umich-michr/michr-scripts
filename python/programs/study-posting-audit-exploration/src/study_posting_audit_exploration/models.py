@@ -63,6 +63,13 @@ class AttemptHistoryTables:
 
 
 @dataclass(frozen=True, slots=True)
+class QualityAnalysisTables:
+    """Identifier-free data-quality summary."""
+
+    data_quality_summary: pd.DataFrame
+
+
+@dataclass(frozen=True, slots=True)
 class OverviewTables:
     """Faculty-facing overview and attempt-history aggregate tables."""
 
@@ -126,6 +133,7 @@ class ExplorationAnalysisTables:
     """All derived and aggregate tables published by one analysis run."""
 
     histories: AttemptHistoryTables
+    quality: QualityAnalysisTables
     overview: OverviewTables
     attempts: AttemptAnalysisTables
     studies: StudyAnalysisTables
@@ -142,6 +150,7 @@ class ExplorationPublication:
     manifest_path: Path
     report_path: Path
     metric_definitions_path: Path
+    data_quality_summary_path: Path
     study_attempt_author_history_path: Path
     study_attempt_history_path: Path
     author_history_path: Path

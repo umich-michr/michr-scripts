@@ -71,14 +71,22 @@ from study_posting_audit_exploration.aggregation.suggestions import (
 from study_posting_audit_exploration.models import (
     AppointmentQualityFinding,
     AttemptAnalysisTables,
+    AttemptHistoryTables,
     AuthorAnalysisTables,
     FieldAnalysisTables,
+    LoadedAuditReport,
     OverviewTables,
+    QualityAnalysisTables,
     ReadabilityAnalysisTables,
     StudyAnalysisTables,
 )
+from study_posting_audit_exploration.quality import (
+    DATA_QUALITY_SUMMARY_COLUMNS,
+    build_data_quality_summary,
+)
 
 AGGREGATE_OUTPUT_COLUMNS: dict[str, tuple[str, ...]] = {
+    "quality/data_quality_summary.csv": DATA_QUALITY_SUMMARY_COLUMNS,
     "overview/overview_summary.csv": OVERVIEW_COLUMNS,
     "overview/study_attempt_history_summary.csv": (STUDY_ATTEMPT_HISTORY_COLUMNS),
     "overview/author_handoff_summary.csv": AUTHOR_HANDOFF_COLUMNS,
@@ -116,6 +124,25 @@ AGGREGATE_OUTPUT_COLUMNS: dict[str, tuple[str, ...]] = {
     ),
     "readability/final_text_metric_summary.csv": FINAL_TEXT_METRIC_COLUMNS,
 }
+
+
+def build_quality_analysis_tables(
+    *,
+    report: LoadedAuditReport,
+    histories: AttemptHistoryTables,
+    appointment_quality_findings: tuple[
+        AppointmentQualityFinding,
+        ...,
+    ] = (),
+) -> QualityAnalysisTables:
+    """Build identifier-free quality analysis tables."""
+    return QualityAnalysisTables(
+        data_quality_summary=build_data_quality_summary(
+            report=report,
+            histories=histories,
+            appointment_quality_findings=appointment_quality_findings,
+        )
+    )
 
 
 def build_overview_tables(
@@ -262,10 +289,12 @@ def build_readability_analysis_tables(
 __all__ = [
     "AGGREGATE_OUTPUT_COLUMNS",
     "COMPLETED_STUDY_AUTHOR_CONTEXT_COLUMNS",
+    "DATA_QUALITY_SUMMARY_COLUMNS",
     "AttemptAnalysisTables",
     "AuthorAnalysisTables",
     "FieldAnalysisTables",
     "OverviewTables",
+    "QualityAnalysisTables",
     "ReadabilityAnalysisTables",
     "StudyAnalysisTables",
     "build_attempt_analysis_tables",
@@ -289,6 +318,7 @@ __all__ = [
     "build_nontext_field_adoption_summary",
     "build_overview_summary",
     "build_overview_tables",
+    "build_quality_analysis_tables",
     "build_readability_analysis_tables",
     "build_selected_vs_unselected_readability_summary",
     "build_study_analysis_tables",

@@ -101,8 +101,8 @@ days, and login-history span as of the report query.
 
 ## Current output
 
-A successful `analyze` run publishes 29 files: `report.html`, one JSON
-manifest, and 27 CSV files.
+A successful `analyze` run publishes 30 files: `report.html`, one JSON
+manifest, and 28 CSV files.
 
 ~~~~text
 exploration/
@@ -110,6 +110,8 @@ exploration/
 ├── analysis_manifest.json
 ├── definitions/
 │   └── metric_definitions.csv
+├── quality/
+│   └── data_quality_summary.csv
 ├── analysis-audit-records/
 │   ├── study_attempt_author_history.csv
 │   ├── study_attempt_history.csv
@@ -145,6 +147,36 @@ exploration/
 └── research/
     └── candidate_research_questions.csv
 ~~~~
+
+### Data quality
+
+`quality/data_quality_summary.csv` is an identifier-free checklist of source
+and derived quality conditions. It reports:
+
+- the stable quality-check name and severity;
+- affected attempt, distinct-study, and distinct-author counts;
+- the eligible attempt denominator and affected percentage;
+- a plain-language check definition;
+- the consequence for analysis.
+
+Checks marked `FATAL` are enforced before publication. Therefore, their
+published affected counts are zero after a successful run; detection would
+instead stop validation and prevent publication. These rows document the
+guarantees that a successful analysis has already passed.
+
+Checks marked `WARNING` may be nonzero in a successful run. Current warning
+checks cover attempts after a study's unique completion, `CREATED_BY_ID`
+variation within a study, and malformed appointment entries. Warning rows make
+these retained conditions visible without exposing audit IDs, study numbers, or
+usernames.
+
+`affected_attempt_percentage` is the affected-attempt count divided by the
+check's explicit eligible-attempt population. A missing percentage means the
+eligible denominator is zero.
+
+The manifest's `warning_count` is the sum of affected-attempt counts across
+warning checks. It is a warning-occurrence total, not a distinct-attempt count;
+one attempt affected by multiple warning checks can contribute more than once.
 
 ### Metric definitions
 
@@ -484,12 +516,13 @@ inferential, or individual-level conclusions.
 - source row counts;
 - the metric-definition row count;
 - the candidate-research-question row count;
-- published analysis row counts, including the completed-study author
-  context summary;
+- published analysis row counts, including the data-quality and
+  completed-study author-context summaries;
 - output file count;
 - configured edit-intensity scheme;
 - readability tolerance;
-- warning count.
+- warning-occurrence count, calculated as the sum of affected-attempt
+  counts across warning checks.
 
 The manifest contains no source payload text.
 

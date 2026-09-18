@@ -21,6 +21,7 @@ METRIC_DEFINITION_COLUMNS: tuple[str, ...] = (
 )
 
 AGGREGATE_FILE_ORDER: tuple[str, ...] = (
+    "quality/data_quality_summary.csv",
     "overview/overview_summary.csv",
     "overview/study_attempt_history_summary.csv",
     "overview/author_handoff_summary.csv",
@@ -105,6 +106,7 @@ _UNIT_RULES: tuple[tuple[str, str], ...] = (
 )
 
 _FILE_ANALYTICAL_UNITS: tuple[tuple[str, str], ...] = (
+    ("quality/", "quality check"),
     ("overview/overview_summary", "overview metric"),
     ("overview/study_attempt", "study"),
     ("overview/author_handoff", "study"),
