@@ -331,7 +331,7 @@ security guidance.
 ## End-to-end audit exploration workflows
 
 The root Makefile can regenerate a normalized audit report, publish its
-30-file exploration, print the deterministic data-quality summary, and open the
+31-file exploration, print the deterministic data-quality summary, and open the
 faculty-facing HTML report.
 
 ### Database source

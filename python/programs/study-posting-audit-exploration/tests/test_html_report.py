@@ -946,7 +946,7 @@ def test_html_report_displays_aggregate_data_quality() -> None:
     assert "Data quality" in html
     assert "Fatal validation checks passed" in normalized_html
     assert "13 of 13" in normalized_html
-    assert "Warning checks with affected attempts" in normalized_html
+    assert "Warning categories detected" in normalized_html
     assert "1 of 3" in normalized_html
     assert "Warning occurrences" in normalized_html
     assert "Malformed Appointment" in normalized_html
@@ -972,7 +972,7 @@ def test_html_report_displays_no_warning_state() -> None:
     )
     normalized_html = " ".join(html.split())
 
-    assert "Warning checks with affected attempts" in normalized_html
+    assert "Warning categories detected" in normalized_html
     assert "0 of 3" in normalized_html
     assert "No warning checks affected attempts in this run." in normalized_html
     assert "No malformed appointment entries affected attempts." in normalized_html

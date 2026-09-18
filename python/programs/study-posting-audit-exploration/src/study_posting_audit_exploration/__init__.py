@@ -101,6 +101,10 @@ from study_posting_audit_exploration.quality import (
     DATA_QUALITY_SUMMARY_COLUMNS,
     build_data_quality_summary,
 )
+from study_posting_audit_exploration.quality_findings import (
+    DATA_QUALITY_FINDING_COLUMNS,
+    build_data_quality_findings,
+)
 from study_posting_audit_exploration.quality_summary import (
     PublishedQualityCheck,
     PublishedQualitySummary,
@@ -122,6 +126,7 @@ __all__ = [
     "AGGREGATE_OUTPUT_COLUMNS",
     "CANDIDATE_RESEARCH_QUESTION_COLUMNS",
     "COMPLETED_STUDY_AUTHOR_CONTEXT_COLUMNS",
+    "DATA_QUALITY_FINDING_COLUMNS",
     "DATA_QUALITY_SUMMARY_COLUMNS",
     "EDIT_INTENSITY_THRESHOLD_SCHEME",
     "METRIC_DEFINITION_COLUMNS",
@@ -168,6 +173,7 @@ __all__ = [
     "build_content_source_concordance_matrix",
     "build_content_source_concordance_summary",
     "build_current_author_experience_summary",
+    "build_data_quality_findings",
     "build_data_quality_summary",
     "build_edit_readability_relationship_chart",
     "build_exploration_charts",

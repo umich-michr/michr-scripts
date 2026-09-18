@@ -112,6 +112,7 @@ def _expected_paths(
         "report": output_directory / "report.html",
         "definitions": (output_directory / "definitions" / "metric_definitions.csv"),
         "quality": quality_directory / "data_quality_summary.csv",
+        "quality_findings": (audit_directory / "data_quality_findings.csv"),
         "completed_study_context": (
             studies_directory / "completed_study_author_context_summary.csv"
         ),
@@ -145,6 +146,7 @@ def _assert_manifest(manifest: dict[str, object]) -> None:
     assert isinstance(readability_counts, dict)
 
     assert quality_counts["data_quality_summary"] == 16
+    assert "data_quality_findings" in audit_counts
     assert audit_counts["completed_ai_field_analysis"] > 0
     assert audit_counts["completed_ai_readability_pairs"] > 0
     assert study_counts["completed_study_author_context_summary"] > 0
@@ -159,7 +161,7 @@ def _assert_manifest(manifest: dict[str, object]) -> None:
 
     assert isinstance(research_counts, dict)
     assert research_counts["candidate_research_questions"] == 14
-    assert manifest["output_file_count"] == 30
+    assert manifest["output_file_count"] == 31
     assert manifest["warning_count"] == 0
 
 
@@ -176,6 +178,7 @@ def _assert_cli_paths_printed(
         f"HTML report: {paths['report']}",
         f"Metric definitions CSV: {paths['definitions']}",
         f"Data quality summary CSV: {paths['quality']}",
+        f"Data quality findings CSV: {paths['quality_findings']}",
         (
             "Completed study author context summary CSV: "
             f"{paths['completed_study_context']}"
@@ -195,7 +198,7 @@ def _assert_cli_paths_printed(
         f"Field edit/readability cross summary CSV: {paths['cross']}",
         f"Final text metric summary CSV: {paths['final_metric']}",
         f"Candidate research questions CSV: {paths['research_questions']}",
-        "Published files: 30",
+        "Published files: 31",
     )
 
     for expected_line in expected_lines:
@@ -373,7 +376,7 @@ def test_summarize_quality_prints_published_quality(
     assert error_output.getvalue() == ""
     assert "Data-quality summary" in output.getvalue()
     assert "Fatal validation checks passed: 13 of 13" in output.getvalue()
-    assert "Warning checks with affected attempts: 0 of 3" in output.getvalue()
+    assert "Warning categories detected: 0 of 3" in output.getvalue()
 
 
 def test_summarize_quality_fail_on_warning_returns_three(

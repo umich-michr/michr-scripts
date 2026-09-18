@@ -180,7 +180,7 @@ _TEMPLATE = """<!doctype html>
         </p>
       </article>
       <article class="quality-card">
-        <p>Warning checks with affected attempts</p>
+        <p>Warning categories detected</p>
         <p class="quality-value">
           {{ quality_affected_warning_count }} of {{ quality_warning_total }}
         </p>
@@ -210,7 +210,7 @@ _TEMPLATE = """<!doctype html>
     <p>No warning checks affected attempts in this run.</p>
     {% endif %}
 
-    <h3>Warning checks with no affected attempts</h3>
+    <h3>Warning categories not detected</h3>
     <ul>
       {% for message in quality_zero_warning_messages %}
       <li>{{ message }}</li>

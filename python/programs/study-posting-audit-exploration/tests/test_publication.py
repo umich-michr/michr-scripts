@@ -163,17 +163,12 @@ def _analysis_tables(
         completed_ai_fields,
     )
 
-    all_findings = (
-        *findings,
-        *attempt_findings,
-    )
-
     return ExplorationAnalysisTables(
         histories=histories,
         quality=build_quality_analysis_tables(
             report=report,
             histories=histories,
-            appointment_quality_findings=all_findings,
+            appointment_quality_findings=attempt_findings,
         ),
         overview=build_overview_tables(
             attempts=attempts,
@@ -185,7 +180,7 @@ def _analysis_tables(
             studies,
             study_attempt_author_history=(histories.study_attempt_author_history),
             appointments=study_appointments,
-            appointment_quality_findings=all_findings,
+            appointment_quality_findings=findings,
         ),
         authors=build_author_analysis_tables(
             attempts=attempts,
@@ -230,6 +225,7 @@ def _publication_paths(
         publication.report_path,
         publication.metric_definitions_path,
         publication.data_quality_summary_path,
+        publication.data_quality_findings_path,
         publication.study_attempt_author_history_path,
         publication.study_attempt_history_path,
         publication.author_history_path,
@@ -264,6 +260,7 @@ def _assert_derived_outputs(
 ) -> None:
     """Assert derived CSV content and privacy boundaries."""
     quality_summary = read_published_csv(publication.data_quality_summary_path)
+    quality_findings = read_published_csv(publication.data_quality_findings_path)
     completed_fields = read_published_csv(publication.completed_ai_field_analysis_path)
     readability_pairs = read_published_csv(
         publication.completed_ai_readability_pairs_path
@@ -298,6 +295,18 @@ def _assert_derived_outputs(
     ):
         assert forbidden_column not in completed_fields.columns
         assert forbidden_column not in readability_pairs.columns
+
+    assert tuple(quality_findings.columns) == (
+        "data_quality_check_name",
+        "severity_level",
+        "audit_record_id",
+        "study_num",
+        "attempt_author_user_name",
+        "finding_source",
+        "finding_position",
+        "finding_detail_code",
+        "analysis_consequence",
+    )
 
     assert tuple(quality_summary.columns) == (
         "data_quality_check_name",
@@ -359,7 +368,7 @@ def test_publish_exploration_writes_atomic_html_output(
     )
 
     assert publication.output_directory == output_directory
-    assert publication.output_file_count == 30
+    assert publication.output_file_count == 31
 
     for path in _publication_paths(publication):
         assert path.is_file()
@@ -375,7 +384,7 @@ def test_publish_exploration_writes_atomic_html_output(
     }
 
     assert published_inventory == expected_inventory
-    assert len(published_inventory) == 30
+    assert len(published_inventory) == 31
 
     assert list(tmp_path.glob(".exploration.*")) == []
 
@@ -414,6 +423,9 @@ def test_manifest_contains_readability_analysis_counts(
     manifest = json.loads(publication.manifest_path.read_text(encoding="utf-8"))
 
     assert manifest["quality_analysis_row_counts"]["data_quality_summary"] == 16
+    assert manifest["analysis_audit_record_row_counts"]["data_quality_findings"] == len(
+        read_published_csv(publication.data_quality_findings_path)
+    )
     assert (
         manifest["analysis_audit_record_row_counts"]["completed_ai_field_analysis"] > 0
     )
@@ -438,7 +450,7 @@ def test_manifest_contains_readability_analysis_counts(
     assert manifest["readability_analysis_row_counts"]["final_text_metric_summary"] > 0
     assert manifest["definition_row_counts"]["metric_definitions"] > 0
     assert manifest["research_row_counts"]["candidate_research_questions"] == 14
-    assert manifest["output_file_count"] == 30
+    assert manifest["output_file_count"] == 31
     assert manifest["warning_count"] == 0
     assert manifest_filename() == "analysis_manifest.json"
 

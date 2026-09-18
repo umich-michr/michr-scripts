@@ -259,17 +259,12 @@ def _analysis_tables(
         completed_ai_fields,
     )
 
-    all_appointment_findings = (
-        *appointment_findings,
-        *attempt_appointment_findings,
-    )
-
     return ExplorationAnalysisTables(
         histories=histories,
         quality=build_quality_analysis_tables(
             report=report,
             histories=histories,
-            appointment_quality_findings=all_appointment_findings,
+            appointment_quality_findings=attempt_appointment_findings,
         ),
         overview=build_overview_tables(
             attempts=attempts,
@@ -281,7 +276,7 @@ def _analysis_tables(
             studies,
             study_attempt_author_history=(histories.study_attempt_author_history),
             appointments=study_appointments,
-            appointment_quality_findings=all_appointment_findings,
+            appointment_quality_findings=appointment_findings,
         ),
         authors=build_author_analysis_tables(
             attempts=attempts,
@@ -337,6 +332,10 @@ def _print_publication(
         ("HTML report", published.report_path),
         ("Metric definitions CSV", published.metric_definitions_path),
         ("Data quality summary CSV", published.data_quality_summary_path),
+        (
+            "Data quality findings CSV",
+            published.data_quality_findings_path,
+        ),
         (
             "Completed study author context summary CSV",
             published.completed_study_author_context_summary_path,

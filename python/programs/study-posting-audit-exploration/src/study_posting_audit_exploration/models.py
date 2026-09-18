@@ -64,9 +64,10 @@ class AttemptHistoryTables:
 
 @dataclass(frozen=True, slots=True)
 class QualityAnalysisTables:
-    """Identifier-free data-quality summary."""
+    """Aggregate quality summary and restricted internal findings."""
 
     data_quality_summary: pd.DataFrame
+    data_quality_findings: pd.DataFrame
 
 
 @dataclass(frozen=True, slots=True)
@@ -151,6 +152,7 @@ class ExplorationPublication:
     report_path: Path
     metric_definitions_path: Path
     data_quality_summary_path: Path
+    data_quality_findings_path: Path
     study_attempt_author_history_path: Path
     study_attempt_history_path: Path
     author_history_path: Path

@@ -6,8 +6,10 @@ import pandas as pd
 
 from study_posting_audit_exploration.models import AppointmentQualityFinding
 
-_APPOINTMENT_SEPARATOR = re.compile(r",\s+")
+_APPOINTMENT_RECORD_SEPARATOR = "~|APPOINTMENT|~"
+_LEGACY_APPOINTMENT_SEPARATOR = re.compile(r",\s+")
 _APPOINTMENT_PART_COUNT = 3
+_APPOINTMENT_SEPARATOR_COUNT = _APPOINTMENT_PART_COUNT - 1
 
 _APPOINTMENT_OUTPUT_COLUMNS: tuple[str, ...] = (
     "audit_record_id",
@@ -29,7 +31,18 @@ def _split_appointments(value: object) -> tuple[str, ...]:
     if not isinstance(value, str) or not value.strip():
         return ()
 
-    return tuple(_APPOINTMENT_SEPARATOR.split(value))
+    if _APPOINTMENT_RECORD_SEPARATOR in value:
+        return tuple(
+            part for part in value.split(_APPOINTMENT_RECORD_SEPARATOR) if part.strip()
+        )
+
+    if (
+        value.count(":") == _APPOINTMENT_SEPARATOR_COUNT
+        and _parse_appointment(value) is not None
+    ):
+        return (value,)
+
+    return tuple(_LEGACY_APPOINTMENT_SEPARATOR.split(value))
 
 
 def _parse_appointment(

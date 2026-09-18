@@ -173,46 +173,54 @@ WITH
            ) >= s.segment_start_dt
  ),
  attempt_author_appointments AS (
-     SELECT spa.id AS study_posting_audit_id,
-     RTRIM(
-         XMLCAST(
-             XMLAGG(
-                 XMLELEMENT(e,
-                     nvl(hj.title,'Unknown')||':'||nvl(hj.department,'Unknown')||':'||nvl(hj.school,'Unknown')||', '
-                 )
-                 ORDER BY hj.primary_appointment DESC, hj.title
-             ) AS CLOB
-         ),
-         ', '
-     ) AS current_appointments
-     FROM study_posting_audit spa
-     JOIN hr_jobs hj
-       ON 'shib:' || hj.email = spa.user_name
-      AND spa.start_time BETWEEN hj.job_effective_date AND hj.job_end_date
-     GROUP BY spa.id
- ),
+    SELECT
+        spa.id AS study_posting_audit_id,
+        LISTAGG(
+            NVL(hj.title, 'Unknown')
+            || ':'
+            || NVL(hj.department, 'Unknown')
+            || ':'
+            || NVL(hj.school, 'Unknown'),
+            '~|APPOINTMENT|~'
+        ) WITHIN GROUP (
+            ORDER BY
+                hj.primary_appointment DESC,
+                hj.title
+        ) AS current_appointments
+    FROM study_posting_audit spa
+    JOIN hr_jobs hj
+      ON 'shib:' || hj.email = spa.user_name
+     AND spa.start_time BETWEEN
+         hj.job_effective_date
+         AND hj.job_end_date
+    GROUP BY spa.id
+),
  attempt_pi_appointments AS (
-     SELECT spa.id AS study_posting_audit_id,
-     RTRIM(
-         XMLCAST(
-             XMLAGG(
-                 XMLELEMENT(e,
-                     nvl(hj.title,'Unknown')||':'||nvl(hj.department,'Unknown')||':'||nvl(hj.school,'Unknown')||', '
-                 )
-                 ORDER BY hj.primary_appointment DESC, hj.title
-             ) AS CLOB
-         ),
-         ', '
-     ) AS current_appointments
-     FROM study_posting_audit spa
-     JOIN v_eres_study_team_member vestm
-       ON vestm.imported_study_id = spa.study_num
-      AND vestm.role = 'PI'
-     JOIN hr_jobs hj
-       ON hj.email = vestm.imported_team_member_user_name
-      AND spa.start_time BETWEEN hj.job_effective_date AND hj.job_end_date
-     GROUP BY spa.id
- ),
+    SELECT
+        spa.id AS study_posting_audit_id,
+        LISTAGG(
+            NVL(hj.title, 'Unknown')
+            || ':'
+            || NVL(hj.department, 'Unknown')
+            || ':'
+            || NVL(hj.school, 'Unknown'),
+            '~|APPOINTMENT|~'
+        ) WITHIN GROUP (
+            ORDER BY
+                hj.primary_appointment DESC,
+                hj.title
+        ) AS current_appointments
+    FROM study_posting_audit spa
+    JOIN v_eres_study_team_member vestm
+      ON vestm.imported_study_id = spa.study_num
+     AND vestm.role = 'PI'
+    JOIN hr_jobs hj
+      ON hj.email = vestm.imported_team_member_user_name
+     AND spa.start_time BETWEEN
+         hj.job_effective_date
+         AND hj.job_end_date
+    GROUP BY spa.id
+),
  all_logins AS (
      SELECT la.user_id, la.user_name, la.successful_login_time login_time
        FROM login_audit la, study_posting_audit spa

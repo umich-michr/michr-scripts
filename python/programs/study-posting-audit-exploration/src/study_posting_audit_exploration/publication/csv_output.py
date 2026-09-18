@@ -54,6 +54,7 @@ _RESEARCH_DIRECTORY = "research"
 _METRIC_DEFINITIONS_FILENAME = "metric_definitions.csv"
 _DATA_QUALITY_SUMMARY_FILENAME = "data_quality_summary.csv"
 
+_DATA_QUALITY_FINDINGS_FILENAME = "data_quality_findings.csv"
 _STUDY_ATTEMPT_AUTHOR_HISTORY_FILENAME = "study_attempt_author_history.csv"
 _STUDY_ATTEMPT_HISTORY_FILENAME = "study_attempt_history.csv"
 _AUTHOR_HISTORY_FILENAME = "author_history.csv"
@@ -94,7 +95,7 @@ _FINAL_TEXT_METRIC_SUMMARY_FILENAME = "final_text_metric_summary.csv"
 
 _CANDIDATE_RESEARCH_QUESTIONS_FILENAME = "candidate_research_questions.csv"
 
-_OUTPUT_FILE_COUNT = 30
+_OUTPUT_FILE_COUNT = 31
 
 
 def _write_frame(
@@ -136,6 +137,10 @@ def _output_frames(
         (
             tables.quality.data_quality_summary,
             quality_directory / _DATA_QUALITY_SUMMARY_FILENAME,
+        ),
+        (
+            tables.quality.data_quality_findings,
+            audit_directory / _DATA_QUALITY_FINDINGS_FILENAME,
         ),
         (
             tables.histories.study_attempt_author_history,
@@ -374,6 +379,7 @@ def _publication_result(
         report_path=destination / _REPORT_FILENAME,
         metric_definitions_path=(definitions_directory / _METRIC_DEFINITIONS_FILENAME),
         data_quality_summary_path=(quality_directory / _DATA_QUALITY_SUMMARY_FILENAME),
+        data_quality_findings_path=(audit_directory / _DATA_QUALITY_FINDINGS_FILENAME),
         study_attempt_author_history_path=(
             audit_directory / _STUDY_ATTEMPT_AUTHOR_HISTORY_FILENAME
         ),

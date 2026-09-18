@@ -23,7 +23,7 @@ def test_derive_appointments_parses_author_and_pi_values(
 ) -> None:
     records = loaded_records(valid_report_directory)
     records.loc[0, "AUTHOR_APPOINTMENTS"] = (
-        "Professor:Synthetic Department:Synthetic School, "
+        "Professor:Synthetic Department:Synthetic School~|APPOINTMENT|~"
         "Researcher:Another Department:Another School"
     )
     records.loc[0, "PI_APPOINTMENTS"] = "PI Professor:PI Department:PI School"
@@ -136,3 +136,79 @@ def test_malformed_appointments_are_reported_without_raw_value(
     assert finding.appointment_index == 0
     assert finding.issue_name == "MALFORMED_APPOINTMENT"
     assert sensitive_value not in repr(finding)
+
+
+def test_appointment_parser_preserves_comma_inside_new_format_component(
+    valid_report_directory: Path,
+) -> None:
+    """Use the record separator without splitting a comma in a school name."""
+    records = loaded_records(valid_report_directory)
+    records.loc[0, "AUTHOR_APPOINTMENTS"] = (
+        "RESEARCH ASST I (TEMP):SRC-d3c:Institute for Social Research"
+        "~|APPOINTMENT|~"
+        "RESEARCH ASST I (TEMP):LSA Psychology:"
+        "College of Lit, Science & Arts"
+    )
+    records.loc[:, "PI_APPOINTMENTS"] = pd.NA
+
+    appointments, findings = derive_appointments(records)
+    author_rows = appointments.loc[
+        appointments["audit_record_id"].eq(1001)
+        & appointments["appointment_source"].eq("AUTHOR")
+    ]
+
+    assert findings == ()
+    assert len(author_rows) == 2
+    assert author_rows["appointment_title"].tolist() == [
+        "RESEARCH ASST I (TEMP)",
+        "RESEARCH ASST I (TEMP)",
+    ]
+    assert author_rows["appointment_department"].tolist() == [
+        "SRC-d3c",
+        "LSA Psychology",
+    ]
+    assert author_rows["appointment_school"].tolist() == [
+        "Institute for Social Research",
+        "College of Lit, Science & Arts",
+    ]
+
+
+def test_new_separator_ignores_empty_boundary_fragments(
+    valid_report_directory: Path,
+) -> None:
+    """Ignore accidental leading and trailing explicit record separators."""
+    records = loaded_records(valid_report_directory)
+    records.loc[0, "AUTHOR_APPOINTMENTS"] = (
+        "~|APPOINTMENT|~Title:Department:School~|APPOINTMENT|~"
+    )
+    records.loc[:, "PI_APPOINTMENTS"] = pd.NA
+    records.loc[1, "AUTHOR_APPOINTMENTS"] = pd.NA
+
+    appointments, findings = derive_appointments(records)
+
+    assert findings == ()
+    assert len(appointments) == 1
+    assert appointments.iloc[0]["appointment_title"] == "Title"
+
+
+def test_single_legacy_appointment_preserves_comma_in_school(
+    valid_report_directory: Path,
+) -> None:
+    """Parse one legacy appointment before treating comma-space as a separator."""
+    records = loaded_records(valid_report_directory)
+    records.loc[0, "AUTHOR_APPOINTMENTS"] = (
+        "Research Technician Lead:LSA Psychology:College of Lit, Science & Arts"
+    )
+    records.loc[0, "PI_APPOINTMENTS"] = pd.NA
+    records.loc[1, "AUTHOR_APPOINTMENTS"] = pd.NA
+    records.loc[1, "PI_APPOINTMENTS"] = pd.NA
+
+    appointments, findings = derive_appointments(records)
+
+    assert findings == ()
+    assert len(appointments) == 1
+
+    row = appointments.iloc[0]
+    assert row["appointment_title"] == "Research Technician Lead"
+    assert row["appointment_department"] == "LSA Psychology"
+    assert row["appointment_school"] == "College of Lit, Science & Arts"

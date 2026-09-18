@@ -19,7 +19,7 @@ from study_posting_audit_exploration.quality import (
 
 _MANIFEST_FILENAME = "analysis_manifest.json"
 _QUALITY_RELATIVE_PATH = Path("quality/data_quality_summary.csv")
-_EXPECTED_OUTPUT_FILE_COUNT = 30
+_EXPECTED_OUTPUT_FILE_COUNT = 31
 _NULL_VALUE = "\\N"
 _FATAL = "FATAL"
 _WARNING = "WARNING"
@@ -50,10 +50,12 @@ class PublishedQualityCheck:
 
 @dataclass(frozen=True, slots=True)
 class PublishedQualitySummary:
-    """Validated quality rows and manifest-level warning context."""
+    """Validated quality rows and investigation context."""
 
     checks: tuple[PublishedQualityCheck, ...]
     warning_occurrence_count: int
+    exploration_directory: Path
+    source_report_directory: Path
 
     @property
     def fatal_checks(self) -> tuple[PublishedQualityCheck, ...]:
@@ -298,7 +300,7 @@ def _validate_manifest(
     if output_file_count != _EXPECTED_OUTPUT_FILE_COUNT:
         raise ExplorationValidationError(
             "Exploration manifest output-file count does not match the "
-            "current 30-file contract"
+            "current 31-file contract"
         )
 
     quality_counts = manifest.get("quality_analysis_row_counts")
@@ -354,10 +356,21 @@ def load_published_quality_summary(
         quality_row_count=len(checks),
         warning_occurrence_count=warning_occurrence_count,
     )
+    source_report_directory = manifest.get("source_report_directory")
+
+    if (
+        not isinstance(source_report_directory, str)
+        or not source_report_directory.strip()
+    ):
+        raise ExplorationValidationError(
+            "Exploration manifest lacks a source report directory"
+        )
 
     return PublishedQualitySummary(
         checks=checks,
         warning_occurrence_count=warning_occurrence_count,
+        exploration_directory=directory.resolve(),
+        source_report_directory=Path(source_report_directory),
     )
 
 
@@ -371,7 +384,7 @@ def render_quality_summary(summary: PublishedQualitySummary) -> str:
         "",
         (f"Fatal validation checks passed: {len(fatal_checks)} of {len(fatal_checks)}"),
         (
-            "Warning checks with affected attempts: "
+            "Warning categories detected: "
             f"{len(affected_warnings)} of {len(warning_checks)}"
         ),
         f"Warning occurrences: {summary.warning_occurrence_count}",
@@ -416,5 +429,35 @@ def render_quality_summary(summary: PublishedQualitySummary) -> str:
         for check in warning_checks
         if check.affected_attempt_count == 0
     )
+
+    if summary.has_warnings:
+        quality_path = (
+            summary.exploration_directory / "quality/data_quality_summary.csv"
+        )
+        findings_path = (
+            summary.exploration_directory
+            / "analysis-audit-records/data_quality_findings.csv"
+        )
+        records_path = summary.source_report_directory / "records.csv"
+        lines.extend(
+            [
+                "",
+                "Where to investigate:",
+                (f"- Warning definitions and aggregate counts: {quality_path}"),
+                (f"- Restricted audit IDs and finding positions: {findings_path}"),
+                (f"- Matching normalized source attempts: {records_path}"),
+                (
+                    "Use audit_record_id from data_quality_findings.csv to "
+                    "locate the corresponding records.csv row."
+                ),
+            ]
+        )
+    else:
+        lines.extend(
+            [
+                "",
+                "No warning investigation is required for this run.",
+            ]
+        )
 
     return "\n".join(lines) + "\n"

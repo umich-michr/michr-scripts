@@ -125,8 +125,8 @@ days, and login-history span as of the report query.
 
 ## Current output
 
-A successful `analyze` run publishes 30 files: `report.html`, one JSON
-manifest, and 28 CSV files.
+A successful `analyze` run publishes 31 files: `report.html`, one JSON
+manifest, and 29 CSV files.
 
 ~~~~text
 exploration/
@@ -137,6 +137,7 @@ exploration/
 ├── quality/
 │   └── data_quality_summary.csv
 ├── analysis-audit-records/
+│   ├── data_quality_findings.csv
 │   ├── study_attempt_author_history.csv
 │   ├── study_attempt_history.csv
 │   ├── author_history.csv
@@ -357,6 +358,13 @@ payloads, selected text, or final text.
 
 These identifier-bearing files expose the derived rows used by aggregate
 analysis:
+
+- `data_quality_findings.csv` maps nonfatal warning findings to the exact audit
+  record, study, and attempt author for authorized internal investigation. It
+  records finding source, appointment position where applicable, structural
+  detail code, and analysis consequence. It excludes raw appointment values,
+  source text, and payloads. Use `audit_record_id` to locate the matching
+  `records.csv` row or perform a targeted approved bind-variable lookup.
 
 - `study_attempt_author_history.csv` has one row per attempt with study,
   authorship, role, appointment, and available experience context.

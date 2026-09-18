@@ -72,6 +72,7 @@ def write_manifest(
             "data_quality_summary": len(quality_tables.data_quality_summary),
         },
         "analysis_audit_record_row_counts": {
+            "data_quality_findings": len(quality_tables.data_quality_findings),
             "study_attempt_author_history": len(histories.study_attempt_author_history),
             "study_attempt_history": len(histories.study_attempt_history),
             "author_history": len(histories.author_history),

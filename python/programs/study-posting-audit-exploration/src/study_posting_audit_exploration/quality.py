@@ -142,6 +142,9 @@ DATA_QUALITY_CHECK_NAMES: tuple[str, ...] = tuple(check.name for check in _CHECK
 DATA_QUALITY_CHECK_SEVERITIES: dict[str, str] = {
     check.name: check.severity for check in _CHECKS
 }
+DATA_QUALITY_ANALYSIS_CONSEQUENCES: dict[str, str] = {
+    check.name: check.consequence for check in _CHECKS
+}
 
 
 def _percentage(numerator: int, denominator: int) -> float | None:

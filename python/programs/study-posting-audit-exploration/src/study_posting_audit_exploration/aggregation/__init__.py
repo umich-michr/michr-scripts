@@ -84,6 +84,9 @@ from study_posting_audit_exploration.quality import (
     DATA_QUALITY_SUMMARY_COLUMNS,
     build_data_quality_summary,
 )
+from study_posting_audit_exploration.quality_findings import (
+    build_data_quality_findings,
+)
 
 AGGREGATE_OUTPUT_COLUMNS: dict[str, tuple[str, ...]] = {
     "quality/data_quality_summary.csv": DATA_QUALITY_SUMMARY_COLUMNS,
@@ -141,7 +144,12 @@ def build_quality_analysis_tables(
             report=report,
             histories=histories,
             appointment_quality_findings=appointment_quality_findings,
-        )
+        ),
+        data_quality_findings=build_data_quality_findings(
+            report=report,
+            histories=histories,
+            appointment_quality_findings=appointment_quality_findings,
+        ),
     )
 
 

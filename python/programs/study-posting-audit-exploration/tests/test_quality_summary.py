@@ -73,7 +73,8 @@ def _write_exploration(
         if row["severity_level"] == "WARNING"
     )
     manifest = {
-        "output_file_count": 30,
+        "source_report_directory": str(directory.parent / "report"),
+        "output_file_count": 31,
         "quality_analysis_row_counts": {
             "data_quality_summary": len(rows),
         },
@@ -101,7 +102,7 @@ def test_loads_and_renders_nonzero_warnings(tmp_path: Path) -> None:
     assert summary.has_warnings
     assert summary.warning_occurrence_count == 4
     assert "Fatal validation checks passed: 13 of 13" in text
-    assert "Warning checks with affected attempts: 1 of 3" in text
+    assert "Warning categories detected: 1 of 3" in text
     assert "Warning occurrences: 4" in text
     assert "- MALFORMED_APPOINTMENT" in text
     assert "Affected attempts: 4 of 20 (20.0%)" in text
@@ -110,6 +111,10 @@ def test_loads_and_renders_nonzero_warnings(tmp_path: Path) -> None:
     assert "Synthetic consequence for MALFORMED_APPOINTMENT." in text
     assert "No attempts occurred after completion." in text
     assert "No studies had varying CREATED_BY_ID values." in text
+    assert "Where to investigate:" in text
+    assert "quality/data_quality_summary.csv" in text
+    assert "analysis-audit-records/data_quality_findings.csv" in text
+    assert "records.csv" in text
 
 
 def test_renders_no_warning_result(tmp_path: Path) -> None:
@@ -121,10 +126,11 @@ def test_renders_no_warning_result(tmp_path: Path) -> None:
     text = render_quality_summary(summary)
 
     assert not summary.has_warnings
-    assert "Warning checks with affected attempts: 0 of 3" in text
+    assert "Warning categories detected: 0 of 3" in text
     assert "Warning occurrences: 0" in text
     assert "No warning checks affected attempts." in text
     assert "No malformed appointment entries affected attempts." in text
+    assert "No warning investigation is required for this run." in text
 
 
 def test_rejects_missing_exploration_directory(tmp_path: Path) -> None:
@@ -178,7 +184,7 @@ def test_rejects_missing_or_reordered_checks(tmp_path: Path) -> None:
 @pytest.mark.parametrize(
     ("manifest_field", "value", "message"),
     [
-        ("output_file_count", 29, "30-file contract"),
+        ("output_file_count", 30, "31-file contract"),
         ("warning_count", 99, "warning count does not match"),
     ],
 )
