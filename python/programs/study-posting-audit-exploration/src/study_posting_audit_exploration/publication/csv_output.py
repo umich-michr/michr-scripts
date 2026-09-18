@@ -66,6 +66,9 @@ _GROUPED_ATTEMPT_SUMMARY_FILENAME = "grouped_attempt_summary.csv"
 _CONTENT_SOURCE_CONCORDANCE_SUMMARY_FILENAME = "content_source_concordance_summary.csv"
 _CONTENT_SOURCE_CONCORDANCE_MATRIX_FILENAME = "content_source_concordance_matrix.csv"
 
+_COMPLETED_STUDY_AUTHOR_CONTEXT_SUMMARY_FILENAME = (
+    "completed_study_author_context_summary.csv"
+)
 _GROUPED_STUDY_SUMMARY_FILENAME = "grouped_study_summary.csv"
 
 _GROUPED_AUTHOR_SUMMARY_FILENAME = "grouped_author_summary.csv"
@@ -89,7 +92,7 @@ _FINAL_TEXT_METRIC_SUMMARY_FILENAME = "final_text_metric_summary.csv"
 
 _CANDIDATE_RESEARCH_QUESTIONS_FILENAME = "candidate_research_questions.csv"
 
-_OUTPUT_FILE_COUNT = 28
+_OUTPUT_FILE_COUNT = 29
 
 
 def _write_frame(
@@ -170,6 +173,10 @@ def _output_frames(
         (
             tables.attempts.content_source_concordance_matrix,
             attempts_directory / _CONTENT_SOURCE_CONCORDANCE_MATRIX_FILENAME,
+        ),
+        (
+            tables.studies.completed_study_author_context_summary,
+            studies_directory / _COMPLETED_STUDY_AUTHOR_CONTEXT_SUMMARY_FILENAME,
         ),
         (
             tables.studies.grouped_study_summary,
@@ -290,6 +297,9 @@ def _write_staging_output(
                 tables.authors.current_author_experience_summary
             ),
             grouped_study_summary=(tables.studies.grouped_study_summary),
+            completed_study_author_context_summary=(
+                tables.studies.completed_study_author_context_summary
+            ),
             grouped_author_summary=(tables.authors.grouped_author_summary),
             field_adoption_editing_summary=(
                 tables.fields.field_adoption_editing_summary
@@ -379,6 +389,9 @@ def _publication_result(
         ),
         content_source_concordance_matrix_path=(
             attempts_directory / _CONTENT_SOURCE_CONCORDANCE_MATRIX_FILENAME
+        ),
+        completed_study_author_context_summary_path=(
+            studies_directory / _COMPLETED_STUDY_AUTHOR_CONTEXT_SUMMARY_FILENAME
         ),
         grouped_study_summary_path=(
             studies_directory / _GROUPED_STUDY_SUMMARY_FILENAME

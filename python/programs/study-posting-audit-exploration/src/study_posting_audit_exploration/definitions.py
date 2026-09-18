@@ -27,6 +27,7 @@ AGGREGATE_FILE_ORDER: tuple[str, ...] = (
     "attempts/grouped_attempt_summary.csv",
     "attempts/content_source_concordance_summary.csv",
     "attempts/content_source_concordance_matrix.csv",
+    "studies/completed_study_author_context_summary.csv",
     "studies/grouped_study_summary.csv",
     "authors/grouped_author_summary.csv",
     "authors/attempt_start_experience_summary.csv",

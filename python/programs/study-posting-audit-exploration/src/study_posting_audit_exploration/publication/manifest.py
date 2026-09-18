@@ -95,6 +95,9 @@ def write_manifest(
             ),
         },
         "study_analysis_row_counts": {
+            "completed_study_author_context_summary": len(
+                study_tables.completed_study_author_context_summary
+            ),
             "grouped_study_summary": len(study_tables.grouped_study_summary),
         },
         "author_analysis_row_counts": {

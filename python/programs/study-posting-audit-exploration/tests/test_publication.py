@@ -172,6 +172,7 @@ def _analysis_tables(
         attempts=build_attempt_analysis_tables(attempts),
         studies=build_study_analysis_tables(
             studies,
+            study_attempt_author_history=(histories.study_attempt_author_history),
             appointments=study_appointments,
             appointment_quality_findings=(
                 *findings,
@@ -231,6 +232,7 @@ def _publication_paths(
         publication.grouped_attempt_summary_path,
         publication.content_source_concordance_summary_path,
         publication.content_source_concordance_matrix_path,
+        publication.completed_study_author_context_summary_path,
         publication.grouped_study_summary_path,
         publication.grouped_author_summary_path,
         publication.attempt_start_experience_summary_path,
@@ -264,6 +266,9 @@ def _assert_derived_outputs(
         publication.field_readability_target_summary_path
     )
     final_metrics = read_published_csv(publication.final_text_metric_summary_path)
+    completed_study_context = read_published_csv(
+        publication.completed_study_author_context_summary_path
+    )
 
     for frame in (
         completed_fields,
@@ -272,6 +277,7 @@ def _assert_derived_outputs(
         readability_change,
         readability_target,
         final_metrics,
+        completed_study_context,
     ):
         assert not frame.empty
 
@@ -283,6 +289,19 @@ def _assert_derived_outputs(
         assert forbidden_column not in readability_pairs.columns
 
     assert final_metrics["final_text_attempt_count_missing_or_blank"].isna().all()
+    assert tuple(completed_study_context.columns) == (
+        "context_dimension_name",
+        "context_dimension_value",
+        "final_completion_authoring_mode",
+        "completed_study_count",
+        "mode_completed_study_count",
+        "all_completed_study_count",
+        "completed_study_percentage_within_mode",
+        "completed_study_percentage_overall",
+        "distinct_completion_author_count",
+    )
+    assert "study_num" not in completed_study_context.columns
+    assert "attempt_author_user_name" not in completed_study_context.columns
 
 
 def _assert_html_privacy(
@@ -313,10 +332,23 @@ def test_publish_exploration_writes_atomic_html_output(
     )
 
     assert publication.output_directory == output_directory
-    assert publication.output_file_count == 28
+    assert publication.output_file_count == 29
 
     for path in _publication_paths(publication):
         assert path.is_file()
+
+    published_inventory = {
+        path.relative_to(output_directory).as_posix()
+        for path in output_directory.rglob("*")
+        if path.is_file()
+    }
+    expected_inventory = {
+        path.relative_to(output_directory).as_posix()
+        for path in _publication_paths(publication)
+    }
+
+    assert published_inventory == expected_inventory
+    assert len(published_inventory) == 29
 
     assert list(tmp_path.glob(".exploration.*")) == []
 
@@ -361,6 +393,10 @@ def test_manifest_contains_readability_analysis_counts(
         manifest["analysis_audit_record_row_counts"]["completed_ai_readability_pairs"]
         > 0
     )
+    assert (
+        manifest["study_analysis_row_counts"]["completed_study_author_context_summary"]
+        > 0
+    )
     assert manifest["field_analysis_row_counts"]["field_adoption_editing_summary"] > 0
     assert manifest["field_analysis_row_counts"]["suggestion_selection_summary"] > 0
     assert (
@@ -374,7 +410,7 @@ def test_manifest_contains_readability_analysis_counts(
     assert manifest["readability_analysis_row_counts"]["final_text_metric_summary"] > 0
     assert manifest["definition_row_counts"]["metric_definitions"] > 0
     assert manifest["research_row_counts"]["candidate_research_questions"] == 14
-    assert manifest["output_file_count"] == 28
+    assert manifest["output_file_count"] == 29
     assert manifest["warning_count"] == 0
     assert manifest_filename() == "analysis_manifest.json"
 

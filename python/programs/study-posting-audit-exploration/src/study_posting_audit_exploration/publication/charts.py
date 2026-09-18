@@ -84,6 +84,18 @@ _REQUIRED_GROUPED_STUDY_COLUMNS: tuple[str, ...] = (
     "distinct_study_percentage_within_population",
 )
 
+_REQUIRED_COMPLETED_STUDY_AUTHOR_CONTEXT_COLUMNS: tuple[str, ...] = (
+    "context_dimension_name",
+    "context_dimension_value",
+    "final_completion_authoring_mode",
+    "completed_study_count",
+    "mode_completed_study_count",
+    "all_completed_study_count",
+    "completed_study_percentage_within_mode",
+    "completed_study_percentage_overall",
+    "distinct_completion_author_count",
+)
+
 _REQUIRED_GROUPED_AUTHOR_COLUMNS: tuple[str, ...] = (
     "author_population_name",
     "attempt_completion_group",
@@ -428,6 +440,7 @@ class ExplorationChartInputs:
     attempt_start_experience_summary: pd.DataFrame
     current_author_experience_summary: pd.DataFrame
     grouped_study_summary: pd.DataFrame
+    completed_study_author_context_summary: pd.DataFrame
     grouped_author_summary: pd.DataFrame
     field_adoption_editing_summary: pd.DataFrame
     suggestion_selection_summary: pd.DataFrame
@@ -451,6 +464,8 @@ class ExplorationCharts:
     author_experience_days: go.Figure
     completed_study_participant_mix: go.Figure
     completed_study_department_mix: go.Figure
+    completed_studies_by_completion_author_role: go.Figure
+    completed_studies_by_completion_author_pi_status: go.Figure
     author_appointment_schools: go.Figure
     pi_appointment_schools: go.Figure
     field_suggestion_adoption: go.Figure
@@ -1094,6 +1109,142 @@ def build_completed_study_mix_chart(
         xaxis_title="Completed study count",
         yaxis_title="Category",
         showlegend=False,
+    )
+
+    return figure
+
+
+def _completion_author_context_label(
+    *,
+    dimension_name: str,
+    value: object,
+) -> str:
+    """Return one faculty-facing completion-author context label."""
+    normalized = str(value)
+
+    if dimension_name == "PI_STATUS":
+        return {
+            "PI": "PI for this study",
+            "NON_PI": "Non-PI for this study",
+        }.get(normalized, normalized)
+
+    return normalized
+
+
+def build_completed_study_author_context_chart(
+    completed_study_author_context_summary: pd.DataFrame,
+    *,
+    dimension_name: str,
+    title: str,
+) -> go.Figure:
+    """Return completed-study counts by mode and completion-author context."""
+    _require_columns(
+        completed_study_author_context_summary,
+        required=_REQUIRED_COMPLETED_STUDY_AUTHOR_CONTEXT_COLUMNS,
+        frame_name="completed_study_author_context_summary",
+    )
+    rows = completed_study_author_context_summary.loc[
+        completed_study_author_context_summary["context_dimension_name"].eq(
+            dimension_name
+        )
+        & completed_study_author_context_summary[
+            "final_completion_authoring_mode"
+        ].isin(_AUTHORING_MODE_ORDER)
+    ].copy()
+
+    if rows.empty:
+        return _empty_figure(
+            title=title,
+            message="No completed-study completion-author context is available.",
+        )
+
+    context_values = sorted(
+        str(value) for value in rows["context_dimension_value"].unique()
+    )
+
+    if dimension_name == "PI_STATUS":
+        context_values = [
+            value for value in ("PI", "NON_PI") if value in context_values
+        ]
+
+    figure = go.Figure()
+
+    for context_value in context_values:
+        value_rows = rows.loc[
+            rows["context_dimension_value"].astype("string").eq(context_value)
+        ]
+        rows_by_mode = {
+            str(row["final_completion_authoring_mode"]): row
+            for row in value_rows.to_dict(orient="records")
+        }
+        counts: list[int] = []
+        customdata: list[list[object]] = []
+
+        for mode in _AUTHORING_MODE_ORDER:
+            row = rows_by_mode.get(mode)
+
+            if row is None:
+                counts.append(0)
+                customdata.append([0, 0, 0, 0.0, 0.0, 0])
+                continue
+
+            count = int(row["completed_study_count"])
+            counts.append(count)
+            customdata.append(
+                [
+                    count,
+                    int(row["mode_completed_study_count"]),
+                    int(row["all_completed_study_count"]),
+                    float(row["completed_study_percentage_within_mode"]),
+                    float(row["completed_study_percentage_overall"]),
+                    int(row["distinct_completion_author_count"]),
+                ]
+            )
+
+        label = _completion_author_context_label(
+            dimension_name=dimension_name,
+            value=context_value,
+        )
+        context_term = (
+            "Completion-author PI status"
+            if dimension_name == "PI_STATUS"
+            else "Completion-author role"
+        )
+        figure.add_bar(
+            name=label,
+            x=counts,
+            y=list(_AUTHORING_MODE_ORDER),
+            orientation="h",
+            customdata=customdata,
+            hovertemplate=(
+                "Final authoring mode: %{y}<br>"
+                f"{context_term}: %{{fullData.name}}<br>"
+                "Completed studies: %{x}<br>"
+                "Share within mode: %{customdata[0]} of "
+                "%{customdata[1]} (%{customdata[3]:.1f}%)<br>"
+                "Share of all completed studies: %{customdata[0]} of "
+                "%{customdata[2]} (%{customdata[4]:.1f}%)<br>"
+                "Distinct completion authors represented: "
+                "%{customdata[5]}<br>"
+                "Unit: each completed study contributes once<br>"
+                "Context source: unique completed attempt<br>"
+                "One author may contribute multiple studies and may have "
+                "different context across studies"
+                "<extra></extra>"
+            ),
+        )
+
+    figure.update_layout(
+        title=title,
+        template="plotly_white",
+        barmode="stack",
+        xaxis_title="Completed study count",
+        yaxis_title="Final authoring mode",
+        legend_title_text=(
+            "PI status for this study"
+            if dimension_name == "PI_STATUS"
+            else "Completion-author role"
+        ),
     )
 
     return figure
@@ -2223,6 +2374,25 @@ def build_exploration_charts(
             inputs.grouped_study_summary,
             dimension_name="STUDY_DEPARTMENT",
             title="Completed studies by department",
+        ),
+        completed_studies_by_completion_author_role=(
+            build_completed_study_author_context_chart(
+                inputs.completed_study_author_context_summary,
+                dimension_name="EFFECTIVE_ROLE",
+                title=(
+                    "Completed studies by authoring mode and completion-author role"
+                ),
+            )
+        ),
+        completed_studies_by_completion_author_pi_status=(
+            build_completed_study_author_context_chart(
+                inputs.completed_study_author_context_summary,
+                dimension_name="PI_STATUS",
+                title=(
+                    "Completed studies by authoring mode and "
+                    "completion-author PI status"
+                ),
+            )
         ),
         author_appointment_schools=build_author_appointment_context_chart(
             inputs.grouped_author_summary,

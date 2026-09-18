@@ -417,6 +417,58 @@ def content_rows() -> pd.DataFrame:
     )
 
 
+def completed_study_author_context_rows() -> pd.DataFrame:
+    """Return synthetic completed-study completion-author context rows."""
+    return pd.DataFrame.from_records(
+        [
+            {
+                "context_dimension_name": "EFFECTIVE_ROLE",
+                "context_dimension_value": "COORDINATOR",
+                "final_completion_authoring_mode": "AI",
+                "completed_study_count": 6,
+                "mode_completed_study_count": 6,
+                "all_completed_study_count": 10,
+                "completed_study_percentage_within_mode": 100.0,
+                "completed_study_percentage_overall": 60.0,
+                "distinct_completion_author_count": 4,
+            },
+            {
+                "context_dimension_name": "EFFECTIVE_ROLE",
+                "context_dimension_value": "PI",
+                "final_completion_authoring_mode": "MANUAL",
+                "completed_study_count": 4,
+                "mode_completed_study_count": 4,
+                "all_completed_study_count": 10,
+                "completed_study_percentage_within_mode": 100.0,
+                "completed_study_percentage_overall": 40.0,
+                "distinct_completion_author_count": 3,
+            },
+            {
+                "context_dimension_name": "PI_STATUS",
+                "context_dimension_value": "NON_PI",
+                "final_completion_authoring_mode": "AI",
+                "completed_study_count": 6,
+                "mode_completed_study_count": 6,
+                "all_completed_study_count": 10,
+                "completed_study_percentage_within_mode": 100.0,
+                "completed_study_percentage_overall": 60.0,
+                "distinct_completion_author_count": 4,
+            },
+            {
+                "context_dimension_name": "PI_STATUS",
+                "context_dimension_value": "PI",
+                "final_completion_authoring_mode": "MANUAL",
+                "completed_study_count": 4,
+                "mode_completed_study_count": 4,
+                "all_completed_study_count": 10,
+                "completed_study_percentage_within_mode": 100.0,
+                "completed_study_percentage_overall": 40.0,
+                "distinct_completion_author_count": 3,
+            },
+        ]
+    )
+
+
 def grouped_author_rows() -> pd.DataFrame:
     """Return synthetic aggregate-only author context rows."""
     rows: list[dict[str, object]] = [
@@ -513,6 +565,9 @@ def charts() -> ExplorationCharts:
             attempt_start_experience_summary=(attempt_start_experience_rows()),
             current_author_experience_summary=(current_author_experience_rows()),
             grouped_study_summary=grouped_study_rows(),
+            completed_study_author_context_summary=(
+                completed_study_author_context_rows()
+            ),
             grouped_author_summary=grouped_author_rows(),
             field_adoption_editing_summary=field_adoption_rows(),
             suggestion_selection_summary=suggestion_selection_rows(),
@@ -584,6 +639,32 @@ def test_html_report_is_self_contained_and_accessible() -> None:
     assert "Field populations and denominators can differ" in normalized_html
     assert "Edited-unclassified is kept separate from replaced" in normalized_html
     assert "do not establish writing quality" in normalized_html
+
+
+def test_html_report_explains_completed_study_author_context() -> None:
+    """Explain the completed-study grain and study-specific author context."""
+    html = render_html_report(
+        overview_summary=overview_rows(),
+        charts=charts(),
+    )
+    normalized_html = " ".join(html.split())
+
+    assert 'id="completed-study-author-context-heading"' in html
+    assert "Completed studies by authoring mode and completion-author context" in html
+    assert "Completed studies by authoring mode and completion-author role" in html
+    assert "Completed studies by authoring mode and completion-author PI status" in html
+    assert "Each completed study contributes exactly once" in normalized_html
+    assert "specific to that study" in normalized_html
+    assert (
+        "Chart values measure completed studies, not distinct people" in normalized_html
+    )
+    assert "same person can complete several studies" in normalized_html
+    assert "different roles" in normalized_html
+    assert "non-principal investigator for another" in normalized_html
+    assert (
+        "Distinct completion authors appear only as aggregate hover context"
+        in normalized_html
+    )
 
 
 def test_html_report_explains_workflow_timing() -> None:

@@ -82,8 +82,9 @@ class AttemptAnalysisTables:
 
 @dataclass(frozen=True, slots=True)
 class StudyAnalysisTables:
-    """Grouped study aggregate tables and appointment quality findings."""
+    """Completed-study context, grouped studies, and quality findings."""
 
+    completed_study_author_context_summary: pd.DataFrame
     grouped_study_summary: pd.DataFrame
     appointment_quality_findings: tuple[AppointmentQualityFinding, ...]
 
@@ -152,6 +153,7 @@ class ExplorationPublication:
     grouped_attempt_summary_path: Path
     content_source_concordance_summary_path: Path
     content_source_concordance_matrix_path: Path
+    completed_study_author_context_summary_path: Path
     grouped_study_summary_path: Path
     grouped_author_summary_path: Path
     attempt_start_experience_summary_path: Path

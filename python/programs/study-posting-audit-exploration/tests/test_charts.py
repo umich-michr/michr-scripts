@@ -16,6 +16,7 @@ from study_posting_audit_exploration.publication import (
     build_author_attempt_start_experience_chart,
     build_author_experience_chart,
     build_author_handoff_chart,
+    build_completed_study_author_context_chart,
     build_completed_study_mix_chart,
     build_content_source_concordance_chart,
     build_edit_readability_relationship_chart,
@@ -387,6 +388,38 @@ def grouped_study_rows() -> pd.DataFrame:
             "distinct_study_percentage_within_population": 10.0,
         },
     ]
+
+    return pd.DataFrame.from_records(rows)
+
+
+def completed_study_author_context_rows() -> pd.DataFrame:
+    """Return synthetic completed-study completion-author context rows."""
+    rows: list[dict[str, object]] = []
+
+    for dimension_name, values in (
+        ("EFFECTIVE_ROLE", (("COORDINATOR", 4, 2), ("PI", 2, 2))),
+        ("PI_STATUS", (("NON_PI", 4, 2), ("PI", 2, 2))),
+    ):
+        for value, ai_count, manual_count in values:
+            for mode, count, mode_total in (
+                ("AI", ai_count, 6),
+                ("MANUAL", manual_count, 4),
+            ):
+                rows.append(
+                    {
+                        "context_dimension_name": dimension_name,
+                        "context_dimension_value": value,
+                        "final_completion_authoring_mode": mode,
+                        "completed_study_count": count,
+                        "mode_completed_study_count": mode_total,
+                        "all_completed_study_count": 10,
+                        "completed_study_percentage_within_mode": (
+                            100.0 * count / mode_total
+                        ),
+                        "completed_study_percentage_overall": 10.0 * count,
+                        "distinct_completion_author_count": max(count - 1, 1),
+                    }
+                )
 
     return pd.DataFrame.from_records(rows)
 
@@ -828,6 +861,58 @@ def test_completed_study_mix_chart_rejects_overlapping_groups() -> None:
         )
 
 
+def test_completed_study_author_role_chart_uses_study_counts() -> None:
+    """Show completed studies, not a permanent author classification."""
+    figure = build_completed_study_author_context_chart(
+        completed_study_author_context_rows(),
+        dimension_name="EFFECTIVE_ROLE",
+        title="Completed studies by authoring mode and completion-author role",
+    )
+    traces = {str(trace.name): trace for trace in figure.data}
+
+    assert figure.layout.barmode == "stack"
+    assert figure.layout.title.text == (
+        "Completed studies by authoring mode and completion-author role"
+    )
+    assert list(traces["COORDINATOR"].y) == ["AI", "MANUAL"]
+    assert list(traces["COORDINATOR"].x) == [4, 2]
+    assert list(traces["COORDINATOR"].customdata[0]) == [
+        4,
+        6,
+        10,
+        100.0 * 4.0 / 6.0,
+        40.0,
+        3,
+    ]
+    hover = str(traces["COORDINATOR"].hovertemplate)
+    assert "each completed study contributes once" in hover
+    assert "unique completed attempt" in hover
+    assert "different context across studies" in hover
+
+
+def test_completed_study_pi_status_chart_uses_study_specific_labels() -> None:
+    """Describe PI status for each study rather than as a permanent identity."""
+    figure = build_completed_study_author_context_chart(
+        completed_study_author_context_rows(),
+        dimension_name="PI_STATUS",
+        title=("Completed studies by authoring mode and completion-author PI status"),
+    )
+    traces = {str(trace.name): trace for trace in figure.data}
+
+    assert set(traces) == {
+        "PI for this study",
+        "Non-PI for this study",
+    }
+    assert list(traces["PI for this study"].x) == [2, 2]
+    assert "Share within mode" in str(traces["Non-PI for this study"].hovertemplate)
+    assert "Share of all completed studies" in str(
+        traces["Non-PI for this study"].hovertemplate
+    )
+    assert "Distinct completion authors represented" in str(
+        traces["Non-PI for this study"].hovertemplate
+    )
+
+
 def test_attempt_outcomes_chart_uses_aggregate_counts() -> None:
     figure = build_attempt_outcomes_chart(grouped_attempt_rows())
 
@@ -1126,6 +1211,9 @@ def test_chart_bundle_contains_all_figures() -> None:
             attempt_start_experience_summary=(attempt_start_experience_rows()),
             current_author_experience_summary=(current_author_experience_rows()),
             grouped_study_summary=grouped_study_rows(),
+            completed_study_author_context_summary=(
+                completed_study_author_context_rows()
+            ),
             grouped_author_summary=grouped_author_rows(),
             field_adoption_editing_summary=field_adoption_rows(),
             suggestion_selection_summary=suggestion_selection_rows(),
@@ -1148,6 +1236,8 @@ def test_chart_bundle_contains_all_figures() -> None:
     assert charts.content_source_concordance.data
     assert charts.completed_study_participant_mix.data
     assert charts.completed_study_department_mix.data
+    assert charts.completed_studies_by_completion_author_role.data
+    assert charts.completed_studies_by_completion_author_pi_status.data
     assert charts.author_appointment_schools.data
     assert charts.pi_appointment_schools.data
     assert charts.field_suggestion_adoption.data
@@ -1189,6 +1279,7 @@ def test_charts_return_accessible_empty_states() -> None:
     experience_columns = current_author_experience_rows().columns
     content_columns = content_source_rows().columns
     grouped_study_columns = grouped_study_rows().columns
+    completed_study_context_columns = completed_study_author_context_rows().columns
     grouped_author_columns = grouped_author_rows().columns
     field_adoption_columns = field_adoption_rows().columns
     suggestion_columns = suggestion_selection_rows().columns
@@ -1212,6 +1303,11 @@ def test_charts_return_accessible_empty_states() -> None:
         pd.DataFrame(columns=grouped_study_columns),
         dimension_name="STUDY_PARTICIPANT_TYPE",
         title="Completed studies by participant type",
+    )
+    completion_author_context_figure = build_completed_study_author_context_chart(
+        pd.DataFrame(columns=completed_study_context_columns),
+        dimension_name="EFFECTIVE_ROLE",
+        title=("Completed studies by authoring mode and completion-author role"),
     )
     author_appointment_figure = build_author_appointment_context_chart(
         pd.DataFrame(columns=grouped_author_columns),
@@ -1249,6 +1345,7 @@ def test_charts_return_accessible_empty_states() -> None:
     assert experience_figure.layout.annotations[0].text
     assert content_figure.layout.annotations[0].text
     assert study_mix_figure.layout.annotations[0].text
+    assert completion_author_context_figure.layout.annotations[0].text
     assert author_appointment_figure.layout.annotations[0].text
     assert field_adoption_figure.layout.annotations[0].text
     assert field_outcomes_figure.layout.annotations[0].text
@@ -1323,6 +1420,20 @@ def test_charts_return_accessible_empty_states() -> None:
             pd.DataFrame(
                 {
                     "study_population_name": ["COMPLETED_STUDIES"],
+                }
+            ),
+        ),
+        (
+            lambda frame: build_completed_study_author_context_chart(
+                frame,
+                dimension_name="EFFECTIVE_ROLE",
+                title=(
+                    "Completed studies by authoring mode and completion-author role"
+                ),
+            ),
+            pd.DataFrame(
+                {
+                    "context_dimension_name": ["EFFECTIVE_ROLE"],
                 }
             ),
         ),

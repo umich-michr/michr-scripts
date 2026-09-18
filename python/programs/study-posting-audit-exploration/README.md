@@ -101,8 +101,8 @@ days, and login-history span as of the report query.
 
 ## Current output
 
-A successful `analyze` run publishes 28 files: `report.html`, one JSON
-manifest, and 26 CSV files.
+A successful `analyze` run publishes 29 files: `report.html`, one JSON
+manifest, and 27 CSV files.
 
 ~~~~text
 exploration/
@@ -125,6 +125,7 @@ exploration/
 │   ├── content_source_concordance_summary.csv
 │   └── content_source_concordance_matrix.csv
 ├── studies/
+│   ├── completed_study_author_context_summary.csv
 │   └── grouped_study_summary.csv
 ├── authors/
 │   ├── grouped_author_summary.csv
@@ -171,7 +172,10 @@ aggregate analysis tables. It currently includes:
 - study completion pathways and author-handoff categories;
 - attempt-start experience at author-attempt grain;
 - query-time experience and activity at unique-author grain;
-- effective author roles and author-level principal-investigator context;
+- completed studies by final authoring mode and the completion author's
+  study-specific effective role;
+- completed studies by final authoring mode and the completion author's
+  study-specific principal-investigator status;
 - author and principal-investigator appointment-school context;
 - completed-study participant-type and department mix;
 - AI suggestion offers and selections by field;
@@ -189,9 +193,26 @@ aggregate analysis tables. It currently includes:
 - reported-versus-inferred content-source concordance;
 - privacy and interpretation cautions.
 
-Appointment-school chart groups may overlap because an author or principal
-investigator can have more than one appointment. Those chart values are not
-intended to sum to 100 percent.
+The completed-study author-context charts use one unique completed study
+as their analytical unit. Each completed study contributes exactly once through
+its unique completed attempt. Final AI or manual mode, effective
+completion-author role, and principal-investigator status all come from that
+attempt.
+
+Role and principal-investigator status are study-specific rather than permanent
+classifications of a person. The same person may complete multiple studies,
+have different roles across studies, and be a principal investigator for one
+study but not another. Chart values count completed studies. Distinct
+completion-author counts appear only as identifier-free hover context; no
+completion-author identity is displayed. The report intentionally does not
+reintroduce the removed author-level role or principal-investigator charts.
+
+Appointment-school charts remain separate context. Their groups may overlap
+because an author or principal investigator can have more than one appointment.
+Those chart values are not intended to sum to 100 percent.
+
+The report does not include cumulative lines, monthly trends, time-series
+outputs, or dropdown filtering for completed-study author context.
 
 The author-experience section describes attempt authors, not PI-specific
 experience unless the PI was also the attempt author. The attempt-start chart
@@ -310,14 +331,23 @@ faculty-facing summaries.
 - `content_source_concordance_matrix.csv` contains reported-versus-inferred
   content-source counts and percentages.
 
-### Study output
+### Study outputs
 
-`grouped_study_summary.csv` summarizes distinct-study populations, completion
-history, timing, participant type, department, appointments, source type, and
-content source.
+- `completed_study_author_context_summary.csv` reports completed-study counts
+  by final AI or manual authoring mode and either the effective
+  completion-author role or study-specific principal-investigator status. Each
+  completed study contributes once through its unique completed attempt.
+  Counts and percentages include explicit within-mode and all-completed-study
+  denominators. The file includes an aggregate distinct-completion-author count
+  but no usernames, study numbers, or audit IDs.
+- `grouped_study_summary.csv` summarizes distinct-study populations, completion
+  history, timing, participant type, department, appointments, source type, and
+  content source.
 
-Appointment group counts are non-mutually-exclusive. A study or author may be
-represented in more than one appointment group.
+The same completion author may contribute to multiple rows across studies
+because role and principal-investigator status are evaluated separately for
+each completed study. Appointment group counts are non-mutually-exclusive. A
+study or author may be represented in more than one appointment group.
 
 ### Author outputs
 
@@ -450,7 +480,8 @@ inferential, or individual-level conclusions.
 - source row counts;
 - the metric-definition row count;
 - the candidate-research-question row count;
-- published analysis row counts;
+- published analysis row counts, including the completed-study author
+  context summary;
 - output file count;
 - configured edit-intensity scheme;
 - readability tolerance;

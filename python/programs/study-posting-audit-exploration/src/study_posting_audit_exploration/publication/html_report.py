@@ -203,6 +203,31 @@ _TEMPLATE = """<!doctype html>
   </p>
 </section>
 
+  <section aria-labelledby="completed-study-author-context-heading">
+    <h2 id="completed-study-author-context-heading">
+      Completed studies by authoring mode and completion-author context
+    </h2>
+    <p>
+      Each completed study contributes exactly once through its unique
+      completed attempt. AI or manual mode is the final authoring mode on that
+      attempt. The role and principal-investigator status shown here are also
+      taken from that completed attempt and are specific to that study.
+    </p>
+    <p class="caution">
+      Chart values measure completed studies, not distinct people. The same
+      person can complete several studies and can have different roles or be a
+      principal investigator for one study and a non-principal investigator for
+      another. Distinct completion authors appear only as aggregate hover
+      context; no identities are displayed.
+    </p>
+    <div class="chart">
+      {{ completed_studies_by_completion_author_role_html | safe }}
+    </div>
+    <div class="chart">
+      {{ completed_studies_by_completion_author_pi_status_html | safe }}
+    </div>
+  </section>
+
   <section aria-labelledby="author-context-heading">
     <h2 id="author-context-heading">
       Author and principal-investigator appointment context
@@ -605,6 +630,14 @@ def render_html_report(
         ),
         attempt_timing_html=_figure_html(
             charts.attempt_timing_distribution_by_mode,
+            include_plotlyjs=False,
+        ),
+        completed_studies_by_completion_author_role_html=_figure_html(
+            charts.completed_studies_by_completion_author_role,
+            include_plotlyjs=False,
+        ),
+        completed_studies_by_completion_author_pi_status_html=_figure_html(
+            charts.completed_studies_by_completion_author_pi_status,
             include_plotlyjs=False,
         ),
         author_appointment_schools_html=_figure_html(

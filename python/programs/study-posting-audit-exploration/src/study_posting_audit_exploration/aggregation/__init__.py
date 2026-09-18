@@ -24,6 +24,10 @@ from study_posting_audit_exploration.aggregation.compensation import (
     COMPENSATION_ANALYSIS_COLUMNS,
     build_compensation_analysis_summary,
 )
+from study_posting_audit_exploration.aggregation.completed_study_context import (
+    COMPLETED_STUDY_AUTHOR_CONTEXT_COLUMNS,
+    build_completed_study_author_context_summary,
+)
 from study_posting_audit_exploration.aggregation.content_sources import (
     CONTENT_SOURCE_CONCORDANCE_MATRIX_COLUMNS,
     CONTENT_SOURCE_CONCORDANCE_SUMMARY_COLUMNS,
@@ -84,6 +88,9 @@ AGGREGATE_OUTPUT_COLUMNS: dict[str, tuple[str, ...]] = {
     ),
     "attempts/content_source_concordance_matrix.csv": (
         CONTENT_SOURCE_CONCORDANCE_MATRIX_COLUMNS
+    ),
+    "studies/completed_study_author_context_summary.csv": (
+        COMPLETED_STUDY_AUTHOR_CONTEXT_COLUMNS
     ),
     "studies/grouped_study_summary.csv": GROUPED_STUDY_COLUMNS,
     "authors/grouped_author_summary.csv": GROUPED_AUTHOR_COLUMNS,
@@ -150,14 +157,18 @@ def build_attempt_analysis_tables(
 def build_study_analysis_tables(
     studies: pd.DataFrame,
     *,
+    study_attempt_author_history: pd.DataFrame,
     appointments: pd.DataFrame | None = None,
     appointment_quality_findings: tuple[
         AppointmentQualityFinding,
         ...,
     ] = (),
 ) -> StudyAnalysisTables:
-    """Build grouped study aggregate tables."""
+    """Build completed-study context and grouped study aggregates."""
     return StudyAnalysisTables(
+        completed_study_author_context_summary=(
+            build_completed_study_author_context_summary(study_attempt_author_history)
+        ),
         grouped_study_summary=build_grouped_study_summary(
             studies,
             appointments=appointments,
@@ -250,6 +261,7 @@ def build_readability_analysis_tables(
 
 __all__ = [
     "AGGREGATE_OUTPUT_COLUMNS",
+    "COMPLETED_STUDY_AUTHOR_CONTEXT_COLUMNS",
     "AttemptAnalysisTables",
     "AuthorAnalysisTables",
     "FieldAnalysisTables",
@@ -261,6 +273,7 @@ __all__ = [
     "build_author_analysis_tables",
     "build_author_handoff_summary",
     "build_compensation_analysis_summary",
+    "build_completed_study_author_context_summary",
     "build_content_source_concordance_matrix",
     "build_content_source_concordance_summary",
     "build_current_author_experience_summary",

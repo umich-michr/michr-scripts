@@ -248,6 +248,7 @@ def _analysis_tables(
         attempts=build_attempt_analysis_tables(attempts),
         studies=build_study_analysis_tables(
             studies,
+            study_attempt_author_history=(histories.study_attempt_author_history),
             appointments=study_appointments,
             appointment_quality_findings=(
                 *appointment_findings,
@@ -307,6 +308,10 @@ def _print_publication(
         ("Manifest", published.manifest_path),
         ("HTML report", published.report_path),
         ("Metric definitions CSV", published.metric_definitions_path),
+        (
+            "Completed study author context summary CSV",
+            published.completed_study_author_context_summary_path,
+        ),
         (
             "Completed AI field analysis CSV",
             published.completed_ai_field_analysis_path,
