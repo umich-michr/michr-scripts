@@ -44,6 +44,30 @@ Publication uses a staging directory and atomically renames the completed
 directory into place. If publication fails, the staging directory is removed
 and the destination is not published.
 
+### Summarize published data quality
+
+~~~~bash
+uv run study-posting-audit-exploration summarize-quality \
+  --exploration output/study-posting-ai-audit-analysis/exploration
+~~~~
+
+This command reads only `quality/data_quality_summary.csv` and
+`analysis_manifest.json`. It prints a deterministic, identifier-free summary of
+fatal validation guarantees, warning checks, affected counts, denominators,
+percentages, and analysis consequences.
+
+Warnings do not fail the command by default. For warning-sensitive automation:
+
+~~~~bash
+uv run study-posting-audit-exploration summarize-quality \
+  --exploration output/study-posting-ai-audit-analysis/exploration \
+  --fail-on-warning
+~~~~
+
+`--fail-on-warning` prints the complete summary and then returns status 3 when
+at least one warning check has affected attempts. Invalid or inconsistent
+exploration output returns status 2.
+
 ## Validation
 
 The current validation contract checks:
@@ -198,7 +222,12 @@ selected text, or final text.
 ### HTML report
 
 `report.html` is a self-contained faculty-facing report generated only from
-aggregate analysis tables. It currently includes:
+aggregate analysis tables. It includes a concise data-quality section showing
+fatal validation guarantees, warning counts, affected and eligible attempt
+context, affected study and author counts, and warning consequences. The full
+checklist remains in `quality/data_quality_summary.csv`.
+
+It currently includes:
 
 - executive key performance indicator cards;
 - study completion pathways and author-handoff categories;

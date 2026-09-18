@@ -178,7 +178,7 @@ WITH
          XMLCAST(
              XMLAGG(
                  XMLELEMENT(e,
-                     hj.title||':'||hj.department||':'||hj.school||', '
+                     nvl(hj.title,'Unknown')||':'||nvl(hj.department,'Unknown')||':'||nvl(hj.school,'Unknown')||', '
                  )
                  ORDER BY hj.primary_appointment DESC, hj.title
              ) AS CLOB
@@ -197,7 +197,7 @@ WITH
          XMLCAST(
              XMLAGG(
                  XMLELEMENT(e,
-                     hj.title||':'||hj.department||':'||hj.school||', '
+                     nvl(hj.title,'Unknown')||':'||nvl(hj.department,'Unknown')||':'||nvl(hj.school,'Unknown')||', '
                  )
                  ORDER BY hj.primary_appointment DESC, hj.title
              ) AS CLOB

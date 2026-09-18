@@ -3,7 +3,10 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from study_posting_audit_exploration import ExplorationInputError
+from study_posting_audit_exploration import (
+    ExplorationInputError,
+    ExplorationValidationError,
+)
 from study_posting_audit_exploration.publication import (
     ExplorationChartInputs,
     ExplorationCharts,
@@ -35,6 +38,57 @@ def overview_rows() -> pd.DataFrame:
             },
         ]
     )
+
+
+def quality_rows(
+    *,
+    malformed_appointment_count: int = 2,
+) -> pd.DataFrame:
+    """Return aggregate-only quality rows for HTML rendering."""
+    rows: list[dict[str, object]] = [
+        {
+            "data_quality_check_name": f"SYNTHETIC_FATAL_{index:02d}",
+            "severity_level": "FATAL",
+            "affected_attempt_count": 0,
+            "affected_distinct_study_count": 0,
+            "affected_distinct_author_count": 0,
+            "eligible_attempt_count": 10,
+            "affected_attempt_percentage": 0.0,
+            "analysis_consequence": (
+                "Any detected case stops validation and publication."
+            ),
+        }
+        for index in range(13)
+    ]
+
+    for name, affected, studies, authors in (
+        ("ATTEMPT_AFTER_COMPLETION", 0, 0, 0),
+        ("CREATED_BY_ID_VARIES_WITHIN_STUDY", 0, 0, 0),
+        (
+            "MALFORMED_APPOINTMENT",
+            malformed_appointment_count,
+            min(malformed_appointment_count, 2),
+            min(malformed_appointment_count, 2),
+        ),
+    ):
+        rows.append(
+            {
+                "data_quality_check_name": name,
+                "severity_level": "WARNING",
+                "affected_attempt_count": affected,
+                "affected_distinct_study_count": studies,
+                "affected_distinct_author_count": authors,
+                "eligible_attempt_count": 10,
+                "affected_attempt_percentage": 10.0 * affected,
+                "analysis_consequence": (
+                    "Malformed entries are excluded from appointment groups."
+                    if name == "MALFORMED_APPOINTMENT"
+                    else "Synthetic warning consequence."
+                ),
+            }
+        )
+
+    return pd.DataFrame.from_records(rows)
 
 
 def attempt_rows() -> pd.DataFrame:
@@ -635,6 +689,7 @@ def charts() -> ExplorationCharts:
 def test_html_report_is_self_contained_and_accessible() -> None:
     html = render_html_report(
         overview_summary=overview_rows(),
+        data_quality_summary=quality_rows(),
         charts=charts(),
     )
     normalized_html = " ".join(html.split())
@@ -689,6 +744,7 @@ def test_html_report_explains_appointment_context() -> None:
     """Explain parsed appointment facets and overlapping groups."""
     html = render_html_report(
         overview_summary=overview_rows(),
+        data_quality_summary=quality_rows(),
         charts=charts(),
     )
     normalized_html = " ".join(html.split())
@@ -712,6 +768,7 @@ def test_html_report_explains_completed_study_author_context() -> None:
     """Explain the completed-study grain and study-specific author context."""
     html = render_html_report(
         overview_summary=overview_rows(),
+        data_quality_summary=quality_rows(),
         charts=charts(),
     )
     normalized_html = " ".join(html.split())
@@ -738,6 +795,7 @@ def test_html_report_explains_workflow_timing() -> None:
     """Verify attempt-level and study-level timing interpretation."""
     html = render_html_report(
         overview_summary=overview_rows(),
+        data_quality_summary=quality_rows(),
         charts=charts(),
     )
     normalized_html = " ".join(html.split())
@@ -754,6 +812,7 @@ def test_html_report_explains_workflow_timing() -> None:
 def test_html_report_explains_suggestion_choice_denominators() -> None:
     html = render_html_report(
         overview_summary=overview_rows(),
+        data_quality_summary=quality_rows(),
         charts=charts(),
     )
     normalized_html = " ".join(html.split())
@@ -771,6 +830,7 @@ def test_html_report_explains_suggestion_choice_denominators() -> None:
 def test_html_report_explains_readability_indicators() -> None:
     html = render_html_report(
         overview_summary=overview_rows(),
+        data_quality_summary=quality_rows(),
         charts=charts(),
     )
     normalized_html = " ".join(html.split())
@@ -813,6 +873,7 @@ def test_html_report_explains_readability_indicators() -> None:
 def test_html_report_excludes_identifier_and_payload_values() -> None:
     html = render_html_report(
         overview_summary=overview_rows(),
+        data_quality_summary=quality_rows(),
         charts=charts(),
     )
 
@@ -837,6 +898,7 @@ def test_write_html_report_creates_utf8_file(
     write_html_report(
         path,
         overview_summary=overview_rows(),
+        data_quality_summary=quality_rows(),
         charts=charts(),
     )
 
@@ -866,5 +928,68 @@ def test_write_html_report_wraps_io_failure(
         write_html_report(
             path,
             overview_summary=overview_rows(),
+            data_quality_summary=quality_rows(),
+            charts=charts(),
+        )
+
+
+def test_html_report_displays_aggregate_data_quality() -> None:
+    """Display fatal-pass guarantees and nonzero warning context."""
+    html = render_html_report(
+        overview_summary=overview_rows(),
+        data_quality_summary=quality_rows(),
+        charts=charts(),
+    )
+    normalized_html = " ".join(html.split())
+
+    assert 'id="data-quality-heading"' in html
+    assert "Data quality" in html
+    assert "Fatal validation checks passed" in normalized_html
+    assert "13 of 13" in normalized_html
+    assert "Warning checks with affected attempts" in normalized_html
+    assert "1 of 3" in normalized_html
+    assert "Warning occurrences" in normalized_html
+    assert "Malformed Appointment" in normalized_html
+    assert "Affected attempts: 2 of 10 (20.0%)" in normalized_html
+    assert "Affected studies: 2" in normalized_html
+    assert "Affected authors: 2" in normalized_html
+    assert "Malformed entries are excluded from appointment groups." in (
+        normalized_html
+    )
+    assert "No attempts occurred after completion." in normalized_html
+    assert "No studies had varying CREATED_BY_ID values." in normalized_html
+    assert "quality/data_quality_summary.csv" in normalized_html
+    assert "not a distinct-attempt count" in normalized_html
+    assert "do not establish a cause" in normalized_html
+
+
+def test_html_report_displays_no_warning_state() -> None:
+    """Clearly state when no warning check affected attempts."""
+    html = render_html_report(
+        overview_summary=overview_rows(),
+        data_quality_summary=quality_rows(malformed_appointment_count=0),
+        charts=charts(),
+    )
+    normalized_html = " ".join(html.split())
+
+    assert "Warning checks with affected attempts" in normalized_html
+    assert "0 of 3" in normalized_html
+    assert "No warning checks affected attempts in this run." in normalized_html
+    assert "No malformed appointment entries affected attempts." in normalized_html
+
+
+def test_html_report_requires_quality_columns() -> None:
+    """Reject an incomplete aggregate quality input."""
+    with pytest.raises(
+        ExplorationValidationError,
+        match="lacks required HTML columns",
+    ):
+        render_html_report(
+            overview_summary=overview_rows(),
+            data_quality_summary=pd.DataFrame(
+                {
+                    "severity_level": ["WARNING"],
+                }
+            ),
             charts=charts(),
         )

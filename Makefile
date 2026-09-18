@@ -44,6 +44,25 @@ LINT_DIRS := $(SRC_DIRS) $(TEST_DIRS) $(EXAMPLE_DIRS)
 
 REPORTS_DIR ?= reports
 
+# --- End-to-end audit workflow ---------------------------------------------
+AUDIT_REPORT_OUTPUT ?= output/study-posting-ai-audit-analysis/report
+AUDIT_EXPLORATION_OUTPUT ?= output/study-posting-ai-audit-analysis/exploration
+AUDIT_CSV_INPUT ?=
+OPEN_REPORT ?= 1
+FAIL_ON_QUALITY_WARNING ?= 0
+
+ifeq ($(strip $(OPEN_REPORT)),0)
+AUDIT_OPEN_REPORT_FLAG := --no-open-report
+else
+AUDIT_OPEN_REPORT_FLAG := --open-report
+endif
+
+ifeq ($(strip $(FAIL_ON_QUALITY_WARNING)),1)
+AUDIT_QUALITY_FLAG := --fail-on-warning
+else
+AUDIT_QUALITY_FLAG :=
+endif
+
 # --- Optional pytest arguments ---------------------------------------------
 #   make test PYTEST_ARGS="-k soft_word -vv"
 PYTEST_ARGS ?=
@@ -65,6 +84,7 @@ endif
         audit audit-deps audit-code \
         test test-fast test-slow coverage coverage-open \
         check ci members validate-package \
+        audit-explore-database audit-explore-csv \
         clean clean-reports clean-output clean-caches clean-venv distclean \
         hooks hooks-run hooks-update hooks-clean doctor
 
@@ -122,6 +142,10 @@ help:
 	@echo "    check            Everything above; run before committing"
 	@echo "    ci               Same as check, for pipelines"
 	@echo ""
+	@echo "  Audit workflows"
+	@echo "    audit-explore-database  Regenerate database report and exploration"
+	@echo "    audit-explore-csv       Regenerate CSV report and exploration"
+	@echo ""
 	@echo "  Maintenance"
 	@echo "    lock             Refresh uv.lock"
 	@echo "    upgrade          Bump dependency versions (review the diff)"
@@ -139,11 +163,19 @@ help:
 	@echo "  Options"
 	@echo "    PACKAGE=$(PACKAGE)   (empty means every member)"
 	@echo "    PYTEST_ARGS=\"$(PYTEST_ARGS)\""
+	@echo "    AUDIT_REPORT_OUTPUT=$(AUDIT_REPORT_OUTPUT)"
+	@echo "    AUDIT_EXPLORATION_OUTPUT=$(AUDIT_EXPLORATION_OUTPUT)"
+	@echo "    AUDIT_CSV_INPUT=$(AUDIT_CSV_INPUT)"
+	@echo "    OPEN_REPORT=$(OPEN_REPORT)"
+	@echo "    FAIL_ON_QUALITY_WARNING=$(FAIL_ON_QUALITY_WARNING)"
 	@echo ""
 	@echo "  Examples"
 	@echo "    make check"
 	@echo "    make test PACKAGE=study-posting-ai-analysis"
 	@echo "    make test PYTEST_ARGS=\"-k compensation -vv\""
+	@echo "    make audit-explore-database"
+	@echo "    make audit-explore-csv AUDIT_CSV_INPUT=path/to/audit.csv"
+	@echo "    make audit-explore-database OPEN_REPORT=0"
 	@echo ""
 
 members:
@@ -296,6 +328,27 @@ coverage: validate-package clean-caches clean-reports
 
 coverage-open: coverage
 	@$(foreach member,$(TEST_TARGETS),$(RUN) python -c "import pathlib, webbrowser; webbrowser.open(pathlib.Path('$(member)/$(REPORTS_DIR)/htmlcov/index.html').resolve().as_uri())";)
+
+# ---------------------------------------------------------------------------
+# End-to-end audit workflows
+# ---------------------------------------------------------------------------
+audit-explore-database:
+	$(RUN) python tools/run_study_posting_audit_exploration.py \
+	  $(AUDIT_OPEN_REPORT_FLAG) \
+	  $(AUDIT_QUALITY_FLAG) \
+	  --report-output "$(AUDIT_REPORT_OUTPUT)" \
+	  --exploration-output "$(AUDIT_EXPLORATION_OUTPUT)" \
+	  database
+
+audit-explore-csv:
+	env $(if $(strip $(AUDIT_CSV_INPUT)),STUDY_POSTING_AUDIT_CSV_INPUT="$(AUDIT_CSV_INPUT)") \
+	  $(RUN) python tools/run_study_posting_audit_exploration.py \
+	  $(AUDIT_OPEN_REPORT_FLAG) \
+	  $(AUDIT_QUALITY_FLAG) \
+	  --report-output "$(AUDIT_REPORT_OUTPUT)" \
+	  --exploration-output "$(AUDIT_EXPLORATION_OUTPUT)" \
+	  csv
+
 
 # ---------------------------------------------------------------------------
 # Combined gates

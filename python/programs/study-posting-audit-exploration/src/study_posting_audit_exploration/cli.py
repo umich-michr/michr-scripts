@@ -37,6 +37,10 @@ from study_posting_audit_exploration.models import (
     ValidationSummary,
 )
 from study_posting_audit_exploration.publication import publish_exploration
+from study_posting_audit_exploration.quality_summary import (
+    load_published_quality_summary,
+    render_quality_summary,
+)
 from study_posting_audit_exploration.validation import validate_audit_report
 
 _SOURCE_COLUMNS: tuple[str, ...] = (
@@ -112,6 +116,22 @@ def build_parser() -> argparse.ArgumentParser:
         required=True,
         metavar="PATH",
         help="New exploration output directory.",
+    )
+
+    quality_parser = subparsers.add_parser(
+        "summarize-quality",
+        help="Explain one published exploration quality summary.",
+    )
+    quality_parser.add_argument(
+        "--exploration",
+        required=True,
+        metavar="PATH",
+        help="Published exploration directory.",
+    )
+    quality_parser.add_argument(
+        "--fail-on-warning",
+        action="store_true",
+        help="Return status 3 after printing when warnings are affected.",
     )
 
     return parser
@@ -399,6 +419,22 @@ def _run_analyze(
     )
 
 
+def _run_summarize_quality(
+    namespace: argparse.Namespace,
+    *,
+    output: TextIO,
+) -> bool:
+    """Print one validated quality summary and return warning presence."""
+    summary = load_published_quality_summary(namespace.exploration)
+    print(
+        render_quality_summary(summary),
+        end="",
+        file=output,
+    )
+
+    return summary.has_warnings
+
+
 def main(
     argv: Sequence[str] | None = None,
     *,
@@ -422,6 +458,14 @@ def main(
                 namespace,
                 output=resolved_output,
             )
+        elif namespace.command == "summarize-quality":
+            has_warnings = _run_summarize_quality(
+                namespace,
+                output=resolved_output,
+            )
+
+            if namespace.fail_on_warning and has_warnings:
+                return 3
         else:  # pragma: no cover - argparse restricts registered commands
             parser.error(f"unsupported command: {namespace.command}")
     except AuditExplorationError as error:

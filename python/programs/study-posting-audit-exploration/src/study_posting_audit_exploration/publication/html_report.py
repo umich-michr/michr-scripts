@@ -98,6 +98,29 @@ _TEMPLATE = """<!doctype html>
       color: var(--muted);
       font-size: 0.85rem;
     }
+    .quality-summary {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 1rem;
+      margin: 1rem 0;
+    }
+    .quality-card {
+      padding: 1rem;
+      border: 1px solid var(--border);
+      border-radius: 0.5rem;
+      background: var(--panel);
+    }
+    .quality-card p { margin: 0.25rem 0; }
+    .quality-value {
+      font-size: 1.5rem;
+      font-weight: 700;
+    }
+    .quality-warning-list {
+      padding-left: 1.25rem;
+    }
+    .quality-warning-list li {
+      margin-bottom: 1rem;
+    }
     .chart {
       min-height: 360px;
       margin-top: 1rem;
@@ -140,6 +163,68 @@ _TEMPLATE = """<!doctype html>
       </article>
       {% endfor %}
     </div>
+  </section>
+
+  <section aria-labelledby="data-quality-heading">
+    <h2 id="data-quality-heading">Data quality</h2>
+    <p>
+      This successful publication passed every fatal validation check.
+      Fatal conditions stop publication, so affected fatal counts are zero
+      in a generated report.
+    </p>
+    <div class="quality-summary">
+      <article class="quality-card">
+        <p>Fatal validation checks passed</p>
+        <p class="quality-value">
+          {{ quality_fatal_passed }} of {{ quality_fatal_total }}
+        </p>
+      </article>
+      <article class="quality-card">
+        <p>Warning checks with affected attempts</p>
+        <p class="quality-value">
+          {{ quality_affected_warning_count }} of {{ quality_warning_total }}
+        </p>
+      </article>
+      <article class="quality-card">
+        <p>Warning occurrences</p>
+        <p class="quality-value">{{ quality_warning_occurrences }}</p>
+      </article>
+    </div>
+
+    {% if quality_warning_rows %}
+    <h3>Warnings requiring review</h3>
+    <ul class="quality-warning-list">
+      {% for warning in quality_warning_rows %}
+      <li>
+        <strong>{{ warning.label }}</strong><br>
+        Affected attempts: {{ warning.affected_attempt_count }} of
+        {{ warning.eligible_attempt_count }}
+        ({{ warning.percentage_text }}). Affected studies:
+        {{ warning.affected_study_count }}. Affected authors:
+        {{ warning.affected_author_count }}.<br>
+        Consequence: {{ warning.consequence }}
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p>No warning checks affected attempts in this run.</p>
+    {% endif %}
+
+    <h3>Warning checks with no affected attempts</h3>
+    <ul>
+      {% for message in quality_zero_warning_messages %}
+      <li>{{ message }}</li>
+      {% endfor %}
+    </ul>
+
+    <p class="caution">
+      Warning occurrences are summed across warning checks and are not a
+      distinct-attempt count. One attempt can contribute to more than one
+      warning. Warnings identify conditions to review; they do not establish
+      a cause, an individual error, or that every analysis result is invalid.
+      See <code>quality/data_quality_summary.csv</code> for the complete
+      checklist, definitions, denominators, and consequences.
+    </p>
   </section>
 
   <section aria-labelledby="study-pathways-heading">
@@ -463,6 +548,32 @@ _TEMPLATE = """<!doctype html>
 
 
 @dataclass(frozen=True, slots=True)
+class QualityWarningView:
+    """One aggregate warning shown in the faculty-facing report."""
+
+    label: str
+    affected_attempt_count: int
+    affected_study_count: int
+    affected_author_count: int
+    eligible_attempt_count: int
+    percentage_text: str
+    consequence: str
+
+
+@dataclass(frozen=True, slots=True)
+class QualityHtmlContext:
+    """Aggregate quality values rendered into the HTML report."""
+
+    fatal_passed: int
+    fatal_total: int
+    affected_warning_count: int
+    warning_total: int
+    warning_occurrences: int
+    warning_rows: tuple[QualityWarningView, ...]
+    zero_warning_messages: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class KpiCard:
     """One executive-overview card."""
 
@@ -547,6 +658,137 @@ def _kpi_cards(overview_summary: pd.DataFrame) -> tuple[KpiCard, ...]:
     return tuple(cards)
 
 
+_QUALITY_REQUIRED_COLUMNS: tuple[str, ...] = (
+    "data_quality_check_name",
+    "severity_level",
+    "affected_attempt_count",
+    "affected_distinct_study_count",
+    "affected_distinct_author_count",
+    "eligible_attempt_count",
+    "affected_attempt_percentage",
+    "analysis_consequence",
+)
+
+_ZERO_WARNING_MESSAGES: dict[str, str] = {
+    "ATTEMPT_AFTER_COMPLETION": "No attempts occurred after completion.",
+    "CREATED_BY_ID_VARIES_WITHIN_STUDY": (
+        "No studies had varying CREATED_BY_ID values."
+    ),
+    "MALFORMED_APPOINTMENT": ("No malformed appointment entries affected attempts."),
+}
+
+
+def _quality_html_context(
+    data_quality_summary: pd.DataFrame,
+) -> QualityHtmlContext:
+    """Return validated aggregate quality values for HTML rendering."""
+    missing = tuple(
+        column
+        for column in _QUALITY_REQUIRED_COLUMNS
+        if column not in data_quality_summary.columns
+    )
+
+    if missing:
+        raise ExplorationValidationError(
+            f"data_quality_summary lacks required HTML columns: {missing!r}"
+        )
+
+    rows = cast(
+        "list[dict[str, object]]",
+        data_quality_summary.to_dict(orient="records"),
+    )
+    fatal_rows = [row for row in rows if row["severity_level"] == "FATAL"]
+    warning_rows = [row for row in rows if row["severity_level"] == "WARNING"]
+
+    if len(fatal_rows) + len(warning_rows) != len(rows):
+        raise ExplorationValidationError(
+            "data_quality_summary contains unsupported severity values"
+        )
+
+    fatal_passed = sum(
+        int(
+            _finite_number(
+                row["affected_attempt_count"],
+                value_name="affected_attempt_count",
+            )
+        )
+        == 0
+        for row in fatal_rows
+    )
+    warning_views: list[QualityWarningView] = []
+    zero_messages: list[str] = []
+
+    for row in warning_rows:
+        name = str(row["data_quality_check_name"])
+        affected_count = int(
+            _finite_number(
+                row["affected_attempt_count"],
+                value_name="affected_attempt_count",
+            )
+        )
+
+        if affected_count == 0:
+            zero_messages.append(
+                _ZERO_WARNING_MESSAGES.get(
+                    name,
+                    f"{name}: no affected attempts.",
+                )
+            )
+            continue
+
+        percentage = _percentage_text(row["affected_attempt_percentage"])
+
+        if percentage is None:
+            percentage = "percentage unavailable"
+
+        warning_views.append(
+            QualityWarningView(
+                label=name.replace("_", " ").title(),
+                affected_attempt_count=affected_count,
+                affected_study_count=int(
+                    _finite_number(
+                        row["affected_distinct_study_count"],
+                        value_name="affected_distinct_study_count",
+                    )
+                ),
+                affected_author_count=int(
+                    _finite_number(
+                        row["affected_distinct_author_count"],
+                        value_name="affected_distinct_author_count",
+                    )
+                ),
+                eligible_attempt_count=int(
+                    _finite_number(
+                        row["eligible_attempt_count"],
+                        value_name="eligible_attempt_count",
+                    )
+                ),
+                percentage_text=percentage,
+                consequence=escape(str(row["analysis_consequence"])),
+            )
+        )
+
+    warning_occurrences = sum(
+        int(
+            _finite_number(
+                row["affected_attempt_count"],
+                value_name="affected_attempt_count",
+            )
+        )
+        for row in warning_rows
+    )
+
+    return QualityHtmlContext(
+        fatal_passed=fatal_passed,
+        fatal_total=len(fatal_rows),
+        affected_warning_count=len(warning_views),
+        warning_total=len(warning_rows),
+        warning_occurrences=warning_occurrences,
+        warning_rows=tuple(warning_views),
+        zero_warning_messages=tuple(zero_messages),
+    )
+
+
 def _figure_html(
     figure: object,
     *,
@@ -569,6 +811,7 @@ def _figure_html(
 def render_html_report(
     *,
     overview_summary: pd.DataFrame,
+    data_quality_summary: pd.DataFrame,
     charts: ExplorationCharts,
 ) -> str:
     """Return one self-contained faculty-facing HTML report."""
@@ -578,10 +821,18 @@ def render_html_report(
         undefined=StrictUndefined,
     )
     template = environment.from_string(_TEMPLATE)
+    quality = _quality_html_context(data_quality_summary)
 
     return template.render(
         title=_REPORT_TITLE,
         kpi_cards=_kpi_cards(overview_summary),
+        quality_fatal_passed=quality.fatal_passed,
+        quality_fatal_total=quality.fatal_total,
+        quality_affected_warning_count=quality.affected_warning_count,
+        quality_warning_total=quality.warning_total,
+        quality_warning_occurrences=quality.warning_occurrences,
+        quality_warning_rows=quality.warning_rows,
+        quality_zero_warning_messages=quality.zero_warning_messages,
         study_pathways_html=_figure_html(
             charts.study_completion_pathways,
             include_plotlyjs=True,
@@ -693,6 +944,7 @@ def write_html_report(
     path: Path,
     *,
     overview_summary: pd.DataFrame,
+    data_quality_summary: pd.DataFrame,
     charts: ExplorationCharts,
 ) -> None:
     """Write one self-contained HTML report."""
@@ -700,6 +952,7 @@ def write_html_report(
         path.write_text(
             render_html_report(
                 overview_summary=overview_summary,
+                data_quality_summary=data_quality_summary,
                 charts=charts,
             ),
             encoding="utf-8",

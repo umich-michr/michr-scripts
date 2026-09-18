@@ -101,6 +101,12 @@ from study_posting_audit_exploration.quality import (
     DATA_QUALITY_SUMMARY_COLUMNS,
     build_data_quality_summary,
 )
+from study_posting_audit_exploration.quality_summary import (
+    PublishedQualityCheck,
+    PublishedQualitySummary,
+    load_published_quality_summary,
+    render_quality_summary,
+)
 from study_posting_audit_exploration.research import (
     CANDIDATE_RESEARCH_QUESTION_COLUMNS,
     CandidateResearchQuestion,
@@ -139,6 +145,8 @@ __all__ = [
     "LoadedAuditReport",
     "MetricDefinition",
     "OverviewTables",
+    "PublishedQualityCheck",
+    "PublishedQualitySummary",
     "QualityAnalysisTables",
     "ReadabilityAnalysisTables",
     "StudyAnalysisTables",
@@ -198,8 +206,10 @@ __all__ = [
     "describe_numeric",
     "effective_author_role",
     "load_audit_report",
+    "load_published_quality_summary",
     "publish_exploration",
     "render_html_report",
+    "render_quality_summary",
     "same_author_within_study",
     "validate_audit_report",
     "write_html_report",

@@ -332,6 +332,7 @@ def _write_staging_output(
     write_html_report(
         report_path,
         overview_summary=tables.overview.overview_summary,
+        data_quality_summary=tables.quality.data_quality_summary,
         charts=charts,
     )
     write_manifest(

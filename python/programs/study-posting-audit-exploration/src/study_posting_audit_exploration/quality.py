@@ -138,6 +138,10 @@ _CHECKS: tuple[_QualityCheck, ...] = (
         "Any detected case stops validation and prevents publication.",
     ),
 )
+DATA_QUALITY_CHECK_NAMES: tuple[str, ...] = tuple(check.name for check in _CHECKS)
+DATA_QUALITY_CHECK_SEVERITIES: dict[str, str] = {
+    check.name: check.severity for check in _CHECKS
+}
 
 
 def _percentage(numerator: int, denominator: int) -> float | None:

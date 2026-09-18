@@ -328,3 +328,116 @@ def test_module_execution_calls_main(
 
     assert captured.value.code == 7
     assert calls == [()]
+
+
+def test_parser_exposes_summarize_quality_command() -> None:
+    namespace = build_parser().parse_args(
+        [
+            "summarize-quality",
+            "--exploration",
+            "synthetic-exploration",
+            "--fail-on-warning",
+        ]
+    )
+
+    assert namespace.command == "summarize-quality"
+    assert namespace.exploration == "synthetic-exploration"
+    assert namespace.fail_on_warning is True
+
+
+def test_summarize_quality_prints_published_quality(
+    valid_report_directory: Path,
+    tmp_path: Path,
+) -> None:
+    exploration_directory = tmp_path / "exploration"
+    status, _, error_text = _run_analyze(
+        valid_report_directory,
+        exploration_directory,
+    )
+    assert status == 0
+    assert error_text == ""
+
+    output = StringIO()
+    error_output = StringIO()
+    status = main(
+        [
+            "summarize-quality",
+            "--exploration",
+            str(exploration_directory),
+        ],
+        output=output,
+        error_output=error_output,
+    )
+
+    assert status == 0
+    assert error_output.getvalue() == ""
+    assert "Data-quality summary" in output.getvalue()
+    assert "Fatal validation checks passed: 13 of 13" in output.getvalue()
+    assert "Warning checks with affected attempts: 0 of 3" in output.getvalue()
+
+
+def test_summarize_quality_fail_on_warning_returns_three(
+    valid_report_directory: Path,
+    tmp_path: Path,
+) -> None:
+    exploration_directory = tmp_path / "exploration"
+    status, _, error_text = _run_analyze(
+        valid_report_directory,
+        exploration_directory,
+    )
+    assert status == 0
+    assert error_text == ""
+
+    quality_path = exploration_directory / "quality/data_quality_summary.csv"
+    quality_text = quality_path.read_text(encoding="utf-8")
+    quality_path.write_text(
+        quality_text.replace(
+            "MALFORMED_APPOINTMENT,WARNING,0,0,0,2,0.0",
+            "MALFORMED_APPOINTMENT,WARNING,1,1,1,2,50.0",
+            1,
+        ),
+        encoding="utf-8",
+    )
+    manifest_path = exploration_directory / "analysis_manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["warning_count"] = 1
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    output = StringIO()
+    error_output = StringIO()
+
+    status = main(
+        [
+            "summarize-quality",
+            "--exploration",
+            str(exploration_directory),
+            "--fail-on-warning",
+        ],
+        output=output,
+        error_output=error_output,
+    )
+
+    assert status == 3
+    assert error_output.getvalue() == ""
+    assert "MALFORMED_APPOINTMENT" in output.getvalue()
+    assert "Affected attempts: 1 of 2 (50.0%)" in output.getvalue()
+
+
+def test_summarize_quality_reports_invalid_exploration(
+    tmp_path: Path,
+) -> None:
+    output = StringIO()
+    error_output = StringIO()
+
+    status = main(
+        [
+            "summarize-quality",
+            "--exploration",
+            str(tmp_path / "missing"),
+        ],
+        output=output,
+        error_output=error_output,
+    )
+
+    assert status == 2
+    assert output.getvalue() == ""
+    assert "Exploration directory does not exist" in error_output.getvalue()

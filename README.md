@@ -328,6 +328,71 @@ See the
 for configuration, input templates, SQL parameters, output behavior, and
 security guidance.
 
+## End-to-end audit exploration workflows
+
+The root Makefile can regenerate a normalized audit report, publish its
+30-file exploration, print the deterministic data-quality summary, and open the
+faculty-facing HTML report.
+
+### Database source
+
+Run:
+
+    make audit-explore-database
+
+Database connection, SQL, schema, and prompt settings continue to use the
+audit-report program's existing command-line, environment, dotenv, default, and
+prompt precedence. Passwords are never accepted as Make variables or command
+arguments.
+
+### CSV source
+
+Use an explicit source:
+
+    make audit-explore-csv AUDIT_CSV_INPUT=path/to/audit.csv
+
+If `AUDIT_CSV_INPUT` is omitted, the audit-report program resolves its input
+through the existing environment, dotenv, or prompt behavior.
+
+### Defaults and options
+
+Generated destinations default to:
+
+    output/study-posting-ai-audit-analysis/report
+    output/study-posting-ai-audit-analysis/exploration
+
+Override them when needed:
+
+    make audit-explore-database \
+      AUDIT_REPORT_OUTPUT="output/custom/report" \
+      AUDIT_EXPLORATION_OUTPUT="output/custom/exploration"
+
+Disable browser opening for remote or automated execution:
+
+    make audit-explore-database OPEN_REPORT=0
+
+Treat quality warnings as a nonzero workflow result:
+
+    make audit-explore-database FAIL_ON_QUALITY_WARNING=1
+
+By default, warnings are printed but do not fail the workflow.
+
+### Regeneration safety
+
+Each target is intentionally idempotent for its two generated destinations. It
+removes the previous normalized-report and exploration directories, then
+regenerates them in order.
+
+The underlying helper validates paths before cleanup. It permits deletion only
+inside the repository-root `output/` directory and rejects broad, overlapping,
+or source-containing paths. The targets never run `rm -rf output` or
+`make clean-output`.
+
+A failure in normalized report generation stops all later stages. An
+exploration failure stops quality summarization and browser opening. Browser
+opening failure does not invalidate successfully generated output; the report
+path is always printed.
+
 ## Adding a Python member
 
 Python packages use:
