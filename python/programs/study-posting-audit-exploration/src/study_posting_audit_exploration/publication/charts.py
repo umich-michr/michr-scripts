@@ -451,8 +451,6 @@ class ExplorationCharts:
     author_experience_days: go.Figure
     completed_study_participant_mix: go.Figure
     completed_study_department_mix: go.Figure
-    effective_author_roles: go.Figure
-    author_pi_context: go.Figure
     author_appointment_schools: go.Figure
     pi_appointment_schools: go.Figure
     field_suggestion_adoption: go.Figure
@@ -1113,158 +1111,6 @@ def _grouped_author_rows(
         & grouped_author_summary["attempt_authoring_mode"].eq(_ALL)
         & grouped_author_summary["grouping_dimension_name"].eq(dimension_name)
     ].copy()
-
-
-def build_effective_author_role_chart(
-    grouped_author_summary: pd.DataFrame,
-) -> go.Figure:
-    """Return mutually exclusive effective author-role counts."""
-    _require_columns(
-        grouped_author_summary,
-        required=_REQUIRED_GROUPED_AUTHOR_COLUMNS,
-        frame_name="grouped_author_summary",
-    )
-    rows = _grouped_author_rows(
-        grouped_author_summary,
-        dimension_name="EFFECTIVE_AUTHOR_ROLE",
-    )
-
-    if rows.empty:
-        return _empty_figure(
-            title="Distinct authors by effective role",
-            message="No effective author-role aggregates are available.",
-        )
-
-    if not rows["group_values_are_mutually_exclusive"].eq(True).all():
-        raise ExplorationValidationError(
-            "effective author-role groups must be mutually exclusive"
-        )
-
-    rows = rows.sort_values(
-        by=[
-            "distinct_author_count",
-            "grouping_dimension_value",
-        ],
-        ascending=[
-            True,
-            True,
-        ],
-        kind="stable",
-    )
-    figure = go.Figure(
-        data=[
-            go.Bar(
-                x=[int(value) for value in rows["distinct_author_count"].tolist()],
-                y=[str(value) for value in rows["grouping_dimension_value"].tolist()],
-                orientation="h",
-                customdata=[
-                    [
-                        float(percentage),
-                        int(population_count),
-                    ]
-                    for percentage, population_count in zip(
-                        rows["distinct_author_percentage_within_population"].tolist(),
-                        rows["population_distinct_author_count"].tolist(),
-                        strict=True,
-                    )
-                ],
-                hovertemplate=(
-                    "Effective role: %{y}<br>"
-                    "Distinct authors: %{x}<br>"
-                    "Share: %{customdata[0]:.1f}%<br>"
-                    "Author population: %{customdata[1]}"
-                    "<extra></extra>"
-                ),
-            )
-        ]
-    )
-    figure.update_layout(
-        title="Distinct authors by effective role",
-        template="plotly_white",
-        xaxis_title="Distinct author count",
-        yaxis_title="Effective author role",
-        showlegend=False,
-    )
-
-    return figure
-
-
-def build_author_pi_context_chart(
-    grouped_author_summary: pd.DataFrame,
-) -> go.Figure:
-    """Return author-level principal-investigator classification counts."""
-    _require_columns(
-        grouped_author_summary,
-        required=_REQUIRED_GROUPED_AUTHOR_COLUMNS,
-        frame_name="grouped_author_summary",
-    )
-    rows = _grouped_author_rows(
-        grouped_author_summary,
-        dimension_name="ALL",
-    )
-    rows = rows.loc[rows["grouping_dimension_value"].eq(_ALL)]
-
-    if rows.empty:
-        return _empty_figure(
-            title="Authors classified as study principal investigators",
-            message="No author principal-investigator aggregates are available.",
-        )
-
-    if len(rows) != 1:
-        raise ExplorationValidationError(
-            "author principal-investigator context requires exactly one "
-            "all-author aggregate row"
-        )
-
-    row = rows.iloc[0]
-    population_count = int(row["population_distinct_author_count"])
-    pi_count = int(row["distinct_author_count_classified_as_pi"])
-
-    if population_count < 0:
-        raise ExplorationValidationError(
-            "all-author population count must be nonnegative"
-        )
-
-    if pi_count < 0 or pi_count > population_count:
-        raise ExplorationValidationError(
-            "authors classified as principal investigators must be between "
-            "zero and the all-author population count"
-        )
-
-    non_pi_count = population_count - pi_count
-    figure = go.Figure(
-        data=[
-            go.Bar(
-                x=[
-                    "Classified as PI",
-                    "Not classified as PI",
-                ],
-                y=[
-                    pi_count,
-                    non_pi_count,
-                ],
-                customdata=[
-                    population_count,
-                    population_count,
-                ],
-                hovertemplate=(
-                    "Classification: %{x}<br>"
-                    "Distinct authors: %{y}<br>"
-                    "Author population: %{customdata}"
-                    "<extra></extra>"
-                ),
-            )
-        ]
-    )
-    figure.update_layout(
-        title="Authors classified as study principal investigators",
-        template="plotly_white",
-        xaxis_title="Author-level classification",
-        yaxis_title="Distinct author count",
-        showlegend=False,
-    )
-
-    return figure
 
 
 def build_author_appointment_context_chart(
@@ -2378,10 +2224,6 @@ def build_exploration_charts(
             dimension_name="STUDY_DEPARTMENT",
             title="Completed studies by department",
         ),
-        effective_author_roles=build_effective_author_role_chart(
-            inputs.grouped_author_summary
-        ),
-        author_pi_context=build_author_pi_context_chart(inputs.grouped_author_summary),
         author_appointment_schools=build_author_appointment_context_chart(
             inputs.grouped_author_summary,
             dimension_name="AUTHOR_APPOINTMENT_SCHOOL",

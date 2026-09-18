@@ -16,11 +16,9 @@ from study_posting_audit_exploration.publication import (
     build_author_attempt_start_experience_chart,
     build_author_experience_chart,
     build_author_handoff_chart,
-    build_author_pi_context_chart,
     build_completed_study_mix_chart,
     build_content_source_concordance_chart,
     build_edit_readability_relationship_chart,
-    build_effective_author_role_chart,
     build_exploration_charts,
     build_study_completion_pathways_chart,
     build_suggestion_selection_by_index_chart,
@@ -1150,8 +1148,6 @@ def test_chart_bundle_contains_all_figures() -> None:
     assert charts.content_source_concordance.data
     assert charts.completed_study_participant_mix.data
     assert charts.completed_study_department_mix.data
-    assert charts.effective_author_roles.data
-    assert charts.author_pi_context.data
     assert charts.author_appointment_schools.data
     assert charts.pi_appointment_schools.data
     assert charts.field_suggestion_adoption.data
@@ -1217,12 +1213,6 @@ def test_charts_return_accessible_empty_states() -> None:
         dimension_name="STUDY_PARTICIPANT_TYPE",
         title="Completed studies by participant type",
     )
-    author_role_figure = build_effective_author_role_chart(
-        pd.DataFrame(columns=grouped_author_columns)
-    )
-    author_pi_figure = build_author_pi_context_chart(
-        pd.DataFrame(columns=grouped_author_columns)
-    )
     author_appointment_figure = build_author_appointment_context_chart(
         pd.DataFrame(columns=grouped_author_columns),
         dimension_name="AUTHOR_APPOINTMENT_SCHOOL",
@@ -1259,8 +1249,6 @@ def test_charts_return_accessible_empty_states() -> None:
     assert experience_figure.layout.annotations[0].text
     assert content_figure.layout.annotations[0].text
     assert study_mix_figure.layout.annotations[0].text
-    assert author_role_figure.layout.annotations[0].text
-    assert author_pi_figure.layout.annotations[0].text
     assert author_appointment_figure.layout.annotations[0].text
     assert field_adoption_figure.layout.annotations[0].text
     assert field_outcomes_figure.layout.annotations[0].text
@@ -1339,22 +1327,6 @@ def test_charts_return_accessible_empty_states() -> None:
             ),
         ),
         (
-            build_effective_author_role_chart,
-            pd.DataFrame(
-                {
-                    "author_population_name": ["ALL_AUTHORS"],
-                }
-            ),
-        ),
-        (
-            build_author_pi_context_chart,
-            pd.DataFrame(
-                {
-                    "author_population_name": ["ALL_AUTHORS"],
-                }
-            ),
-        ),
-        (
             lambda frame: build_author_appointment_context_chart(
                 frame,
                 dimension_name="AUTHOR_APPOINTMENT_SCHOOL",
@@ -1414,22 +1386,6 @@ def test_charts_return_accessible_empty_states() -> None:
                 }
             ),
         ),
-        (
-            build_selected_vs_unselected_readability_chart,
-            pd.DataFrame(
-                {
-                    "field_name": ["title"],
-                }
-            ),
-        ),
-        (
-            build_edit_readability_relationship_chart,
-            pd.DataFrame(
-                {
-                    "field_name": ["title"],
-                }
-            ),
-        ),
     ],
 )
 def test_charts_require_aggregate_columns(
@@ -1441,96 +1397,6 @@ def test_charts_require_aggregate_columns(
         match="lacks required chart columns",
     ):
         builder(frame)
-
-
-def test_effective_author_role_chart_uses_mutually_exclusive_counts() -> None:
-    figure = build_effective_author_role_chart(grouped_author_rows())
-    bar = figure.data[0]
-
-    assert figure.layout.title.text == "Distinct authors by effective role"
-    assert list(bar.y) == ["PI", "TEAM_MEMBER"]
-    assert list(bar.x) == [3, 7]
-
-
-def test_author_pi_context_chart_uses_all_author_population() -> None:
-    figure = build_author_pi_context_chart(grouped_author_rows())
-    bar = figure.data[0]
-
-    assert list(bar.x) == [
-        "Classified as PI",
-        "Not classified as PI",
-    ]
-    assert list(bar.y) == [3, 7]
-
-
-@pytest.mark.parametrize(
-    "pi_count",
-    [
-        -1,
-        11,
-    ],
-)
-def test_author_pi_context_chart_rejects_invalid_pi_count(
-    pi_count: int,
-) -> None:
-    rows = grouped_author_rows()
-    all_author_row = rows["grouping_dimension_name"].eq("ALL") & rows[
-        "grouping_dimension_value"
-    ].eq("ALL")
-    rows.loc[
-        all_author_row,
-        "distinct_author_count_classified_as_pi",
-    ] = pi_count
-
-    with pytest.raises(
-        ExplorationValidationError,
-        match=(
-            "authors classified as principal investigators must be between "
-            "zero and the all-author population count"
-        ),
-    ):
-        build_author_pi_context_chart(rows)
-
-
-def test_author_pi_context_chart_rejects_duplicate_all_author_rows() -> None:
-    rows = grouped_author_rows()
-    all_author_rows = rows.loc[
-        rows["grouping_dimension_name"].eq("ALL")
-        & rows["grouping_dimension_value"].eq("ALL")
-    ]
-    rows = pd.concat(
-        [
-            rows,
-            all_author_rows,
-        ],
-        ignore_index=True,
-    )
-
-    with pytest.raises(
-        ExplorationValidationError,
-        match=(
-            "author principal-investigator context requires exactly one "
-            "all-author aggregate row"
-        ),
-    ):
-        build_author_pi_context_chart(rows)
-
-
-def test_author_pi_context_chart_rejects_negative_population() -> None:
-    rows = grouped_author_rows()
-    all_author_row = rows["grouping_dimension_name"].eq("ALL") & rows[
-        "grouping_dimension_value"
-    ].eq("ALL")
-    rows.loc[
-        all_author_row,
-        "population_distinct_author_count",
-    ] = -1
-
-    with pytest.raises(
-        ExplorationValidationError,
-        match="all-author population count must be nonnegative",
-    ):
-        build_author_pi_context_chart(rows)
 
 
 def test_author_appointment_context_chart_preserves_overlapping_groups() -> None:

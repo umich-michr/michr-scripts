@@ -564,12 +564,12 @@ def test_html_report_is_self_contained_and_accessible() -> None:
     assert "not historical snapshots of individual attempts" in normalized_html
 
     assert 'id="author-context-heading"' in html
-    assert "Author and principal-investigator context" in html
-    assert "Distinct authors by effective role" in html
-    assert "Authors classified as study principal investigators" in html
+    assert "Author and principal-investigator appointment context" in html
+    assert "Distinct authors by effective role" not in html
+    assert "Authors classified as study principal investigators" not in html
     assert "Author appointment schools" in html
     assert "Principal-investigator appointment schools" in html
-    assert "those charts are not intended to sum to 100 percent" in normalized_html
+    assert "not intended to sum to 100 percent" in normalized_html
 
     assert 'id="study-mix-heading"' in html
     assert "Participant and department mix" in html
