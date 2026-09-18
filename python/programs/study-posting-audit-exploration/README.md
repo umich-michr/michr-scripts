@@ -176,7 +176,8 @@ aggregate analysis tables. It currently includes:
   study-specific effective role;
 - completed studies by final authoring mode and the completion author's
   study-specific principal-investigator status;
-- author and principal-investigator appointment-school context;
+- author and principal-investigator appointment school, department, and
+  title context;
 - completed-study participant-type and department mix;
 - AI suggestion offers and selections by field;
 - selected-suggestion retention and edit outcomes by field;
@@ -207,9 +208,12 @@ completion-author counts appear only as identifier-free hover context; no
 completion-author identity is displayed. The report intentionally does not
 reintroduce the removed author-level role or principal-investigator charts.
 
-Appointment-school charts remain separate context. Their groups may overlap
-because an author or principal investigator can have more than one appointment.
-Those chart values are not intended to sum to 100 percent.
+Appointment school, department, and title charts remain separate context.
+Appointment values are parsed from comma-separated `Title:Department:School`
+entries. Their groups may overlap because an author or principal investigator
+can have more than one appointment. Each chart counts distinct attempt authors
+represented in a group, and chart values are not intended to sum to 100
+percent.
 
 The report does not include cumulative lines, monthly trends, time-series
 outputs, or dropdown filtering for completed-study author context.

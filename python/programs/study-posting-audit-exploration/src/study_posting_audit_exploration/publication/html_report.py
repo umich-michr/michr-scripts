@@ -232,13 +232,23 @@ _TEMPLATE = """<!doctype html>
     <h2 id="author-context-heading">
       Author and principal-investigator appointment context
     </h2>
+    <p>
+      Appointment values are parsed from comma-separated
+      <code>Title:Department:School</code> entries. The charts summarize
+      schools, departments, and titles separately.
+    </p>
     <p class="caution">
-      Appointment-school groups may overlap because an author or principal
+      Appointment groups may overlap because an author or principal
       investigator can have more than one appointment; these charts are not
-      intended to sum to 100 percent.
+      intended to sum to 100 percent. Each chart counts distinct attempt
+      authors represented in the displayed appointment group.
     </p>
     <div class="chart">{{ author_appointment_schools_html | safe }}</div>
     <div class="chart">{{ pi_appointment_schools_html | safe }}</div>
+    <div class="chart">{{ author_appointment_departments_html | safe }}</div>
+    <div class="chart">{{ pi_appointment_departments_html | safe }}</div>
+    <div class="chart">{{ author_appointment_titles_html | safe }}</div>
+    <div class="chart">{{ pi_appointment_titles_html | safe }}</div>
   </section>
 
   <section aria-labelledby="study-mix-heading">
@@ -646,6 +656,22 @@ def render_html_report(
         ),
         pi_appointment_schools_html=_figure_html(
             charts.pi_appointment_schools,
+            include_plotlyjs=False,
+        ),
+        author_appointment_departments_html=_figure_html(
+            charts.author_appointment_departments,
+            include_plotlyjs=False,
+        ),
+        pi_appointment_departments_html=_figure_html(
+            charts.pi_appointment_departments,
+            include_plotlyjs=False,
+        ),
+        author_appointment_titles_html=_figure_html(
+            charts.author_appointment_titles,
+            include_plotlyjs=False,
+        ),
+        pi_appointment_titles_html=_figure_html(
+            charts.pi_appointment_titles,
             include_plotlyjs=False,
         ),
         participant_mix_html=_figure_html(

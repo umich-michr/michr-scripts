@@ -505,6 +505,58 @@ def grouped_author_rows() -> pd.DataFrame:
             "distinct_author_percentage_within_population": 40.0,
             "distinct_author_count_classified_as_pi": 2,
         },
+        {
+            "author_population_name": "ALL_AUTHORS",
+            "attempt_completion_group": "ALL",
+            "attempt_authoring_mode": "ALL",
+            "effective_author_role": "ALL",
+            "grouping_dimension_name": "AUTHOR_APPOINTMENT_DEPARTMENT",
+            "grouping_dimension_value": "Emergency Medicine",
+            "group_values_are_mutually_exclusive": False,
+            "distinct_author_count": 5,
+            "population_distinct_author_count": 10,
+            "distinct_author_percentage_within_population": 50.0,
+            "distinct_author_count_classified_as_pi": 2,
+        },
+        {
+            "author_population_name": "ALL_AUTHORS",
+            "attempt_completion_group": "ALL",
+            "attempt_authoring_mode": "ALL",
+            "effective_author_role": "ALL",
+            "grouping_dimension_name": "PI_APPOINTMENT_DEPARTMENT",
+            "grouping_dimension_value": "Neurology",
+            "group_values_are_mutually_exclusive": False,
+            "distinct_author_count": 3,
+            "population_distinct_author_count": 10,
+            "distinct_author_percentage_within_population": 30.0,
+            "distinct_author_count_classified_as_pi": 2,
+        },
+        {
+            "author_population_name": "ALL_AUTHORS",
+            "attempt_completion_group": "ALL",
+            "attempt_authoring_mode": "ALL",
+            "effective_author_role": "ALL",
+            "grouping_dimension_name": "AUTHOR_APPOINTMENT_TITLE",
+            "grouping_dimension_value": "PROFESSOR",
+            "group_values_are_mutually_exclusive": False,
+            "distinct_author_count": 6,
+            "population_distinct_author_count": 10,
+            "distinct_author_percentage_within_population": 60.0,
+            "distinct_author_count_classified_as_pi": 2,
+        },
+        {
+            "author_population_name": "ALL_AUTHORS",
+            "attempt_completion_group": "ALL",
+            "attempt_authoring_mode": "ALL",
+            "effective_author_role": "ALL",
+            "grouping_dimension_name": "PI_APPOINTMENT_TITLE",
+            "grouping_dimension_value": "ASSOCIATE PROFESSOR",
+            "group_values_are_mutually_exclusive": False,
+            "distinct_author_count": 4,
+            "population_distinct_author_count": 10,
+            "distinct_author_percentage_within_population": 40.0,
+            "distinct_author_count_classified_as_pi": 2,
+        },
     ]
 
     return pd.DataFrame.from_records(rows)
@@ -829,6 +881,51 @@ def test_completed_study_mix_chart_ranks_mutually_exclusive_groups() -> None:
         [30.0, 10],
         [50.0, 10],
     ]
+    assert figure.layout.yaxis.tickmode == "array"
+    assert list(figure.layout.yaxis.tickvals) == [
+        "MISSING",
+        "Other",
+        "HEALTHY",
+    ]
+    assert list(figure.layout.yaxis.ticktext) == [
+        "MISSING",
+        "Other",
+        "HEALTHY",
+    ]
+    assert figure.layout.height >= 420
+
+
+def test_completed_study_mix_chart_height_grows_with_category_count() -> None:
+    """Keep every study-category label visible without requiring hover."""
+    rows = grouped_study_rows()
+    template = rows.loc[
+        rows["grouping_dimension_1_name"].eq("STUDY_DEPARTMENT")
+        & rows["final_completion_authoring_mode"].eq("ALL")
+        & rows["grouping_dimension_2_name"].eq("NONE")
+    ].iloc[0]
+    additions = pd.DataFrame.from_records(
+        [
+            {
+                **template.to_dict(),
+                "grouping_dimension_1_value": f"Synthetic Department {index:02d}",
+                "distinct_study_count": index + 1,
+            }
+            for index in range(20)
+        ]
+    )
+    rows = pd.concat([rows, additions], ignore_index=True)
+
+    figure = build_completed_study_mix_chart(
+        rows,
+        dimension_name="STUDY_DEPARTMENT",
+        title="Completed studies by department",
+    )
+    bar = figure.data[0]
+
+    assert len(bar.y) == 22
+    assert len(figure.layout.yaxis.tickvals) == 22
+    assert len(figure.layout.yaxis.ticktext) == 22
+    assert figure.layout.height == 34 * 22 + 150
 
 
 def test_completed_study_department_chart_excludes_other_modes() -> None:
@@ -1240,6 +1337,10 @@ def test_chart_bundle_contains_all_figures() -> None:
     assert charts.completed_studies_by_completion_author_pi_status.data
     assert charts.author_appointment_schools.data
     assert charts.pi_appointment_schools.data
+    assert charts.author_appointment_departments.data
+    assert charts.pi_appointment_departments.data
+    assert charts.author_appointment_titles.data
+    assert charts.pi_appointment_titles.data
     assert charts.field_suggestion_adoption.data
     assert charts.field_selected_outcomes.data
     assert charts.suggestion_selection_by_kind.data
@@ -1521,6 +1622,82 @@ def test_author_appointment_context_chart_preserves_overlapping_groups() -> None
     assert list(bar.y) == ["School B", "School A"]
     assert list(bar.x) == [5, 6]
     assert "Groups may overlap" in str(bar.hovertemplate)
+
+
+def test_appointment_context_chart_uses_dimension_specific_labels() -> None:
+    """Use department and title wording rather than school wording."""
+    department = build_author_appointment_context_chart(
+        grouped_author_rows(),
+        dimension_name="AUTHOR_APPOINTMENT_DEPARTMENT",
+        title="Author appointment departments",
+    )
+    title = build_author_appointment_context_chart(
+        grouped_author_rows(),
+        dimension_name="PI_APPOINTMENT_TITLE",
+        title="Principal-investigator appointment titles",
+    )
+
+    department_bar = department.data[0]
+    title_bar = title.data[0]
+
+    assert department.layout.yaxis.title.text == "Appointment department"
+    assert "Appointment department" in str(department_bar.hovertemplate)
+    assert list(department_bar.y) == ["Emergency Medicine"]
+    assert department.layout.yaxis.tickmode == "array"
+    assert list(department.layout.yaxis.tickvals) == ["Emergency Medicine"]
+    assert list(department.layout.yaxis.ticktext) == ["Emergency Medicine"]
+    assert department.layout.height >= 420
+    assert title.layout.yaxis.title.text == "Appointment title"
+    assert "Appointment title" in str(title_bar.hovertemplate)
+    assert list(title_bar.y) == ["ASSOCIATE PROFESSOR"]
+    assert title.layout.yaxis.tickmode == "array"
+    assert list(title.layout.yaxis.tickvals) == ["ASSOCIATE PROFESSOR"]
+    assert list(title.layout.yaxis.ticktext) == ["ASSOCIATE PROFESSOR"]
+    assert title.layout.height >= 420
+
+
+def test_appointment_chart_height_grows_with_category_count() -> None:
+    """Keep every appointment category label visible without requiring hover."""
+    rows = grouped_author_rows()
+    template = rows.loc[
+        rows["grouping_dimension_name"].eq("AUTHOR_APPOINTMENT_TITLE")
+    ].iloc[0]
+    additions = pd.DataFrame.from_records(
+        [
+            {
+                **template.to_dict(),
+                "grouping_dimension_value": f"SYNTHETIC TITLE {index:02d}",
+                "distinct_author_count": index + 1,
+            }
+            for index in range(20)
+        ]
+    )
+    rows = pd.concat([rows, additions], ignore_index=True)
+
+    figure = build_author_appointment_context_chart(
+        rows,
+        dimension_name="AUTHOR_APPOINTMENT_TITLE",
+        title="Author appointment titles",
+    )
+    bar = figure.data[0]
+
+    assert len(bar.y) == 21
+    assert len(figure.layout.yaxis.tickvals) == 21
+    assert len(figure.layout.yaxis.ticktext) == 21
+    assert figure.layout.height == 34 * 21 + 150
+
+
+def test_author_appointment_context_chart_rejects_unsupported_dimension() -> None:
+    """Reject dimensions that are not appointment title, department, or school."""
+    with pytest.raises(
+        ExplorationValidationError,
+        match="unsupported appointment chart dimension",
+    ):
+        build_author_appointment_context_chart(
+            grouped_author_rows(),
+            dimension_name="UNKNOWN_APPOINTMENT_DIMENSION",
+            title="Unsupported",
+        )
 
 
 def test_author_appointment_context_chart_rejects_exclusive_groups() -> None:

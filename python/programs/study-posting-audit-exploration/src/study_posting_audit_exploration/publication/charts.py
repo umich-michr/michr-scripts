@@ -468,6 +468,10 @@ class ExplorationCharts:
     completed_studies_by_completion_author_pi_status: go.Figure
     author_appointment_schools: go.Figure
     pi_appointment_schools: go.Figure
+    author_appointment_departments: go.Figure
+    pi_appointment_departments: go.Figure
+    author_appointment_titles: go.Figure
+    pi_appointment_titles: go.Figure
     field_suggestion_adoption: go.Figure
     field_selected_outcomes: go.Figure
     suggestion_selection_by_kind: go.Figure
@@ -1103,11 +1107,27 @@ def build_completed_study_mix_chart(
             )
         ]
     )
+    category_count = len(rows)
+    figure_height = max(420, 34 * category_count + 150)
+
     figure.update_layout(
         title=title,
         template="plotly_white",
+        height=figure_height,
+        margin={
+            "l": 220,
+            "r": 40,
+            "t": 80,
+            "b": 70,
+        },
         xaxis_title="Completed study count",
-        yaxis_title="Category",
+        yaxis={
+            "title": "Category",
+            "tickmode": "array",
+            "tickvals": values,
+            "ticktext": values,
+            "automargin": True,
+        },
         showlegend=False,
     )
 
@@ -1264,6 +1284,22 @@ def _grouped_author_rows(
     ].copy()
 
 
+def _appointment_dimension_label(dimension_name: str) -> str:
+    """Return the faculty-facing appointment facet label."""
+    if dimension_name.endswith("_SCHOOL"):
+        return "Appointment school"
+
+    if dimension_name.endswith("_DEPARTMENT"):
+        return "Appointment department"
+
+    if dimension_name.endswith("_TITLE"):
+        return "Appointment title"
+
+    raise ExplorationValidationError(
+        f"unsupported appointment chart dimension {dimension_name!r}"
+    )
+
+
 def build_author_appointment_context_chart(
     grouped_author_summary: pd.DataFrame,
     *,
@@ -1276,6 +1312,7 @@ def build_author_appointment_context_chart(
         required=_REQUIRED_GROUPED_AUTHOR_COLUMNS,
         frame_name="grouped_author_summary",
     )
+    dimension_label = _appointment_dimension_label(dimension_name)
     rows = _grouped_author_rows(
         grouped_author_summary,
         dimension_name=dimension_name,
@@ -1304,18 +1341,19 @@ def build_author_appointment_context_chart(
         ],
         kind="stable",
     )
+    values = [str(value) for value in rows["grouping_dimension_value"].tolist()]
     figure = go.Figure(
         data=[
             go.Bar(
                 x=[int(value) for value in rows["distinct_author_count"].tolist()],
-                y=[str(value) for value in rows["grouping_dimension_value"].tolist()],
+                y=values,
                 orientation="h",
                 customdata=[
                     int(value)
                     for value in rows["population_distinct_author_count"].tolist()
                 ],
                 hovertemplate=(
-                    "Appointment school: %{y}<br>"
+                    f"{dimension_label}: %{{y}}<br>"
                     "Distinct authors represented: %{x}<br>"
                     "Author population: %{customdata}<br>"
                     "Groups may overlap"
@@ -1324,11 +1362,27 @@ def build_author_appointment_context_chart(
             )
         ]
     )
+    category_count = len(rows)
+    figure_height = max(420, 34 * category_count + 150)
+
     figure.update_layout(
         title=title,
         template="plotly_white",
+        height=figure_height,
+        margin={
+            "l": 220,
+            "r": 40,
+            "t": 80,
+            "b": 70,
+        },
         xaxis_title="Distinct authors represented",
-        yaxis_title="Appointment school",
+        yaxis={
+            "title": dimension_label,
+            "tickmode": "array",
+            "tickvals": values,
+            "ticktext": values,
+            "automargin": True,
+        },
         showlegend=False,
     )
 
@@ -2403,6 +2457,26 @@ def build_exploration_charts(
             inputs.grouped_author_summary,
             dimension_name="PI_APPOINTMENT_SCHOOL",
             title="Principal-investigator appointment schools",
+        ),
+        author_appointment_departments=build_author_appointment_context_chart(
+            inputs.grouped_author_summary,
+            dimension_name="AUTHOR_APPOINTMENT_DEPARTMENT",
+            title="Author appointment departments",
+        ),
+        pi_appointment_departments=build_author_appointment_context_chart(
+            inputs.grouped_author_summary,
+            dimension_name="PI_APPOINTMENT_DEPARTMENT",
+            title="Principal-investigator appointment departments",
+        ),
+        author_appointment_titles=build_author_appointment_context_chart(
+            inputs.grouped_author_summary,
+            dimension_name="AUTHOR_APPOINTMENT_TITLE",
+            title="Author appointment titles",
+        ),
+        pi_appointment_titles=build_author_appointment_context_chart(
+            inputs.grouped_author_summary,
+            dimension_name="PI_APPOINTMENT_TITLE",
+            title="Principal-investigator appointment titles",
         ),
         field_suggestion_adoption=build_field_suggestion_adoption_chart(
             inputs.field_adoption_editing_summary

@@ -550,6 +550,58 @@ def grouped_author_rows() -> pd.DataFrame:
             "distinct_author_percentage_within_population": 40.0,
             "distinct_author_count_classified_as_pi": 2,
         },
+        {
+            "author_population_name": "ALL_AUTHORS",
+            "attempt_completion_group": "ALL",
+            "attempt_authoring_mode": "ALL",
+            "effective_author_role": "ALL",
+            "grouping_dimension_name": "AUTHOR_APPOINTMENT_DEPARTMENT",
+            "grouping_dimension_value": "Emergency Medicine",
+            "group_values_are_mutually_exclusive": False,
+            "distinct_author_count": 5,
+            "population_distinct_author_count": 10,
+            "distinct_author_percentage_within_population": 50.0,
+            "distinct_author_count_classified_as_pi": 2,
+        },
+        {
+            "author_population_name": "ALL_AUTHORS",
+            "attempt_completion_group": "ALL",
+            "attempt_authoring_mode": "ALL",
+            "effective_author_role": "ALL",
+            "grouping_dimension_name": "PI_APPOINTMENT_DEPARTMENT",
+            "grouping_dimension_value": "Neurology",
+            "group_values_are_mutually_exclusive": False,
+            "distinct_author_count": 3,
+            "population_distinct_author_count": 10,
+            "distinct_author_percentage_within_population": 30.0,
+            "distinct_author_count_classified_as_pi": 2,
+        },
+        {
+            "author_population_name": "ALL_AUTHORS",
+            "attempt_completion_group": "ALL",
+            "attempt_authoring_mode": "ALL",
+            "effective_author_role": "ALL",
+            "grouping_dimension_name": "AUTHOR_APPOINTMENT_TITLE",
+            "grouping_dimension_value": "PROFESSOR",
+            "group_values_are_mutually_exclusive": False,
+            "distinct_author_count": 6,
+            "population_distinct_author_count": 10,
+            "distinct_author_percentage_within_population": 60.0,
+            "distinct_author_count_classified_as_pi": 2,
+        },
+        {
+            "author_population_name": "ALL_AUTHORS",
+            "attempt_completion_group": "ALL",
+            "attempt_authoring_mode": "ALL",
+            "effective_author_role": "ALL",
+            "grouping_dimension_name": "PI_APPOINTMENT_TITLE",
+            "grouping_dimension_value": "ASSOCIATE PROFESSOR",
+            "group_values_are_mutually_exclusive": False,
+            "distinct_author_count": 4,
+            "population_distinct_author_count": 10,
+            "distinct_author_percentage_within_population": 40.0,
+            "distinct_author_count_classified_as_pi": 2,
+        },
     ]
 
     return pd.DataFrame.from_records(rows)
@@ -618,14 +670,6 @@ def test_html_report_is_self_contained_and_accessible() -> None:
     assert "missing values can further reduce either count" in normalized_html
     assert "not historical snapshots of individual attempts" in normalized_html
 
-    assert 'id="author-context-heading"' in html
-    assert "Author and principal-investigator appointment context" in html
-    assert "Distinct authors by effective role" not in html
-    assert "Authors classified as study principal investigators" not in html
-    assert "Author appointment schools" in html
-    assert "Principal-investigator appointment schools" in html
-    assert "not intended to sum to 100 percent" in normalized_html
-
     assert 'id="study-mix-heading"' in html
     assert "Participant and department mix" in html
     assert "Completed studies by participant type" in html
@@ -639,6 +683,29 @@ def test_html_report_is_self_contained_and_accessible() -> None:
     assert "Field populations and denominators can differ" in normalized_html
     assert "Edited-unclassified is kept separate from replaced" in normalized_html
     assert "do not establish writing quality" in normalized_html
+
+
+def test_html_report_explains_appointment_context() -> None:
+    """Explain parsed appointment facets and overlapping groups."""
+    html = render_html_report(
+        overview_summary=overview_rows(),
+        charts=charts(),
+    )
+    normalized_html = " ".join(html.split())
+
+    assert 'id="author-context-heading"' in html
+    assert "Author and principal-investigator appointment context" in html
+    assert "Distinct authors by effective role" not in html
+    assert "Authors classified as study principal investigators" not in html
+    assert "Author appointment schools" in html
+    assert "Principal-investigator appointment schools" in html
+    assert "Author appointment departments" in html
+    assert "Principal-investigator appointment departments" in html
+    assert "Author appointment titles" in html
+    assert "Principal-investigator appointment titles" in html
+    assert "Title:Department:School" in normalized_html
+    assert "not intended to sum to 100 percent" in normalized_html
+    assert "counts distinct attempt authors represented" in normalized_html
 
 
 def test_html_report_explains_completed_study_author_context() -> None:
