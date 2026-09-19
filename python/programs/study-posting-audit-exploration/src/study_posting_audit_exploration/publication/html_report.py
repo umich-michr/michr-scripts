@@ -651,19 +651,6 @@ _TEMPLATE = """<!doctype html>
     {% endif %}
   </section>
 
-  <section aria-labelledby="interpretation-heading">
-    <h2 id="interpretation-heading">Interpretation and privacy</h2>
-    <p>
-      The HTML report is generated only from aggregate analysis tables. It does
-      not include usernames, audit identifiers, study numbers, source payloads,
-      selected text, or final text.
-    </p>
-    <p>
-      Readability formulas are indicators only. They do not establish
-      comprehension, accuracy, cultural appropriateness, layout quality,
-      accessibility, usefulness, or ethical adequacy.
-    </p>
-  </section>
 </main>
 </body>
 </html>

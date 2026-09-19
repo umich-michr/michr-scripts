@@ -799,7 +799,8 @@ def test_html_report_is_self_contained_and_accessible() -> None:
     assert 'src="https://cdn.plot.ly' not in html
     assert "These descriptive results do not" in normalized_html
     assert "establish causality and must not be" in normalized_html
-    assert "Readability formulas are indicators only" in normalized_html
+    assert 'id="interpretation-heading"' not in html
+    assert "Interpretation and privacy" not in html
 
     assert 'id="author-experience-heading"' in html
     assert "Author experience and activity" in html
@@ -1027,10 +1028,9 @@ def test_html_report_displays_authorized_user_feedback_table() -> None:
     assert ">40<" not in normalized_html
     assert "<tags>" not in html
     assert "&lt;tags&gt; &amp; special characters." in html
-    assert "Interpretation and privacy" in html
-    assert html.index("User feedback on AI assistance") < html.index(
-        "Interpretation and privacy"
-    )
+    assert html.rstrip().endswith("</html>")
+    assert "Interpretation and privacy" not in html
+    assert html.index("User feedback on AI assistance") < html.index("</main>")
 
 
 def test_html_report_displays_feedback_empty_state() -> None:
