@@ -149,6 +149,40 @@ _TEMPLATE = """<!doctype html>
     .quality-warning-list li {
       margin-bottom: 1rem;
     }
+    .feedback-table-wrapper {
+      margin-top: 1rem;
+      overflow-x: auto;
+    }
+    .feedback-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--surface);
+    }
+    .feedback-table caption {
+      padding-bottom: 0.75rem;
+      color: var(--muted);
+      text-align: left;
+      font-weight: 700;
+    }
+    .feedback-table th,
+    .feedback-table td {
+      padding: 0.75rem;
+      border: 1px solid var(--border);
+      text-align: left;
+      vertical-align: top;
+    }
+    .feedback-table th {
+      background: var(--panel);
+    }
+    .feedback-record-id {
+      width: 10rem;
+      white-space: nowrap;
+    }
+    .feedback-text {
+      min-width: 28rem;
+      overflow-wrap: anywhere;
+      white-space: pre-wrap;
+    }
     .chart {
       min-height: 360px;
       margin-top: 1rem;
@@ -581,6 +615,42 @@ _TEMPLATE = """<!doctype html>
     <div class="chart">{{ content_source_html | safe }}</div>
   </section>
 
+  <section aria-labelledby="user-feedback-heading">
+    <h2 id="user-feedback-heading">User feedback on AI assistance</h2>
+    <p>
+      These comments are self-reported feedback about the perceived usefulness
+      of AI assistance. They are descriptive and do not establish causal
+      benefit, writing quality, correctness, accessibility, or effectiveness.
+    </p>
+
+    {% if user_feedback_rows %}
+    <div class="feedback-table-wrapper" role="region"
+         aria-label="User feedback table" tabindex="0">
+      <table class="feedback-table">
+        <caption>
+          Available AI-usefulness feedback ordered by audit record ID
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col">Audit record ID</th>
+            <th scope="col">User feedback</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for feedback in user_feedback_rows %}
+          <tr>
+            <td class="feedback-record-id">{{ feedback.audit_record_id }}</td>
+            <td class="feedback-text">{{ feedback.feedback_text }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p>No user feedback about AI usefulness was available for this report.</p>
+    {% endif %}
+  </section>
+
   <section aria-labelledby="interpretation-heading">
     <h2 id="interpretation-heading">Interpretation and privacy</h2>
     <p>
@@ -644,6 +714,83 @@ class CompletionPathwayCallout:
     completed_study_count: int
     percentage_text: str
     detail: str
+
+
+@dataclass(frozen=True, slots=True)
+class UserFeedbackView:
+    """One authorized faculty-facing feedback response."""
+
+    audit_record_id: int
+    feedback_text: str
+
+
+def _user_feedback_rows(
+    records: pd.DataFrame,
+) -> tuple[UserFeedbackView, ...]:
+    """Return authorized nonblank feedback ordered by audit record ID."""
+    required_columns = (
+        "ID",
+        "USER_FEEDBACK_COMMENTS",
+    )
+    missing = tuple(
+        column for column in required_columns if column not in records.columns
+    )
+
+    if missing:
+        raise ExplorationValidationError(
+            f"records lacks required feedback columns: {missing!r}"
+        )
+
+    projected = records.loc[
+        :,
+        list(required_columns),
+    ].copy()
+    feedback_text = projected["USER_FEEDBACK_COMMENTS"].astype("string")
+    projected["_feedback_trimmed"] = feedback_text.str.strip()
+    available = projected.loc[
+        projected["USER_FEEDBACK_COMMENTS"].notna()
+        & projected["_feedback_trimmed"].notna()
+        & projected["_feedback_trimmed"].ne("")
+    ].copy()
+
+    if available.empty:
+        return ()
+
+    if available["ID"].isna().any():
+        raise ExplorationValidationError(
+            "feedback-bearing records require an audit record ID"
+        )
+
+    try:
+        numeric_ids = pd.to_numeric(
+            available["ID"],
+            errors="raise",
+        )
+    except (TypeError, ValueError) as error:
+        raise ExplorationValidationError(
+            "feedback-bearing records require numeric audit record IDs"
+        ) from error
+
+    if not numeric_ids.map(lambda value: float(value).is_integer()).all():
+        raise ExplorationValidationError(
+            "feedback-bearing records require integer audit record IDs"
+        )
+
+    available["_audit_record_id"] = numeric_ids.astype("int64")
+    available = available.sort_values(
+        by=[
+            "_audit_record_id",
+        ],
+        kind="stable",
+    )
+
+    return tuple(
+        UserFeedbackView(
+            audit_record_id=int(row["_audit_record_id"]),
+            feedback_text=str(row["USER_FEEDBACK_COMMENTS"]),
+        )
+        for row in available.to_dict(orient="records")
+    )
 
 
 def _finite_number(
@@ -1041,6 +1188,7 @@ def _figure_html(
 
 def render_html_report(
     *,
+    records: pd.DataFrame,
     overview_summary: pd.DataFrame,
     author_handoff_summary: pd.DataFrame,
     data_quality_summary: pd.DataFrame,
@@ -1057,6 +1205,7 @@ def render_html_report(
 
     return template.render(
         title=_REPORT_TITLE,
+        user_feedback_rows=_user_feedback_rows(records),
         kpi_cards=_kpi_cards(overview_summary),
         pathway_callouts=_completion_pathway_callouts(
             overview_summary,
@@ -1179,6 +1328,7 @@ def render_html_report(
 def write_html_report(
     path: Path,
     *,
+    records: pd.DataFrame,
     overview_summary: pd.DataFrame,
     author_handoff_summary: pd.DataFrame,
     data_quality_summary: pd.DataFrame,
@@ -1188,6 +1338,7 @@ def write_html_report(
     try:
         path.write_text(
             render_html_report(
+                records=records,
                 overview_summary=overview_summary,
                 author_handoff_summary=author_handoff_summary,
                 data_quality_summary=data_quality_summary,

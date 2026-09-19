@@ -337,6 +337,7 @@ def _write_staging_output(
 
     write_html_report(
         report_path,
+        records=report.records,
         overview_summary=tables.overview.overview_summary,
         author_handoff_summary=tables.overview.author_handoff_summary,
         data_quality_summary=tables.quality.data_quality_summary,

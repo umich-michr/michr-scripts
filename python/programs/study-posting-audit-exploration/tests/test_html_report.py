@@ -84,6 +84,48 @@ def overview_rows() -> pd.DataFrame:
     )
 
 
+def feedback_records() -> pd.DataFrame:
+    """Return synthetic source records for authorized feedback rendering."""
+    return pd.DataFrame.from_records(
+        [
+            {
+                "ID": 30,
+                "USER_FEEDBACK_COMMENTS": (
+                    "Synthetic feedback with <tags> & special characters."
+                ),
+                "AUTHOR_USER_NAME": "forbidden-author@example.edu",
+                "STUDY_NUM": "FORBIDDEN-STUDY",
+                "LLM_SUGGESTIONS": "FORBIDDEN-SUGGESTION-PAYLOAD",
+                "FINAL_SUBMISSION": "FORBIDDEN-FINAL-PAYLOAD",
+            },
+            {
+                "ID": 10,
+                "USER_FEEDBACK_COMMENTS": "Synthetic feedback shown first.",
+                "AUTHOR_USER_NAME": "another-forbidden-author@example.edu",
+                "STUDY_NUM": "ANOTHER-FORBIDDEN-STUDY",
+                "LLM_SUGGESTIONS": "ANOTHER-FORBIDDEN-SUGGESTION",
+                "FINAL_SUBMISSION": "ANOTHER-FORBIDDEN-FINAL",
+            },
+            {
+                "ID": 20,
+                "USER_FEEDBACK_COMMENTS": "   ",
+                "AUTHOR_USER_NAME": "blank-feedback-author@example.edu",
+                "STUDY_NUM": "BLANK-FEEDBACK-STUDY",
+                "LLM_SUGGESTIONS": "BLANK-FEEDBACK-SUGGESTION",
+                "FINAL_SUBMISSION": "BLANK-FEEDBACK-FINAL",
+            },
+            {
+                "ID": 40,
+                "USER_FEEDBACK_COMMENTS": pd.NA,
+                "AUTHOR_USER_NAME": "missing-feedback-author@example.edu",
+                "STUDY_NUM": "MISSING-FEEDBACK-STUDY",
+                "LLM_SUGGESTIONS": "MISSING-FEEDBACK-SUGGESTION",
+                "FINAL_SUBMISSION": "MISSING-FEEDBACK-FINAL",
+            },
+        ]
+    )
+
+
 def quality_rows(
     *,
     malformed_appointment_count: int = 2,
@@ -735,6 +777,7 @@ def charts() -> ExplorationCharts:
 
 def test_html_report_is_self_contained_and_accessible() -> None:
     html = render_html_report(
+        records=feedback_records(),
         overview_summary=overview_rows(),
         author_handoff_summary=author_handoff_rows(),
         data_quality_summary=quality_rows(),
@@ -791,6 +834,7 @@ def test_html_report_is_self_contained_and_accessible() -> None:
 def test_html_report_explains_appointment_context() -> None:
     """Explain parsed appointment facets and overlapping groups."""
     html = render_html_report(
+        records=feedback_records(),
         overview_summary=overview_rows(),
         author_handoff_summary=author_handoff_rows(),
         data_quality_summary=quality_rows(),
@@ -816,6 +860,7 @@ def test_html_report_explains_appointment_context() -> None:
 def test_html_report_explains_completed_study_author_context() -> None:
     """Explain the completed-study grain and study-specific author context."""
     html = render_html_report(
+        records=feedback_records(),
         overview_summary=overview_rows(),
         author_handoff_summary=author_handoff_rows(),
         data_quality_summary=quality_rows(),
@@ -844,6 +889,7 @@ def test_html_report_explains_completed_study_author_context() -> None:
 def test_html_report_loads_plotly_before_first_chart() -> None:
     """Load Plotly before the first overview chart executes."""
     html = render_html_report(
+        records=feedback_records(),
         overview_summary=overview_rows(),
         author_handoff_summary=author_handoff_rows(),
         data_quality_summary=quality_rows(),
@@ -867,6 +913,7 @@ def test_html_report_loads_plotly_before_first_chart() -> None:
 def test_html_report_explains_workflow_timing() -> None:
     """Verify overview timing interpretation without duplicate rendering."""
     html = render_html_report(
+        records=feedback_records(),
         overview_summary=overview_rows(),
         author_handoff_summary=author_handoff_rows(),
         data_quality_summary=quality_rows(),
@@ -887,6 +934,7 @@ def test_html_report_explains_workflow_timing() -> None:
 
 def test_html_report_explains_suggestion_choice_denominators() -> None:
     html = render_html_report(
+        records=feedback_records(),
         overview_summary=overview_rows(),
         author_handoff_summary=author_handoff_rows(),
         data_quality_summary=quality_rows(),
@@ -906,6 +954,7 @@ def test_html_report_explains_suggestion_choice_denominators() -> None:
 
 def test_html_report_explains_readability_indicators() -> None:
     html = render_html_report(
+        records=feedback_records(),
         overview_summary=overview_rows(),
         author_handoff_summary=author_handoff_rows(),
         data_quality_summary=quality_rows(),
@@ -948,8 +997,120 @@ def test_html_report_explains_readability_indicators() -> None:
     assert "Lower is not automatically better" in normalized_html
 
 
+def test_html_report_displays_authorized_user_feedback_table() -> None:
+    html = render_html_report(
+        records=feedback_records(),
+        overview_summary=overview_rows(),
+        author_handoff_summary=author_handoff_rows(),
+        data_quality_summary=quality_rows(),
+        charts=charts(),
+    )
+    normalized_html = " ".join(html.split())
+
+    assert 'id="user-feedback-heading"' in html
+    assert "User feedback on AI assistance" in html
+    assert "<table" in html
+    assert "<caption>" in html
+    assert "Available AI-usefulness feedback ordered by audit record ID" in (
+        normalized_html
+    )
+    assert '<th scope="col">Audit record ID</th>' in html
+    assert '<th scope="col">User feedback</th>' in html
+    assert normalized_html.index("Synthetic feedback shown first.") < (
+        normalized_html.index(
+            "Synthetic feedback with &lt;tags&gt; &amp; special characters."
+        )
+    )
+    assert ">10<" in normalized_html
+    assert ">30<" in normalized_html
+    assert ">20<" not in normalized_html
+    assert ">40<" not in normalized_html
+    assert "<tags>" not in html
+    assert "&lt;tags&gt; &amp; special characters." in html
+    assert "Interpretation and privacy" in html
+    assert html.index("User feedback on AI assistance") < html.index(
+        "Interpretation and privacy"
+    )
+
+
+def test_html_report_displays_feedback_empty_state() -> None:
+    html = render_html_report(
+        records=pd.DataFrame(
+            {
+                "ID": pd.Series(dtype="Int64"),
+                "USER_FEEDBACK_COMMENTS": pd.Series(dtype="string"),
+            }
+        ),
+        overview_summary=overview_rows(),
+        author_handoff_summary=author_handoff_rows(),
+        data_quality_summary=quality_rows(),
+        charts=charts(),
+    )
+
+    assert "No user feedback about AI usefulness was available" in html
+    assert '<table class="feedback-table">' not in html
+
+
+@pytest.mark.parametrize(
+    ("records", "message"),
+    [
+        (
+            pd.DataFrame(
+                {
+                    "ID": [1],
+                }
+            ),
+            "lacks required feedback columns",
+        ),
+        (
+            pd.DataFrame(
+                {
+                    "ID": [pd.NA],
+                    "USER_FEEDBACK_COMMENTS": ["Synthetic feedback"],
+                }
+            ),
+            "require an audit record ID",
+        ),
+        (
+            pd.DataFrame(
+                {
+                    "ID": ["not-numeric"],
+                    "USER_FEEDBACK_COMMENTS": ["Synthetic feedback"],
+                }
+            ),
+            "require numeric audit record IDs",
+        ),
+        (
+            pd.DataFrame(
+                {
+                    "ID": [1.5],
+                    "USER_FEEDBACK_COMMENTS": ["Synthetic feedback"],
+                }
+            ),
+            "require integer audit record IDs",
+        ),
+    ],
+)
+def test_html_report_validates_feedback_records(
+    records: pd.DataFrame,
+    message: str,
+) -> None:
+    with pytest.raises(
+        ExplorationValidationError,
+        match=message,
+    ):
+        render_html_report(
+            records=records,
+            overview_summary=overview_rows(),
+            author_handoff_summary=author_handoff_rows(),
+            data_quality_summary=quality_rows(),
+            charts=charts(),
+        )
+
+
 def test_html_report_excludes_identifier_and_payload_values() -> None:
     html = render_html_report(
+        records=feedback_records(),
         overview_summary=overview_rows(),
         author_handoff_summary=author_handoff_rows(),
         data_quality_summary=quality_rows(),
@@ -963,6 +1124,14 @@ def test_html_report_excludes_identifier_and_payload_values() -> None:
         "final_text",
         "LLM_SUGGESTIONS",
         "FINAL_SUBMISSION",
+        "forbidden-author@example.edu",
+        "FORBIDDEN-STUDY",
+        "FORBIDDEN-SUGGESTION-PAYLOAD",
+        "FORBIDDEN-FINAL-PAYLOAD",
+        "another-forbidden-author@example.edu",
+        "ANOTHER-FORBIDDEN-STUDY",
+        "ANOTHER-FORBIDDEN-SUGGESTION",
+        "ANOTHER-FORBIDDEN-FINAL",
     )
 
     for value in forbidden_values:
@@ -976,6 +1145,7 @@ def test_write_html_report_creates_utf8_file(
 
     write_html_report(
         path,
+        records=feedback_records(),
         overview_summary=overview_rows(),
         author_handoff_summary=author_handoff_rows(),
         data_quality_summary=quality_rows(),
@@ -1007,6 +1177,7 @@ def test_write_html_report_wraps_io_failure(
     ):
         write_html_report(
             path,
+            records=feedback_records(),
             overview_summary=overview_rows(),
             author_handoff_summary=author_handoff_rows(),
             data_quality_summary=quality_rows(),
@@ -1020,6 +1191,7 @@ def test_html_report_rejects_missing_overview_columns() -> None:
         match="overview_summary lacks required HTML columns",
     ):
         render_html_report(
+            records=feedback_records(),
             overview_summary=pd.DataFrame(
                 {
                     "overview_metric_name": ["all_attempt_count"],
@@ -1043,6 +1215,7 @@ def test_html_report_rejects_missing_required_kpi_metric() -> None:
         match="lacks required metric 'distinct_author_count_with_any_attempt'",
     ):
         render_html_report(
+            records=feedback_records(),
             overview_summary=rows,
             author_handoff_summary=author_handoff_rows(),
             data_quality_summary=quality_rows(),
@@ -1064,6 +1237,7 @@ def test_html_report_rejects_pathway_count_above_completed_population() -> None:
         match="outside the completed-study population",
     ):
         render_html_report(
+            records=feedback_records(),
             overview_summary=rows,
             author_handoff_summary=author_handoff_rows(),
             data_quality_summary=quality_rows(),
@@ -1077,6 +1251,7 @@ def test_html_report_requires_author_handoff_columns() -> None:
         match="author_handoff_summary lacks required HTML columns",
     ):
         render_html_report(
+            records=feedback_records(),
             overview_summary=overview_rows(),
             author_handoff_summary=pd.DataFrame(
                 {
@@ -1091,6 +1266,7 @@ def test_html_report_requires_author_handoff_columns() -> None:
 def test_html_report_displays_aggregate_data_quality() -> None:
     """Display fatal-pass guarantees and nonzero warning context."""
     html = render_html_report(
+        records=feedback_records(),
         overview_summary=overview_rows(),
         author_handoff_summary=author_handoff_rows(),
         data_quality_summary=quality_rows(),
@@ -1122,6 +1298,7 @@ def test_html_report_displays_aggregate_data_quality() -> None:
 def test_html_report_displays_no_warning_state() -> None:
     """Clearly state when no warning check affected attempts."""
     html = render_html_report(
+        records=feedback_records(),
         overview_summary=overview_rows(),
         author_handoff_summary=author_handoff_rows(),
         data_quality_summary=quality_rows(malformed_appointment_count=0),
@@ -1142,6 +1319,7 @@ def test_html_report_requires_quality_columns() -> None:
         match="lacks required HTML columns",
     ):
         render_html_report(
+            records=feedback_records(),
             overview_summary=overview_rows(),
             author_handoff_summary=author_handoff_rows(),
             data_quality_summary=pd.DataFrame(
