@@ -26,7 +26,7 @@ The package must remain independent of:
 
 Rules:
 
-- never mutate os.environ;
+- never mutate `os.environ`;
 - never expose secret values in representations or errors;
 - report all missing settings together;
 - preserve setting declaration order;
@@ -36,11 +36,10 @@ Rules:
 - use injected prompt behavior when prompting is introduced;
 - keep dotenv-file I/O explicit and separate from the pure core resolver;
 - disable implicit dotenv interpolation;
-- never mutate `os.environ`.
 - prompting must be explicit and injectable;
 - do not prompt when a higher-precedence source or default resolved the value;
 - do not inspect terminal interactivity when no unresolved setting can prompt;
 - secret prompts must use a non-echoing reader;
 - batch consumers must be able to disable prompting;
 
-Use synthetic values in tests. Never include real credentials, DSNs, tokens, orinstitutional configuration.
+Use synthetic values in tests. Never include real credentials, DSNs, tokens, or institutional configuration.

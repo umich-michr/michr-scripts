@@ -200,6 +200,29 @@ Default processing-column names:
 | Selections | `SELECTED_SUGGESTIONS` |
 | Final saved values | `FINAL_SUBMISSION` |
 
+### Source-column meaning and lineage
+
+The normalized `records.csv` preserves every canonical source column.
+
+The complete 39-column source dictionary is maintained in the exploration
+[data-lineage guide](../study-posting-audit-exploration/docs/data-lineage.md).
+
+Important groups:
+
+| Source columns | Purpose |
+|---|---|
+| `ID`, `STUDY_NUM` | Attempt identity and study grouping |
+| `START_TIME`, `END_TIME` | Attempt ordering and completion timing |
+| `ATTEMPT_TYPE`, `ATTEMPT_RESULT` | Authoring mode and outcome |
+| `AUTHOR_USER_NAME`, role, appointment columns | Attempt-author context |
+| `PI_USER_NAME`, `PI_APPOINTMENTS` | Named PI context |
+| experience and login columns | Attempt-start or query-time experience |
+| timing columns ending in `_MS` | Recorded source durations in milliseconds |
+| source-type and content-source columns | Reported and inferred source context |
+| `USER_FEEDBACK_COMMENTS` | Self-reported AI-usefulness feedback |
+| three analysis payloads | Suggested, selected, and final study values |
+| `LLM_METADATA` | Model metadata supplied by the source |
+
 ### SQL template
 
 `audit-rows.example.sql` is sanitized and does not run unchanged.

@@ -20,7 +20,20 @@ developer interface across the repository.
 
 `tools/` is not a location for user-facing or operational programs.
 
-## Current Python packages
+## Current Python members
+
+Packages:
+
+- `program-configuration`;
+- `tabular-row-sources`;
+- `text-post-edit-metrics`;
+- `text-readability-metrics`;
+- `study-posting-ai-analysis`.
+
+Programs:
+
+- `study-posting-audit-report`;
+- `study-posting-audit-exploration`.
 
 ### `text-post-edit-metrics`
 
@@ -151,6 +164,29 @@ the same change.
 - Keep generated reports out of version control.
 - Database and filesystem access belong only to members whose documented
   contracts require them.
+
+## Faculty-question answering
+
+When faculty asks how a feature, data point, metric, or report value works:
+
+1. identify the owning member;
+2. cite the owning README or methodology;
+3. state the analytical unit and denominator;
+4. trace source column → normalized file → derivation → aggregate → HTML;
+5. cite implementation and focused tests when calculations are questioned;
+6. provide a synthetic step-by-step example when requested;
+7. distinguish software verification from scientific validation;
+8. identify uncertainty rather than guessing.
+
+Primary navigation:
+
+- `python/programs/study-posting-audit-exploration/docs/inquiry-guide.md`;
+- `python/programs/study-posting-audit-exploration/docs/data-lineage.md`;
+- generated `definitions/metric_definitions.csv`;
+- generated `analysis_manifest.json`.
+
+Do not infer semantics from a field name when documentation or source can be
+checked. Do not present descriptive associations as causal findings.
 
 ## Agent completion checklist
 

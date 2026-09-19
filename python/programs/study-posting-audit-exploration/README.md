@@ -7,6 +7,19 @@ validate the report contract or atomically publish derived audit records,
 aggregate CSV files, a JSON manifest, and a self-contained faculty-facing HTML
 report.
 
+## Faculty and LLM documentation
+
+Use:
+
+- the [Study Posting Audit inquiry guide](docs/inquiry-guide.md) to find the
+  authoritative document for a question;
+- the [data-lineage guide](docs/data-lineage.md) to trace source columns through
+  normalized, derived, aggregate, and HTML outputs;
+- generated `definitions/metric_definitions.csv` for exact aggregate-column
+  definitions;
+- generated `analysis_manifest.json` for source counts, output counts, and
+  reproducibility settings.
+
 ## Input
 
 The program accepts a report directory containing exactly these required source
@@ -222,15 +235,29 @@ selected text, or final text.
 
 ### HTML report
 
-`report.html` is a self-contained faculty-facing report generated only from
-aggregate analysis tables. It includes a concise data-quality section showing
-fatal validation guarantees, warning counts, affected and eligible attempt
-context, affected study and author counts, and warning consequences. The full
-checklist remains in `quality/data_quality_summary.csv`.
+`report.html` is a self-contained faculty/development report.
+
+Plotly charts consume only aggregate analysis tables. The final user-feedback
+table is the narrow authorized exception and projects only `records.csv.ID` and
+`records.csv.USER_FEEDBACK_COMMENTS`.
+
+The report begins with:
+
+- a table of contents with anchor links;
+- a concise faculty summary;
+- a captured-data overview;
+- data-quality context.
+
+Detailed sections use native HTML `details` and `summary` controls for
+progressive disclosure. Executive, quality, pathway, and feedback sections are
+open by default. Technical sections are collapsed by default. Print CSS exposes
+all section content.
 
 It currently includes:
 
 - executive key performance indicator cards;
+- a four-part completed/incomplete by AI/manual attempt-outcome chart;
+- three completion-pathway callouts;
 - study completion pathways and author-handoff categories;
 - attempt-start experience at author-attempt grain;
 - query-time experience and activity at unique-author grain;
@@ -249,12 +276,12 @@ It currently includes:
 - selected versus mean-unselected Flesch-Kincaid differences;
 - edit-intensity and consensus grade-level direction relationships using
   aggregate attempt-and-field percentages;
-- attempt outcomes by authoring mode;
-- study-information-page and total-attempt timing distributions by authoring
-  mode, including medians, interquartile ranges, 90th percentiles, and missing
-  counts;
+- completed-attempt study-information-page and total-attempt timing by
+  authoring mode, including medians, interquartile ranges, 90th percentiles,
+  and missing counts;
 - reported-versus-inferred content-source concordance;
-- privacy and interpretation cautions.
+- self-reported AI-usefulness feedback ordered by audit record ID;
+- interpretation cautions beside relevant analyses.
 
 The completed-study author-context charts use one unique completed study
 as their analytical unit. Each completed study contributes exactly once through
@@ -293,6 +320,34 @@ Selection percentages use attempts with at least one offered suggestion as
 their denominator. Selected-suggestion outcomes retain
 `EDITED_UNCLASSIFIED` separately from `REPLACED`; they are descriptive and
 do not establish writing quality or causal benefit.
+
+### Suggestion index and prompt-assigned rank
+
+For title, purpose, and about, the author-assistance prompt instructs the model
+to rank suggestions from best to worst using accuracy, clarity, appeal without
+hype, and conciseness. Zero-based index 0 is therefore the model's intended
+highest-ranked suggestion for those fields.
+
+This is prompt intent, not proof that the ranking is correct.
+
+Selection-by-index analysis can describe whether authors selected earlier
+prompt-ranked suggestions more often. It cannot independently establish
+objective suggestion quality because:
+
+- model rank is confounded with display position;
+- later indices are not offered on every attempt;
+- author selection reflects preference or practical fit;
+- selection alone does not show retention or editing.
+
+Use `selected_suggestion_count_at_index / suggestion_count_at_index`, not raw
+selected counts.
+
+Compensation must be analyzed by suggestion kind and within-kind index. The
+prompt places specific suggestions before generic suggestions, so the six
+display positions are not one unambiguous best-to-worst scale.
+
+A stronger ranking study would preserve hidden model rank while randomizing
+display order and obtaining blinded rubric ratings.
 
 The suggestion-choice section distinguishes two denominators.
 Attempt-level selection is the percentage of completed AI attempts with at
@@ -581,6 +636,14 @@ The aggregate outputs and HTML report are intended for exploratory analysis.
 Counts, percentages, timing distributions, experience measures, post-edit
 measures, and readability indicators must not be interpreted as causal findings
 or evaluations of an individual author.
+
+HTML charts are aggregate-only. The authorized feedback table is the narrow
+exception and displays audit record ID plus `USER_FEEDBACK_COMMENTS`. It does not
+display usernames, study numbers, analysis payloads, selected text, or final
+text.
+
+The report includes a table of contents, concise faculty summary, and native
+collapsible sections. Print styling exposes collapsed content.
 
 Do not place real audit records, source payload text, credentials, connection
 values, or operational SQL in tests, documentation, commits, or issue reports.

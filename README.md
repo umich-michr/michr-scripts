@@ -43,6 +43,7 @@ development interface.
 | Program | Command | Responsibility |
 |---|---|---|
 | [`study-posting-audit-report`](python/programs/study-posting-audit-report/) | `study-posting-audit-report` | Generate normalized audit records and completed-AI field metrics from CSV or Oracle |
+| [`study-posting-audit-exploration`](python/programs/study-posting-audit-exploration/) | `study-posting-audit-exploration` | Validate normalized reports and publish traceable aggregates and faculty exploration |
 
 ## Architecture
 
@@ -71,6 +72,10 @@ study-posting-ai-analysis
  text-post-edit-metrics
             ↓
  records.csv + ai_assistance_metrics.csv + readability_metrics.csv
+            ↓
+study-posting-audit-exploration
+            ↓
+31-file exploration + report.html
 ```
 
 Dependency rules:
@@ -161,9 +166,11 @@ Analyzes nonblank English text:
 ```python
 from text_readability_metrics import analyze_readability
 
-result = analyze_readability(
-    "Synthetic text used for readability analysis."
-)
+result = analyze_readability("Synthetic text used for readability analysis.")
+```
+
+See the
+[package README](python/packages/text-readability-metrics/README.md).
 
 ### `study-posting-ai-analysis`
 
@@ -196,6 +203,34 @@ See:
 - the [package README](python/packages/study-posting-ai-analysis/README.md);
 - the [analysis specification](python/packages/study-posting-ai-analysis/docs/analysis-specification.md);
 - the [program flow](python/packages/study-posting-ai-analysis/docs/program-flow.md).
+
+## Faculty and LLM inquiry
+
+The repository is organized so faculty and language-model assistants can trace
+a report statement to its source, formula, implementation, and tests.
+
+Start with:
+
+- the [Study Posting Audit inquiry guide](python/programs/study-posting-audit-exploration/docs/inquiry-guide.md);
+- the [data-lineage guide](python/programs/study-posting-audit-exploration/docs/data-lineage.md);
+- the [exploration program README](python/programs/study-posting-audit-exploration/README.md);
+- the [study analysis specification](python/packages/study-posting-ai-analysis/docs/analysis-specification.md);
+- the [post-edit metric methodology](python/packages/text-post-edit-metrics/docs/methodology.md);
+- the [post-edit verification strategy](python/packages/text-post-edit-metrics/docs/verification.md);
+- the [readability metric README](python/packages/text-readability-metrics/README.md);
+- the [normalized report README](python/programs/study-posting-audit-report/README.md).
+
+Generated explorations also contain:
+
+- `definitions/metric_definitions.csv`, the aggregate data dictionary;
+- `analysis_manifest.json`, source and output counts plus reproducibility
+  settings;
+- `research/candidate_research_questions.csv`, currently supported descriptive
+  questions.
+
+A reliable answer should state its analytical unit, numerator, denominator,
+source columns, missing-value policy, implementation path, and interpretation
+limits.
 
 ## Setup
 
@@ -485,6 +520,8 @@ or operational programs belong under the language-specific program area.
 | Shared agent rules | `.github/copilot-instructions.md` |
 | Member-specific rules | `.github/instructions/` |
 | Generic readability metrics | `text-readability-metrics/README.md` |
+| Study Posting Audit inquiry navigation | `study-posting-audit-exploration/docs/inquiry-guide.md` |
+| Source-to-report lineage | `study-posting-audit-exploration/docs/data-lineage.md` |
 
 A behavior or public-contract change is incomplete until its owning
 documentation is updated.

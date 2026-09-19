@@ -167,8 +167,8 @@ Examples:
 05/15/2026 11:29:54
 05/15/2026 11:29:54.702864
 
-The report format requires exactly six fractional digits when a fraction ispresent. Values with greater precision are rejected rather than truncated.
-Timezone-aware values remain aware. Naive values remain naive. The package doesnot silently assign a timezone.
+The report format requires exactly six fractional digits when a fraction is present. Values with greater precision are rejected rather than truncated.
+Timezone-aware values remain aware. Naive values remain naive. The package does not silently assign a timezone.
 
 ---
 

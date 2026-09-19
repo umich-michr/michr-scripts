@@ -499,7 +499,39 @@ values.
 
 ---
 
-## 14. References
+## 14. Implementation and checking
+
+Production implementation:
+
+```text
+python/packages/text-post-edit-metrics/src/text_post_edit_metrics/
+├── metrics.py
+├── models.py
+└── normalization.py
+```
+
+Key mappings:
+
+| Calculation | Implementation |
+|---|---|
+| TER and TER-derived scores | `calculate_ter_metrics()` |
+| Character Levenshtein scores | `calculate_character_metrics()` |
+| Weighted soft-word recurrence | `weighted_soft_word_distance()` |
+| Weighted soft-word normalized score | `calculate_soft_word_metrics()` |
+| Combined result | `analyze_post_edit()` |
+| Unicode normalization and token counts | `normalization.py` |
+
+Verification is documented in
+[`verification.md`](verification.md)
+and implemented under:
+
+```text
+python/packages/text-post-edit-metrics/tests/
+```
+
+Use the locked dependencies when reproducing report values.
+
+## 15. References
 
 ### Translation Edit Rate
 
