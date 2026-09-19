@@ -20,22 +20,66 @@ from study_posting_audit_exploration.publication.html_report import (
 
 def overview_rows() -> pd.DataFrame:
     """Return synthetic aggregate-only overview rows."""
+    specs = (
+        ("all_attempt_count", "All attempts", 12, 12),
+        (
+            "distinct_study_count_with_any_attempt",
+            "Distinct studies",
+            10,
+            10,
+        ),
+        ("distinct_completed_study_count", "Completed studies", 8, 10),
+        (
+            "distinct_author_count_with_any_attempt",
+            "Distinct attempt authors",
+            6,
+            6,
+        ),
+        (
+            "distinct_completed_study_count_final_mode_ai",
+            "Completed studies authored with AI",
+            4,
+            8,
+        ),
+        (
+            "distinct_completed_study_count_final_mode_manual",
+            "Completed studies authored manually",
+            4,
+            8,
+        ),
+        ("complete_attempt_count", "Completed attempts", 8, 12),
+        ("incomplete_attempt_count", "Incomplete attempts", 4, 12),
+        ("completed_ai_attempt_count", "Completed AI attempts", 4, 8),
+        ("completed_manual_attempt_count", "Completed manual attempts", 4, 8),
+        ("incomplete_ai_attempt_count", "Incomplete AI attempts", 1, 4),
+        ("incomplete_manual_attempt_count", "Incomplete manual attempts", 3, 4),
+        (
+            "distinct_completed_study_count_with_preceding_incomplete_attempts",
+            "Completed studies with preceding incomplete attempts",
+            3,
+            8,
+        ),
+        (
+            "distinct_completed_study_count_with_preceding_ai_error_attempts",
+            "Completed studies with preceding AI errors",
+            1,
+            8,
+        ),
+    )
+
     return pd.DataFrame.from_records(
         [
             {
-                "overview_metric_name": ("distinct_study_count_with_any_attempt"),
-                "overview_metric_label": "Distinct studies",
-                "metric_count": 10,
-                "metric_denominator_count": 10,
-                "metric_percentage": 100.0,
-            },
-            {
-                "overview_metric_name": "distinct_completed_study_count",
-                "overview_metric_label": "Completed studies",
-                "metric_count": 8,
-                "metric_denominator_count": 10,
-                "metric_percentage": 80.0,
-            },
+                "overview_metric_name": metric_name,
+                "overview_metric_label": label,
+                "metric_count": count,
+                "metric_denominator_count": denominator,
+                "metric_percentage": (
+                    100.0 * count / denominator if denominator else None
+                ),
+                "metric_denominator_definition": "Synthetic aggregate denominator.",
+            }
+            for metric_name, label, count, denominator in specs
         ]
     )
 
@@ -92,10 +136,11 @@ def quality_rows(
 
 
 def attempt_rows() -> pd.DataFrame:
-    """Return aggregate-only attempt chart rows."""
+    """Return aggregate-only completed-attempt timing rows."""
     return pd.DataFrame.from_records(
         [
             {
+                "attempt_completion_group": "COMPLETE",
                 "attempt_result": "COMPLETE",
                 "attempt_authoring_mode": "AI",
                 "grouping_dimension_1_name": "ATTEMPT_RESULT",
@@ -115,10 +160,11 @@ def attempt_rows() -> pd.DataFrame:
                 "percentile_90_total_attempt_minutes": 5.0,
             },
             {
+                "attempt_completion_group": "COMPLETE",
                 "attempt_result": "ALL",
                 "attempt_authoring_mode": "AI",
-                "grouping_dimension_1_name": "AUTHORING_MODE",
-                "grouping_dimension_2_name": "NONE",
+                "grouping_dimension_1_name": "COMPLETION_GROUP",
+                "grouping_dimension_2_name": "AUTHORING_MODE",
                 "attempt_count": 4,
                 "attempt_count_with_nonmissing_study_info_page_time": 3,
                 "attempt_count_missing_study_info_page_time": 1,
@@ -665,6 +711,7 @@ def charts() -> ExplorationCharts:
     """Return synthetic aggregate-only chart bundle."""
     return build_exploration_charts(
         ExplorationChartInputs(
+            overview_summary=overview_rows(),
             grouped_attempt_summary=attempt_rows(),
             study_attempt_history_summary=study_history_rows(),
             author_handoff_summary=author_handoff_rows(),
@@ -689,6 +736,7 @@ def charts() -> ExplorationCharts:
 def test_html_report_is_self_contained_and_accessible() -> None:
     html = render_html_report(
         overview_summary=overview_rows(),
+        author_handoff_summary=author_handoff_rows(),
         data_quality_summary=quality_rows(),
         charts=charts(),
     )
@@ -744,6 +792,7 @@ def test_html_report_explains_appointment_context() -> None:
     """Explain parsed appointment facets and overlapping groups."""
     html = render_html_report(
         overview_summary=overview_rows(),
+        author_handoff_summary=author_handoff_rows(),
         data_quality_summary=quality_rows(),
         charts=charts(),
     )
@@ -768,6 +817,7 @@ def test_html_report_explains_completed_study_author_context() -> None:
     """Explain the completed-study grain and study-specific author context."""
     html = render_html_report(
         overview_summary=overview_rows(),
+        author_handoff_summary=author_handoff_rows(),
         data_quality_summary=quality_rows(),
         charts=charts(),
     )
@@ -791,18 +841,44 @@ def test_html_report_explains_completed_study_author_context() -> None:
     )
 
 
-def test_html_report_explains_workflow_timing() -> None:
-    """Verify attempt-level and study-level timing interpretation."""
+def test_html_report_loads_plotly_before_first_chart() -> None:
+    """Load Plotly before the first overview chart executes."""
     html = render_html_report(
         overview_summary=overview_rows(),
+        author_handoff_summary=author_handoff_rows(),
+        data_quality_summary=quality_rows(),
+        charts=charts(),
+    )
+
+    plotly_library_position = html.lower().find("plotly.js")
+    first_chart_position = html.find("How the captured attempts ended")
+    study_pathways_position = html.find(
+        "Completed-study pathways by final authoring mode"
+    )
+
+    assert plotly_library_position != -1
+    assert first_chart_position != -1
+    assert study_pathways_position != -1
+    assert plotly_library_position < first_chart_position
+    assert first_chart_position < study_pathways_position
+    assert html.lower().count("plotly.js v") == 1
+
+
+def test_html_report_explains_workflow_timing() -> None:
+    """Verify overview timing interpretation without duplicate rendering."""
+    html = render_html_report(
+        overview_summary=overview_rows(),
+        author_handoff_summary=author_handoff_rows(),
         data_quality_summary=quality_rows(),
         charts=charts(),
     )
     normalized_html = " ".join(html.split())
 
-    assert 'id="attempts-heading"' in html
-    assert "Attempts and workflow timing" in html
-    assert "Attempt timing distributions by authoring mode" in html
+    assert 'id="attempts-heading"' not in html
+    assert "Attempts and workflow timing" not in html
+    assert html.count("Completed-attempt timing by authoring mode") == 1
+    assert html.count("How the captured attempts ended") == 1
+    assert "Recorded time for completed attempts" in html
     assert "Time from first attempt to study completion" not in html
     assert "25th through 75th percentiles" in normalized_html
     assert "observed minimum through maximum" not in normalized_html
@@ -812,6 +888,7 @@ def test_html_report_explains_workflow_timing() -> None:
 def test_html_report_explains_suggestion_choice_denominators() -> None:
     html = render_html_report(
         overview_summary=overview_rows(),
+        author_handoff_summary=author_handoff_rows(),
         data_quality_summary=quality_rows(),
         charts=charts(),
     )
@@ -830,6 +907,7 @@ def test_html_report_explains_suggestion_choice_denominators() -> None:
 def test_html_report_explains_readability_indicators() -> None:
     html = render_html_report(
         overview_summary=overview_rows(),
+        author_handoff_summary=author_handoff_rows(),
         data_quality_summary=quality_rows(),
         charts=charts(),
     )
@@ -873,6 +951,7 @@ def test_html_report_explains_readability_indicators() -> None:
 def test_html_report_excludes_identifier_and_payload_values() -> None:
     html = render_html_report(
         overview_summary=overview_rows(),
+        author_handoff_summary=author_handoff_rows(),
         data_quality_summary=quality_rows(),
         charts=charts(),
     )
@@ -898,6 +977,7 @@ def test_write_html_report_creates_utf8_file(
     write_html_report(
         path,
         overview_summary=overview_rows(),
+        author_handoff_summary=author_handoff_rows(),
         data_quality_summary=quality_rows(),
         charts=charts(),
     )
@@ -928,6 +1008,81 @@ def test_write_html_report_wraps_io_failure(
         write_html_report(
             path,
             overview_summary=overview_rows(),
+            author_handoff_summary=author_handoff_rows(),
+            data_quality_summary=quality_rows(),
+            charts=charts(),
+        )
+
+
+def test_html_report_rejects_missing_overview_columns() -> None:
+    with pytest.raises(
+        ExplorationValidationError,
+        match="overview_summary lacks required HTML columns",
+    ):
+        render_html_report(
+            overview_summary=pd.DataFrame(
+                {
+                    "overview_metric_name": ["all_attempt_count"],
+                }
+            ),
+            author_handoff_summary=author_handoff_rows(),
+            data_quality_summary=quality_rows(),
+            charts=charts(),
+        )
+
+
+def test_html_report_rejects_missing_required_kpi_metric() -> None:
+    rows = overview_rows().loc[
+        overview_rows()["overview_metric_name"].ne(
+            "distinct_author_count_with_any_attempt"
+        )
+    ]
+
+    with pytest.raises(
+        ExplorationValidationError,
+        match="lacks required metric 'distinct_author_count_with_any_attempt'",
+    ):
+        render_html_report(
+            overview_summary=rows,
+            author_handoff_summary=author_handoff_rows(),
+            data_quality_summary=quality_rows(),
+            charts=charts(),
+        )
+
+
+def test_html_report_rejects_pathway_count_above_completed_population() -> None:
+    rows = overview_rows()
+    rows.loc[
+        rows["overview_metric_name"].eq(
+            "distinct_completed_study_count_with_preceding_incomplete_attempts"
+        ),
+        "metric_count",
+    ] = 9
+
+    with pytest.raises(
+        ExplorationValidationError,
+        match="outside the completed-study population",
+    ):
+        render_html_report(
+            overview_summary=rows,
+            author_handoff_summary=author_handoff_rows(),
+            data_quality_summary=quality_rows(),
+            charts=charts(),
+        )
+
+
+def test_html_report_requires_author_handoff_columns() -> None:
+    with pytest.raises(
+        ExplorationValidationError,
+        match="author_handoff_summary lacks required HTML columns",
+    ):
+        render_html_report(
+            overview_summary=overview_rows(),
+            author_handoff_summary=pd.DataFrame(
+                {
+                    "author_handoff_category": ["NO_PRECEDING_ATTEMPT"],
+                }
+            ),
             data_quality_summary=quality_rows(),
             charts=charts(),
         )
@@ -937,6 +1092,7 @@ def test_html_report_displays_aggregate_data_quality() -> None:
     """Display fatal-pass guarantees and nonzero warning context."""
     html = render_html_report(
         overview_summary=overview_rows(),
+        author_handoff_summary=author_handoff_rows(),
         data_quality_summary=quality_rows(),
         charts=charts(),
     )
@@ -967,6 +1123,7 @@ def test_html_report_displays_no_warning_state() -> None:
     """Clearly state when no warning check affected attempts."""
     html = render_html_report(
         overview_summary=overview_rows(),
+        author_handoff_summary=author_handoff_rows(),
         data_quality_summary=quality_rows(malformed_appointment_count=0),
         charts=charts(),
     )
@@ -986,6 +1143,7 @@ def test_html_report_requires_quality_columns() -> None:
     ):
         render_html_report(
             overview_summary=overview_rows(),
+            author_handoff_summary=author_handoff_rows(),
             data_quality_summary=pd.DataFrame(
                 {
                     "severity_level": ["WARNING"],

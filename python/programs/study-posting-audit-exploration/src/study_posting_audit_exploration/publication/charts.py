@@ -2,6 +2,7 @@
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from typing import cast
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -10,7 +11,17 @@ from study_posting_audit_exploration.errors import ExplorationValidationError
 
 _ALL = "ALL"
 
+_REQUIRED_OVERVIEW_COLUMNS: tuple[str, ...] = (
+    "overview_metric_name",
+    "overview_metric_label",
+    "metric_count",
+    "metric_denominator_count",
+    "metric_percentage",
+    "metric_denominator_definition",
+)
+
 _REQUIRED_ATTEMPT_COLUMNS: tuple[str, ...] = (
+    "attempt_completion_group",
     "attempt_result",
     "attempt_authoring_mode",
     "grouping_dimension_1_name",
@@ -194,12 +205,38 @@ _REQUIRED_EDIT_READABILITY_CROSS_COLUMNS: tuple[str, ...] = (
     "median_consensus_grade_level_change",
 )
 
-_ATTEMPT_RESULT_ORDER: tuple[str, ...] = (
-    "COMPLETE",
-    "AI_ERROR",
-    "AI_ERROR_WITHOUT_STACK_TRACE",
-    "USER_DROPPED",
-    "OTHER_INCOMPLETE_RESULT",
+_ATTEMPT_OUTCOME_SPECS: tuple[
+    tuple[str, str, str, str, str],
+    ...,
+] = (
+    (
+        "COMPLETE",
+        "AI",
+        "completed_ai_attempt_count",
+        "Completed — AI",
+        "AI complete",
+    ),
+    (
+        "COMPLETE",
+        "MANUAL",
+        "completed_manual_attempt_count",
+        "Completed — manual",
+        "Manual complete",
+    ),
+    (
+        "INCOMPLETE",
+        "AI",
+        "incomplete_ai_attempt_count",
+        "Incomplete — AI",
+        "AI incomplete",
+    ),
+    (
+        "INCOMPLETE",
+        "MANUAL",
+        "incomplete_manual_attempt_count",
+        "Incomplete — manual",
+        "Manual incomplete",
+    ),
 )
 
 _AUTHORING_MODE_ORDER: tuple[str, ...] = (
@@ -434,6 +471,7 @@ _FIELD_EDIT_OUTCOMES: tuple[tuple[str, str], ...] = (
 class ExplorationChartInputs:
     """Aggregate-only DataFrames consumed by the HTML chart bundle."""
 
+    overview_summary: pd.DataFrame
     grouped_attempt_summary: pd.DataFrame
     study_attempt_history_summary: pd.DataFrame
     author_handoff_summary: pd.DataFrame
@@ -525,64 +563,214 @@ def _empty_figure(
     return figure
 
 
-def build_attempt_outcomes_chart(
-    grouped_attempt_summary: pd.DataFrame,
-) -> go.Figure:
-    """Return stacked attempt-result counts by authoring mode."""
+def _unique_overview_rows(
+    overview_summary: pd.DataFrame,
+) -> dict[str, dict[str, object]]:
+    """Return unique overview rows keyed by metric name."""
     _require_columns(
-        grouped_attempt_summary,
-        required=_REQUIRED_ATTEMPT_COLUMNS,
-        frame_name="grouped_attempt_summary",
+        overview_summary,
+        required=_REQUIRED_OVERVIEW_COLUMNS,
+        frame_name="overview_summary",
     )
-    rows = grouped_attempt_summary.loc[
-        grouped_attempt_summary["grouping_dimension_1_name"].eq("ATTEMPT_RESULT")
-        & grouped_attempt_summary["grouping_dimension_2_name"].eq("AUTHORING_MODE")
-        & grouped_attempt_summary["attempt_result"].ne(_ALL)
-        & grouped_attempt_summary["attempt_authoring_mode"].ne(_ALL)
-    ]
+    rows_by_name: dict[str, dict[str, object]] = {}
 
-    if rows.empty:
+    records = cast(
+        "list[dict[str, object]]",
+        overview_summary.to_dict(orient="records"),
+    )
+
+    for row in records:
+        metric_name = str(row["overview_metric_name"])
+
+        if metric_name in rows_by_name:
+            raise ExplorationValidationError(
+                f"overview_summary contains duplicate metric {metric_name!r}"
+            )
+
+        rows_by_name[metric_name] = row
+
+    return rows_by_name
+
+
+def _overview_count(
+    rows_by_name: Mapping[str, Mapping[str, object]],
+    metric_name: str,
+) -> int:
+    """Return one validated nonnegative overview count."""
+    row = rows_by_name.get(metric_name)
+
+    if row is None:
+        raise ExplorationValidationError(
+            f"overview_summary lacks required metric {metric_name!r}"
+        )
+
+    value = row["metric_count"]
+
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        raise ExplorationValidationError(
+            f"overview metric {metric_name!r} count must be numeric"
+        )
+
+    converted = float(value)
+
+    if not converted.is_integer() or converted < 0:
+        raise ExplorationValidationError(
+            f"overview metric {metric_name!r} count must be a nonnegative integer"
+        )
+
+    return int(converted)
+
+
+def build_attempt_outcomes_chart(
+    overview_summary: pd.DataFrame,
+) -> go.Figure:
+    """Return one four-part partition of all attempts."""
+    rows_by_name = _unique_overview_rows(overview_summary)
+
+    if not rows_by_name:
         return _empty_figure(
-            title="Attempt outcomes by authoring mode",
+            title="How the captured attempts ended",
             message="No attempt outcome aggregates are available.",
         )
 
-    figure = go.Figure()
+    all_attempt_count = _overview_count(rows_by_name, "all_attempt_count")
+    complete_attempt_count = _overview_count(
+        rows_by_name,
+        "complete_attempt_count",
+    )
+    incomplete_attempt_count = _overview_count(
+        rows_by_name,
+        "incomplete_attempt_count",
+    )
+    completion_counts = {
+        "COMPLETE": complete_attempt_count,
+        "INCOMPLETE": incomplete_attempt_count,
+    }
+    outcome_counts = [
+        _overview_count(rows_by_name, metric_name)
+        for _, _, metric_name, _, _ in _ATTEMPT_OUTCOME_SPECS
+    ]
 
-    for result in _ATTEMPT_RESULT_ORDER:
-        result_rows = rows.loc[rows["attempt_result"].eq(result)]
-        values_by_mode: Mapping[str, int] = {
-            str(row["attempt_authoring_mode"]): int(row["attempt_count"])
-            for row in result_rows.to_dict(orient="records")
-        }
+    if complete_attempt_count + incomplete_attempt_count != all_attempt_count:
+        raise ExplorationValidationError(
+            "overview attempt completion counts do not partition all attempts"
+        )
+
+    completed_outcome_count = sum(outcome_counts[:2])
+    incomplete_outcome_count = sum(outcome_counts[2:])
+
+    if (
+        completed_outcome_count != complete_attempt_count
+        or incomplete_outcome_count != incomplete_attempt_count
+    ):
+        raise ExplorationValidationError(
+            "overview AI/manual outcome counts do not partition their completion groups"
+        )
+
+    if sum(outcome_counts) != all_attempt_count:
+        raise ExplorationValidationError(
+            "overview AI/manual outcome counts do not partition all attempts"
+        )
+
+    figure = go.Figure()
+    colors = {
+        ("COMPLETE", "AI"): "#1f5a94",
+        ("COMPLETE", "MANUAL"): "#2f855a",
+        ("INCOMPLETE", "AI"): "#9ec5e5",
+        ("INCOMPLETE", "MANUAL"): "#9fc9ad",
+    }
+    patterns = {
+        "COMPLETE": "",
+        "INCOMPLETE": "/",
+    }
+
+    for (
+        completion_group,
+        authoring_mode,
+        metric_name,
+        label,
+        short_label,
+    ), count in zip(
+        _ATTEMPT_OUTCOME_SPECS,
+        outcome_counts,
+        strict=True,
+    ):
+        completion_count = completion_counts[completion_group]
+        percentage_all = 100.0 * count / all_attempt_count if all_attempt_count else 0.0
+        percentage_completion = (
+            100.0 * count / completion_count if completion_count else 0.0
+        )
+        denominator_definition = str(
+            rows_by_name[metric_name]["metric_denominator_definition"]
+        )
         figure.add_bar(
-            name=result.replace("_", " ").title(),
-            x=list(_AUTHORING_MODE_ORDER),
-            y=[values_by_mode.get(mode, 0) for mode in _AUTHORING_MODE_ORDER],
+            name=label,
+            x=[count],
+            y=["All attempts"],
+            orientation="h",
+            text=[f"{short_label}<br>{count:,} ({percentage_all:.1f}%)"],
+            textposition="inside",
+            textangle=0,
+            insidetextanchor="middle",
+            marker={
+                "color": colors[(completion_group, authoring_mode)],
+                "pattern": {"shape": patterns[completion_group]},
+                "line": {
+                    "color": "#ffffff",
+                    "width": 1,
+                },
+            },
+            customdata=[
+                [
+                    percentage_all,
+                    completion_count,
+                    percentage_completion,
+                    denominator_definition,
+                ]
+            ],
             hovertemplate=(
-                "Mode: %{x}<br>Attempts: %{y}<extra>%{fullData.name}</extra>"
+                "Outcome: %{fullData.name}<br>"
+                "Attempts: %{x}<br>"
+                "Share of all attempts: %{customdata[0]:.1f}%<br>"
+                "Share within completion group: %{x} of "
+                "%{customdata[1]} (%{customdata[2]:.1f}%)<br>"
+                "Published denominator: %{customdata[3]}"
+                "<extra></extra>"
             ),
         )
 
     figure.update_layout(
-        title="Attempt outcomes by authoring mode",
+        title="How the captured attempts ended",
         template="plotly_white",
         barmode="stack",
-        xaxis_title="Authoring mode",
-        yaxis_title="Attempt count",
-        legend_title_text="Attempt result",
+        xaxis_title="Attempt count",
+        yaxis_title="",
+        legend_title_text="Attempt outcome and authoring mode",
+        height=420,
+        margin={
+            "l": 120,
+            "r": 40,
+            "t": 80,
+            "b": 70,
+        },
+        uniformtext={
+            "minsize": 10,
+            "mode": "hide",
+        },
     )
 
     return figure
 
 
-def _authoring_mode_rows(
+def _completed_authoring_mode_rows(
     grouped_attempt_summary: pd.DataFrame,
 ) -> pd.DataFrame:
-    """Return aggregate attempt rows grouped only by authoring mode."""
+    """Return completed-attempt rows grouped by authoring mode."""
     return grouped_attempt_summary.loc[
-        grouped_attempt_summary["grouping_dimension_1_name"].eq("AUTHORING_MODE")
-        & grouped_attempt_summary["grouping_dimension_2_name"].eq("NONE")
+        grouped_attempt_summary["attempt_result"].eq(_ALL)
+        & grouped_attempt_summary["attempt_completion_group"].eq("COMPLETE")
+        & grouped_attempt_summary["grouping_dimension_1_name"].eq("COMPLETION_GROUP")
+        & grouped_attempt_summary["grouping_dimension_2_name"].eq("AUTHORING_MODE")
         & grouped_attempt_summary["attempt_authoring_mode"].isin(_AUTHORING_MODE_ORDER)
     ].copy()
 
@@ -596,7 +784,7 @@ def build_attempt_timing_chart(
         required=_REQUIRED_ATTEMPT_COLUMNS,
         frame_name="grouped_attempt_summary",
     )
-    rows = _authoring_mode_rows(grouped_attempt_summary)
+    rows = _completed_authoring_mode_rows(grouped_attempt_summary)
 
     timing_specs = (
         (
@@ -628,7 +816,7 @@ def build_attempt_timing_chart(
 
     if available.empty:
         return _empty_figure(
-            title="Attempt timing distributions by authoring mode",
+            title="Completed-attempt timing by authoring mode",
             message="No attempt timing aggregates are available.",
         )
 
@@ -719,16 +907,23 @@ def build_attempt_timing_chart(
 
     if not figure.data:
         return _empty_figure(
-            title="Attempt timing distributions by authoring mode",
+            title="Completed-attempt timing by authoring mode",
             message="No attempt timing aggregates are available.",
         )
 
     figure.update_layout(
-        title="Attempt timing distributions by authoring mode",
+        title="Completed-attempt timing by authoring mode",
         template="plotly_white",
         barmode="group",
+        height=460,
+        margin={
+            "l": 110,
+            "r": 40,
+            "t": 90,
+            "b": 70,
+        },
         xaxis_title="Authoring mode",
-        yaxis_title="Median minutes; error bars show 25th-75th percentiles",
+        yaxis_title="Median minutes",
         legend_title_text="Attempt timing measure",
     )
 
@@ -2394,9 +2589,7 @@ def build_exploration_charts(
 ) -> ExplorationCharts:
     """Return all aggregate-only exploration figures."""
     return ExplorationCharts(
-        attempt_outcomes_by_mode=build_attempt_outcomes_chart(
-            inputs.grouped_attempt_summary
-        ),
+        attempt_outcomes_by_mode=build_attempt_outcomes_chart(inputs.overview_summary),
         attempt_timing_distribution_by_mode=build_attempt_timing_chart(
             inputs.grouped_attempt_summary
         ),

@@ -22,14 +22,25 @@ from study_posting_audit_exploration.publication.charts import (
 _REPORT_TITLE = "Study Posting Audit Exploration"
 
 _KPI_METRICS: tuple[str, ...] = (
+    "all_attempt_count",
     "distinct_study_count_with_any_attempt",
     "distinct_completed_study_count",
+    "distinct_author_count_with_any_attempt",
     "distinct_completed_study_count_final_mode_ai",
     "distinct_completed_study_count_final_mode_manual",
-    "distinct_author_count_with_any_ai_attempt",
-    "distinct_author_count_with_any_manual_attempt",
-    "distinct_author_count_with_both_ai_and_manual_attempts",
+)
+
+_REQUIRED_PATHWAY_METRICS: tuple[str, ...] = (
+    "distinct_completed_study_count",
     "distinct_completed_study_count_with_preceding_incomplete_attempts",
+    "distinct_completed_study_count_with_preceding_ai_error_attempts",
+)
+
+_HANDOFF_CATEGORIES: frozenset[str] = frozenset(
+    {
+        "ALL_PRECEDING_ATTEMPTS_BY_OTHER_AUTHORS",
+        "MIXED_COMPLETION_AND_OTHER_AUTHORS",
+    }
 )
 
 _TEMPLATE = """<!doctype html>
@@ -98,6 +109,23 @@ _TEMPLATE = """<!doctype html>
       color: var(--muted);
       font-size: 0.85rem;
     }
+    .pathway-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 1rem;
+      margin: 1rem 0;
+    }
+    .pathway-card {
+      padding: 1rem;
+      border: 1px solid var(--border);
+      border-radius: 0.5rem;
+      background: var(--panel);
+    }
+    .pathway-card p { margin: 0.25rem 0; }
+    .pathway-value {
+      font-size: 1.35rem;
+      font-weight: 700;
+    }
     .quality-summary {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
@@ -153,7 +181,7 @@ _TEMPLATE = """<!doctype html>
   </header>
 
   <section aria-labelledby="executive-overview-heading">
-    <h2 id="executive-overview-heading">Executive overview</h2>
+    <h2 id="executive-overview-heading">Captured data at a glance</h2>
     <div class="kpi-grid">
       {% for card in kpi_cards %}
       <article class="kpi-card">
@@ -163,6 +191,48 @@ _TEMPLATE = """<!doctype html>
       </article>
       {% endfor %}
     </div>
+    <p class="caution">
+      Authors are counted as distinct attempt authors. Completed-study
+      authoring mode is taken from each study's unique completed attempt.
+    </p>
+
+    <div class="chart">{{ attempt_outcomes_html | safe }}</div>
+
+    <h3>Completion pathways</h3>
+    <div class="pathway-grid">
+      {% for callout in pathway_callouts %}
+      <article class="pathway-card">
+        <p class="kpi-label">{{ callout.label }}</p>
+        <p class="pathway-value">
+          {{ callout.affected_count }} of {{ callout.completed_study_count }}
+          ({{ callout.percentage_text }})
+        </p>
+        <p class="kpi-detail">{{ callout.detail }}</p>
+      </article>
+      {% endfor %}
+    </div>
+
+    <h3>Recorded time for completed attempts</h3>
+    <p>
+      Attempt-level timing separates time on the study-information page from
+      total elapsed attempt time. Bars show medians and error bars show the
+      25th through 75th percentiles. Sample sizes, missing counts, and 90th
+      percentiles are available in hover text.
+    </p>
+    <p class="caution">
+      Recorded and elapsed times may include pauses or work outside the
+      application. They do not establish author effort, efficiency, quality,
+      or a causal effect of authoring mode.
+    </p>
+    <div class="chart">{{ attempt_timing_html | safe }}</div>
+
+    <p class="caution">
+      These figures describe the audit records captured in this report. They
+      do not estimate causal effects of AI, measure writing quality, or
+      establish author productivity. Attempts and studies are different
+      analytical units: a study may have multiple attempts, while each
+      completed study contributes one unique completed attempt.
+    </p>
   </section>
 
   <section aria-labelledby="data-quality-heading">
@@ -503,23 +573,6 @@ _TEMPLATE = """<!doctype html>
   </div>
 </section>
 
-  <section aria-labelledby="attempts-heading">
-    <h2 id="attempts-heading">Attempts and workflow timing</h2>
-    <p>
-      Attempt-level timing separates time on the study-information page from
-      total elapsed attempt time. Bars show medians and the error bars show the
-      25th through 75th percentiles.
-    </p>
-    <p class="caution">
-      Missing timing values are excluded from timing distributions and are
-      reported in hover text where available. These descriptive attempt
-      timings do not establish author effort, efficiency, quality, or a causal
-      effect of authoring mode.
-    </p>
-    <div class="chart">{{ attempt_outcomes_html | safe }}</div>
-    <div class="chart">{{ attempt_timing_html | safe }}</div>
-  </section>
-
   <section aria-labelledby="content-source-heading">
     <h2 id="content-source-heading">Content-source concordance</h2>
     <p class="caution">
@@ -582,6 +635,17 @@ class KpiCard:
     detail: str
 
 
+@dataclass(frozen=True, slots=True)
+class CompletionPathwayCallout:
+    """One completed-study pathway callout."""
+
+    label: str
+    affected_count: int
+    completed_study_count: int
+    percentage_text: str
+    detail: str
+
+
 def _finite_number(
     value: object,
     *,
@@ -614,21 +678,67 @@ def _percentage_text(value: object) -> str | None:
     return f"{_finite_number(value, value_name='metric_percentage'):.1f}%"
 
 
-def _kpi_cards(overview_summary: pd.DataFrame) -> tuple[KpiCard, ...]:
-    """Return ordered KPI cards from the aggregate overview table."""
+def _overview_rows_by_name(
+    overview_summary: pd.DataFrame,
+) -> dict[str, dict[str, object]]:
+    """Return unique overview rows keyed by metric name."""
+    required_columns = (
+        "overview_metric_name",
+        "overview_metric_label",
+        "metric_count",
+        "metric_denominator_count",
+        "metric_percentage",
+    )
+    missing = tuple(
+        column for column in required_columns if column not in overview_summary.columns
+    )
+
+    if missing:
+        raise ExplorationValidationError(
+            f"overview_summary lacks required HTML columns: {missing!r}"
+        )
+
     rows = cast(
         "list[dict[str, object]]",
         overview_summary.to_dict(orient="records"),
     )
-    rows_by_name = {str(row["overview_metric_name"]): row for row in rows}
+    rows_by_name: dict[str, dict[str, object]] = {}
+
+    for row in rows:
+        metric_name = str(row["overview_metric_name"])
+
+        if metric_name in rows_by_name:
+            raise ExplorationValidationError(
+                f"overview_summary contains duplicate metric {metric_name!r}"
+            )
+
+        rows_by_name[metric_name] = row
+
+    return rows_by_name
+
+
+def _required_overview_row(
+    rows_by_name: dict[str, dict[str, object]],
+    metric_name: str,
+) -> dict[str, object]:
+    """Return one required overview row."""
+    row = rows_by_name.get(metric_name)
+
+    if row is None:
+        raise ExplorationValidationError(
+            f"overview_summary lacks required metric {metric_name!r}"
+        )
+
+    return row
+
+
+def _kpi_cards(overview_summary: pd.DataFrame) -> tuple[KpiCard, ...]:
+    """Return the six ordered faculty overview KPI cards."""
+    rows_by_name = _overview_rows_by_name(overview_summary)
     cards: list[KpiCard] = []
 
     for metric_name in _KPI_METRICS:
-        row = rows_by_name.get(metric_name)
-
-        if row is None:
-            continue
-
+        row = _required_overview_row(rows_by_name, metric_name)
         count = int(
             _finite_number(
                 row["metric_count"],
@@ -656,6 +766,127 @@ def _kpi_cards(overview_summary: pd.DataFrame) -> tuple[KpiCard, ...]:
         )
 
     return tuple(cards)
+
+
+def _completion_pathway_callouts(
+    overview_summary: pd.DataFrame,
+    author_handoff_summary: pd.DataFrame,
+) -> tuple[CompletionPathwayCallout, ...]:
+    """Return three faculty-facing completed-study pathway callouts."""
+    rows_by_name = _overview_rows_by_name(overview_summary)
+
+    for metric_name in _REQUIRED_PATHWAY_METRICS:
+        _required_overview_row(rows_by_name, metric_name)
+
+    completed_study_count = int(
+        _finite_number(
+            rows_by_name["distinct_completed_study_count"]["metric_count"],
+            value_name="distinct_completed_study_count",
+        )
+    )
+    preceding_incomplete_count = int(
+        _finite_number(
+            rows_by_name[
+                "distinct_completed_study_count_with_preceding_incomplete_attempts"
+            ]["metric_count"],
+            value_name=(
+                "distinct_completed_study_count_with_preceding_incomplete_attempts"
+            ),
+        )
+    )
+    preceding_ai_error_count = int(
+        _finite_number(
+            rows_by_name[
+                "distinct_completed_study_count_with_preceding_ai_error_attempts"
+            ]["metric_count"],
+            value_name=(
+                "distinct_completed_study_count_with_preceding_ai_error_attempts"
+            ),
+        )
+    )
+    required_handoff_columns = (
+        "completed_attempt_authoring_mode",
+        "author_handoff_category",
+        "distinct_completed_study_count",
+    )
+    missing = tuple(
+        column
+        for column in required_handoff_columns
+        if column not in author_handoff_summary.columns
+    )
+
+    if missing:
+        raise ExplorationValidationError(
+            f"author_handoff_summary lacks required HTML columns: {missing!r}"
+        )
+
+    handoff_rows = author_handoff_summary.loc[
+        author_handoff_summary["completed_attempt_authoring_mode"].isin(
+            ("AI", "MANUAL")
+        )
+        & author_handoff_summary["author_handoff_category"].isin(_HANDOFF_CATEGORIES)
+    ]
+    handoff_count = sum(
+        int(
+            _finite_number(
+                value,
+                value_name="distinct_completed_study_count",
+            )
+        )
+        for value in handoff_rows["distinct_completed_study_count"].tolist()
+    )
+
+    def callout(
+        *,
+        label: str,
+        affected_count: int,
+        detail: str,
+    ) -> CompletionPathwayCallout:
+        if affected_count < 0 or affected_count > completed_study_count:
+            raise ExplorationValidationError(
+                f"{label} count is outside the completed-study population"
+            )
+
+        percentage = (
+            100.0 * affected_count / completed_study_count
+            if completed_study_count
+            else 0.0
+        )
+
+        return CompletionPathwayCallout(
+            label=label,
+            affected_count=affected_count,
+            completed_study_count=completed_study_count,
+            percentage_text=f"{percentage:.1f}%",
+            detail=detail,
+        )
+
+    return (
+        callout(
+            label="Completed studies with preceding incomplete attempts",
+            affected_count=preceding_incomplete_count,
+            detail=(
+                "At least one incomplete attempt was ordered before the unique "
+                "completed attempt for the same study."
+            ),
+        ),
+        callout(
+            label="Completed studies with an author handoff",
+            affected_count=handoff_count,
+            detail=(
+                "At least one preceding attempt was authored by someone other "
+                "than the completion author."
+            ),
+        ),
+        callout(
+            label="Completed studies with a preceding AI error",
+            affected_count=preceding_ai_error_count,
+            detail=(
+                "At least one AI-error attempt was ordered before the unique "
+                "completed attempt for the same study."
+            ),
+        ),
+    )
 
 
 _QUALITY_REQUIRED_COLUMNS: tuple[str, ...] = (
@@ -811,6 +1042,7 @@ def _figure_html(
 def render_html_report(
     *,
     overview_summary: pd.DataFrame,
+    author_handoff_summary: pd.DataFrame,
     data_quality_summary: pd.DataFrame,
     charts: ExplorationCharts,
 ) -> str:
@@ -826,6 +1058,10 @@ def render_html_report(
     return template.render(
         title=_REPORT_TITLE,
         kpi_cards=_kpi_cards(overview_summary),
+        pathway_callouts=_completion_pathway_callouts(
+            overview_summary,
+            author_handoff_summary,
+        ),
         quality_fatal_passed=quality.fatal_passed,
         quality_fatal_total=quality.fatal_total,
         quality_affected_warning_count=quality.affected_warning_count,
@@ -835,7 +1071,7 @@ def render_html_report(
         quality_zero_warning_messages=quality.zero_warning_messages,
         study_pathways_html=_figure_html(
             charts.study_completion_pathways,
-            include_plotlyjs=True,
+            include_plotlyjs=False,
         ),
         author_handoffs_html=_figure_html(
             charts.author_handoff_categories,
@@ -887,7 +1123,7 @@ def render_html_report(
         ),
         attempt_outcomes_html=_figure_html(
             charts.attempt_outcomes_by_mode,
-            include_plotlyjs=False,
+            include_plotlyjs=True,
         ),
         attempt_timing_html=_figure_html(
             charts.attempt_timing_distribution_by_mode,
@@ -944,6 +1180,7 @@ def write_html_report(
     path: Path,
     *,
     overview_summary: pd.DataFrame,
+    author_handoff_summary: pd.DataFrame,
     data_quality_summary: pd.DataFrame,
     charts: ExplorationCharts,
 ) -> None:
@@ -952,6 +1189,7 @@ def write_html_report(
         path.write_text(
             render_html_report(
                 overview_summary=overview_summary,
+                author_handoff_summary=author_handoff_summary,
                 data_quality_summary=data_quality_summary,
                 charts=charts,
             ),

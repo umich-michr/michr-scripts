@@ -34,107 +34,146 @@ from study_posting_audit_exploration.publication.charts import (
 )
 
 
+def overview_rows() -> pd.DataFrame:
+    """Return synthetic aggregate-only overview rows."""
+    counts = {
+        "all_attempt_count": ("All attempts", 10, 10),
+        "complete_attempt_count": ("Completed attempts", 7, 10),
+        "incomplete_attempt_count": ("Incomplete attempts", 3, 10),
+        "completed_ai_attempt_count": ("Completed AI attempts", 4, 7),
+        "completed_manual_attempt_count": ("Completed manual attempts", 3, 7),
+        "incomplete_ai_attempt_count": ("Incomplete AI attempts", 2, 3),
+        "incomplete_manual_attempt_count": ("Incomplete manual attempts", 1, 3),
+    }
+    rows: list[dict[str, object]] = []
+
+    for metric_name, (label, count, denominator) in counts.items():
+        rows.append(
+            {
+                "overview_metric_name": metric_name,
+                "overview_metric_label": label,
+                "metric_count": count,
+                "metric_denominator_count": denominator,
+                "metric_percentage": (
+                    100.0 * count / denominator if denominator else None
+                ),
+                "metric_denominator_definition": (
+                    "All audit attempts."
+                    if metric_name == "all_attempt_count"
+                    else "Published aggregate denominator."
+                ),
+            }
+        )
+
+    return pd.DataFrame.from_records(rows)
+
+
 def grouped_attempt_rows() -> pd.DataFrame:
     """Return synthetic aggregate-only attempt rows."""
-    return pd.DataFrame.from_records(
-        [
-            {
-                "attempt_result": "COMPLETE",
-                "attempt_authoring_mode": "AI",
-                "grouping_dimension_1_name": "ATTEMPT_RESULT",
-                "grouping_dimension_2_name": "AUTHORING_MODE",
-                "attempt_count": 4,
-                "attempt_count_with_nonmissing_study_info_page_time": 4,
-                "attempt_count_missing_study_info_page_time": 0,
-                "percentile_25_study_info_page_minutes": 1.0,
-                "median_study_info_page_minutes": 2.0,
-                "percentile_75_study_info_page_minutes": 3.0,
-                "percentile_90_study_info_page_minutes": 4.0,
-                "attempt_count_with_nonmissing_total_attempt_time": 4,
-                "attempt_count_missing_total_attempt_time": 0,
-                "percentile_25_total_attempt_minutes": 2.0,
-                "median_total_attempt_minutes": 3.0,
-                "percentile_75_total_attempt_minutes": 4.0,
-                "percentile_90_total_attempt_minutes": 5.0,
-            },
-            {
-                "attempt_result": "USER_DROPPED",
-                "attempt_authoring_mode": "AI",
-                "grouping_dimension_1_name": "ATTEMPT_RESULT",
-                "grouping_dimension_2_name": "AUTHORING_MODE",
-                "attempt_count": 2,
-                "attempt_count_with_nonmissing_study_info_page_time": 2,
-                "attempt_count_missing_study_info_page_time": 0,
-                "percentile_25_study_info_page_minutes": 0.5,
-                "median_study_info_page_minutes": 0.75,
-                "percentile_75_study_info_page_minutes": 1.0,
-                "percentile_90_study_info_page_minutes": 1.25,
-                "attempt_count_with_nonmissing_total_attempt_time": 2,
-                "attempt_count_missing_total_attempt_time": 0,
-                "percentile_25_total_attempt_minutes": 0.75,
-                "median_total_attempt_minutes": 1.0,
-                "percentile_75_total_attempt_minutes": 1.25,
-                "percentile_90_total_attempt_minutes": 1.5,
-            },
-            {
-                "attempt_result": "COMPLETE",
-                "attempt_authoring_mode": "MANUAL",
-                "grouping_dimension_1_name": "ATTEMPT_RESULT",
-                "grouping_dimension_2_name": "AUTHORING_MODE",
-                "attempt_count": 3,
-                "attempt_count_with_nonmissing_study_info_page_time": 3,
-                "attempt_count_missing_study_info_page_time": 0,
-                "percentile_25_study_info_page_minutes": 2.0,
-                "median_study_info_page_minutes": 3.0,
-                "percentile_75_study_info_page_minutes": 4.0,
-                "percentile_90_study_info_page_minutes": 5.0,
-                "attempt_count_with_nonmissing_total_attempt_time": 3,
-                "attempt_count_missing_total_attempt_time": 0,
-                "percentile_25_total_attempt_minutes": 4.0,
-                "median_total_attempt_minutes": 5.0,
-                "percentile_75_total_attempt_minutes": 6.0,
-                "percentile_90_total_attempt_minutes": 7.0,
-            },
-            {
-                "attempt_result": "ALL",
-                "attempt_authoring_mode": "AI",
-                "grouping_dimension_1_name": "AUTHORING_MODE",
-                "grouping_dimension_2_name": "NONE",
-                "attempt_count": 6,
-                "attempt_count_with_nonmissing_study_info_page_time": 5,
-                "attempt_count_missing_study_info_page_time": 1,
-                "percentile_25_study_info_page_minutes": 1.0,
-                "median_study_info_page_minutes": 2.0,
-                "percentile_75_study_info_page_minutes": 3.0,
-                "percentile_90_study_info_page_minutes": 4.0,
-                "attempt_count_with_nonmissing_total_attempt_time": 6,
-                "attempt_count_missing_total_attempt_time": 0,
-                "percentile_25_total_attempt_minutes": 1.5,
-                "median_total_attempt_minutes": 2.5,
-                "percentile_75_total_attempt_minutes": 4.0,
-                "percentile_90_total_attempt_minutes": 5.0,
-            },
-            {
-                "attempt_result": "ALL",
-                "attempt_authoring_mode": "MANUAL",
-                "grouping_dimension_1_name": "AUTHORING_MODE",
-                "grouping_dimension_2_name": "NONE",
-                "attempt_count": 3,
-                "attempt_count_with_nonmissing_study_info_page_time": 2,
-                "attempt_count_missing_study_info_page_time": 1,
-                "percentile_25_study_info_page_minutes": 2.0,
-                "median_study_info_page_minutes": 3.0,
-                "percentile_75_study_info_page_minutes": 4.0,
-                "percentile_90_study_info_page_minutes": 5.0,
-                "attempt_count_with_nonmissing_total_attempt_time": 3,
-                "attempt_count_missing_total_attempt_time": 0,
-                "percentile_25_total_attempt_minutes": 4.0,
-                "median_total_attempt_minutes": 5.0,
-                "percentile_75_total_attempt_minutes": 7.0,
-                "percentile_90_total_attempt_minutes": 8.0,
-            },
-        ]
-    )
+    rows: list[dict[str, object]] = [
+        {
+            "attempt_completion_group": "COMPLETE",
+            "attempt_result": "COMPLETE",
+            "attempt_authoring_mode": "AI",
+            "grouping_dimension_1_name": "ATTEMPT_RESULT",
+            "grouping_dimension_2_name": "AUTHORING_MODE",
+            "attempt_count": 4,
+            "attempt_count_with_nonmissing_study_info_page_time": 4,
+            "attempt_count_missing_study_info_page_time": 0,
+            "percentile_25_study_info_page_minutes": 1.0,
+            "median_study_info_page_minutes": 2.0,
+            "percentile_75_study_info_page_minutes": 3.0,
+            "percentile_90_study_info_page_minutes": 4.0,
+            "attempt_count_with_nonmissing_total_attempt_time": 4,
+            "attempt_count_missing_total_attempt_time": 0,
+            "percentile_25_total_attempt_minutes": 2.0,
+            "median_total_attempt_minutes": 3.0,
+            "percentile_75_total_attempt_minutes": 4.0,
+            "percentile_90_total_attempt_minutes": 5.0,
+        },
+        {
+            "attempt_completion_group": "INCOMPLETE",
+            "attempt_result": "USER_DROPPED",
+            "attempt_authoring_mode": "AI",
+            "grouping_dimension_1_name": "ATTEMPT_RESULT",
+            "grouping_dimension_2_name": "AUTHORING_MODE",
+            "attempt_count": 2,
+            "attempt_count_with_nonmissing_study_info_page_time": 2,
+            "attempt_count_missing_study_info_page_time": 0,
+            "percentile_25_study_info_page_minutes": 0.5,
+            "median_study_info_page_minutes": 0.75,
+            "percentile_75_study_info_page_minutes": 1.0,
+            "percentile_90_study_info_page_minutes": 1.25,
+            "attempt_count_with_nonmissing_total_attempt_time": 0,
+            "attempt_count_missing_total_attempt_time": 2,
+            "percentile_25_total_attempt_minutes": None,
+            "median_total_attempt_minutes": None,
+            "percentile_75_total_attempt_minutes": None,
+            "percentile_90_total_attempt_minutes": None,
+        },
+        {
+            "attempt_completion_group": "COMPLETE",
+            "attempt_result": "COMPLETE",
+            "attempt_authoring_mode": "MANUAL",
+            "grouping_dimension_1_name": "ATTEMPT_RESULT",
+            "grouping_dimension_2_name": "AUTHORING_MODE",
+            "attempt_count": 3,
+            "attempt_count_with_nonmissing_study_info_page_time": 3,
+            "attempt_count_missing_study_info_page_time": 0,
+            "percentile_25_study_info_page_minutes": 2.0,
+            "median_study_info_page_minutes": 3.0,
+            "percentile_75_study_info_page_minutes": 4.0,
+            "percentile_90_study_info_page_minutes": 5.0,
+            "attempt_count_with_nonmissing_total_attempt_time": 3,
+            "attempt_count_missing_total_attempt_time": 0,
+            "percentile_25_total_attempt_minutes": 4.0,
+            "median_total_attempt_minutes": 5.0,
+            "percentile_75_total_attempt_minutes": 6.0,
+            "percentile_90_total_attempt_minutes": 7.0,
+        },
+        {
+            "attempt_completion_group": "COMPLETE",
+            "attempt_result": "ALL",
+            "attempt_authoring_mode": "AI",
+            "grouping_dimension_1_name": "COMPLETION_GROUP",
+            "grouping_dimension_2_name": "AUTHORING_MODE",
+            "attempt_count": 4,
+            "attempt_count_with_nonmissing_study_info_page_time": 4,
+            "attempt_count_missing_study_info_page_time": 0,
+            "percentile_25_study_info_page_minutes": 1.0,
+            "median_study_info_page_minutes": 2.0,
+            "percentile_75_study_info_page_minutes": 3.0,
+            "percentile_90_study_info_page_minutes": 4.0,
+            "attempt_count_with_nonmissing_total_attempt_time": 4,
+            "attempt_count_missing_total_attempt_time": 0,
+            "percentile_25_total_attempt_minutes": 1.5,
+            "median_total_attempt_minutes": 2.5,
+            "percentile_75_total_attempt_minutes": 4.0,
+            "percentile_90_total_attempt_minutes": 5.0,
+        },
+        {
+            "attempt_completion_group": "COMPLETE",
+            "attempt_result": "ALL",
+            "attempt_authoring_mode": "MANUAL",
+            "grouping_dimension_1_name": "COMPLETION_GROUP",
+            "grouping_dimension_2_name": "AUTHORING_MODE",
+            "attempt_count": 3,
+            "attempt_count_with_nonmissing_study_info_page_time": 2,
+            "attempt_count_missing_study_info_page_time": 1,
+            "percentile_25_study_info_page_minutes": 2.0,
+            "median_study_info_page_minutes": 3.0,
+            "percentile_75_study_info_page_minutes": 4.0,
+            "percentile_90_study_info_page_minutes": 5.0,
+            "attempt_count_with_nonmissing_total_attempt_time": 3,
+            "attempt_count_missing_total_attempt_time": 0,
+            "percentile_25_total_attempt_minutes": 4.0,
+            "median_total_attempt_minutes": 5.0,
+            "percentile_75_total_attempt_minutes": 7.0,
+            "percentile_90_total_attempt_minutes": 8.0,
+        },
+    ]
+
+    return pd.DataFrame.from_records(rows)
 
 
 def study_history_rows() -> pd.DataFrame:
@@ -1010,23 +1049,131 @@ def test_completed_study_pi_status_chart_uses_study_specific_labels() -> None:
     )
 
 
-def test_attempt_outcomes_chart_uses_aggregate_counts() -> None:
-    figure = build_attempt_outcomes_chart(grouped_attempt_rows())
+def test_attempt_outcomes_chart_partitions_all_attempts() -> None:
+    figure = build_attempt_outcomes_chart(overview_rows())
+    traces = {str(trace.name): trace for trace in figure.data}
 
-    assert figure.layout.title.text == "Attempt outcomes by authoring mode"
+    assert figure.layout.title.text == "How the captured attempts ended"
     assert figure.layout.barmode == "stack"
-    assert list(figure.data[0].x) == ["AI", "MANUAL"]
-    assert list(figure.data[0].y) == [4, 3]
+    assert list(traces) == [
+        "Completed — AI",
+        "Completed — manual",
+        "Incomplete — AI",
+        "Incomplete — manual",
+    ]
+    assert [trace.orientation for trace in figure.data] == ["h", "h", "h", "h"]
+    assert [list(trace.x) for trace in figure.data] == [[4], [3], [2], [1]]
+    assert [list(trace.y) for trace in figure.data] == [
+        ["All attempts"],
+        ["All attempts"],
+        ["All attempts"],
+        ["All attempts"],
+    ]
+    assert traces["Completed — AI"].customdata[0][0] == pytest.approx(40.0)
+    assert traces["Completed — AI"].customdata[0][1] == 7
+    assert traces["Completed — AI"].customdata[0][2] == pytest.approx(100.0 * 4.0 / 7.0)
+    assert "Share within completion group" in str(
+        traces["Completed — AI"].hovertemplate
+    )
+    assert traces["Incomplete — AI"].marker.pattern.shape == "/"
+    assert traces["Completed — AI"].textangle == 0
+    assert "AI complete" in str(traces["Completed — AI"].text[0])
+    assert figure.layout.height == 420
+
+
+def test_attempt_outcomes_chart_rejects_contradictory_partition() -> None:
+    rows = overview_rows()
+    rows.loc[
+        rows["overview_metric_name"].eq("incomplete_manual_attempt_count"),
+        "metric_count",
+    ] = 2
+
+    with pytest.raises(
+        ExplorationValidationError,
+        match="do not partition their completion groups",
+    ):
+        build_attempt_outcomes_chart(rows)
+
+
+def test_attempt_outcomes_chart_rejects_duplicate_overview_metric() -> None:
+    rows = pd.concat(
+        [
+            overview_rows(),
+            overview_rows().loc[
+                overview_rows()["overview_metric_name"].eq("all_attempt_count")
+            ],
+        ],
+        ignore_index=True,
+    )
+
+    with pytest.raises(
+        ExplorationValidationError,
+        match="contains duplicate metric",
+    ):
+        build_attempt_outcomes_chart(rows)
+
+
+def test_attempt_outcomes_chart_requires_every_partition_metric() -> None:
+    rows = overview_rows().loc[
+        overview_rows()["overview_metric_name"].ne("incomplete_manual_attempt_count")
+    ]
+
+    with pytest.raises(
+        ExplorationValidationError,
+        match="lacks required metric 'incomplete_manual_attempt_count'",
+    ):
+        build_attempt_outcomes_chart(rows)
+
+
+@pytest.mark.parametrize(
+    ("value", "message"),
+    [
+        ("not-a-number", "must be numeric"),
+        (1.5, "must be a nonnegative integer"),
+        (-1, "must be a nonnegative integer"),
+    ],
+)
+def test_attempt_outcomes_chart_rejects_invalid_counts(
+    value: object,
+    message: str,
+) -> None:
+    records = overview_rows().to_dict(orient="records")
+
+    for record in records:
+        if record["overview_metric_name"] == "completed_ai_attempt_count":
+            record["metric_count"] = value
+
+    rows = pd.DataFrame.from_records(records)
+
+    with pytest.raises(
+        ExplorationValidationError,
+        match=message,
+    ):
+        build_attempt_outcomes_chart(rows)
+
+
+def test_attempt_outcomes_chart_rejects_completion_partition_mismatch() -> None:
+    rows = overview_rows()
+    rows.loc[
+        rows["overview_metric_name"].eq("incomplete_attempt_count"),
+        "metric_count",
+    ] = 4
+
+    with pytest.raises(
+        ExplorationValidationError,
+        match="completion counts do not partition all attempts",
+    ):
+        build_attempt_outcomes_chart(rows)
 
 
 def test_attempt_timing_chart_shows_two_timing_distributions() -> None:
     figure = build_attempt_timing_chart(grouped_attempt_rows())
     traces = {str(trace.name): trace for trace in figure.data}
 
-    assert figure.layout.title.text == (
-        "Attempt timing distributions by authoring mode"
-    )
+    assert figure.layout.title.text == ("Completed-attempt timing by authoring mode")
     assert figure.layout.barmode == "group"
+    assert figure.layout.height == 460
+    assert figure.layout.yaxis.title.text == "Median minutes"
     assert list(traces["Study-information-page time"].x) == [
         "AI",
         "MANUAL",
@@ -1042,7 +1189,7 @@ def test_attempt_timing_chart_shows_two_timing_distributions() -> None:
     ]
     assert list(traces["Total attempt time"].y) == [2.5, 5.0]
     assert [list(value[:2]) for value in traces["Total attempt time"].customdata] == [
-        [6, 0],
+        [4, 0],
         [3, 0],
     ]
     assert "90th percentile" in str(traces["Total attempt time"].hovertemplate)
@@ -1302,6 +1449,7 @@ def test_content_source_chart_uses_all_attempt_population() -> None:
 def test_chart_bundle_contains_all_figures() -> None:
     charts = build_exploration_charts(
         ExplorationChartInputs(
+            overview_summary=overview_rows(),
             grouped_attempt_summary=grouped_attempt_rows(),
             study_attempt_history_summary=study_history_rows(),
             author_handoff_summary=author_handoff_rows(),
@@ -1370,7 +1518,6 @@ def assert_attempt_timing_chart_has_accessible_empty_state() -> None:
 
 
 def test_charts_return_accessible_empty_states() -> None:
-    attempt_columns = grouped_attempt_rows().columns
     study_columns = study_history_rows().columns
     handoff_columns = author_handoff_rows().columns
     attempt_start_experience_columns = attempt_start_experience_rows().columns
@@ -1388,7 +1535,9 @@ def test_charts_return_accessible_empty_states() -> None:
     readability_target_columns = readability_target_rows().columns
     selected_comparison_columns = selected_comparison_rows().columns
 
-    attempt_figure = build_attempt_outcomes_chart(pd.DataFrame(columns=attempt_columns))
+    attempt_figure = build_attempt_outcomes_chart(
+        pd.DataFrame(columns=overview_rows().columns)
+    )
     study_figure = build_study_completion_pathways_chart(
         pd.DataFrame(columns=study_columns)
     )
@@ -1465,7 +1614,7 @@ def test_charts_return_accessible_empty_states() -> None:
             build_attempt_outcomes_chart,
             pd.DataFrame(
                 {
-                    "attempt_result": ["COMPLETE"],
+                    "overview_metric_name": ["all_attempt_count"],
                 }
             ),
         ),

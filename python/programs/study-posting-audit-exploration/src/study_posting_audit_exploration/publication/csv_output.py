@@ -298,6 +298,7 @@ def _write_staging_output(
 
     charts = build_exploration_charts(
         ExplorationChartInputs(
+            overview_summary=(tables.overview.overview_summary),
             grouped_attempt_summary=(tables.attempts.grouped_attempt_summary),
             study_attempt_history_summary=(
                 tables.overview.study_attempt_history_summary
@@ -337,6 +338,7 @@ def _write_staging_output(
     write_html_report(
         report_path,
         overview_summary=tables.overview.overview_summary,
+        author_handoff_summary=tables.overview.author_handoff_summary,
         data_quality_summary=tables.quality.data_quality_summary,
         charts=charts,
     )
