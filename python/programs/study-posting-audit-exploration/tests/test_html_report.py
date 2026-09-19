@@ -887,6 +887,109 @@ def test_html_report_explains_completed_study_author_context() -> None:
     )
 
 
+def test_html_report_has_navigation_and_faculty_summary() -> None:
+    html = render_html_report(
+        records=feedback_records(),
+        overview_summary=overview_rows(),
+        author_handoff_summary=author_handoff_rows(),
+        data_quality_summary=quality_rows(),
+        charts=charts(),
+    )
+    normalized = " ".join(html.split())
+
+    assert '<nav aria-labelledby="report-contents-heading">' in html
+    assert 'id="report-contents-heading"' in html
+    assert 'id="faculty-summary-heading"' in html
+    assert html.index('id="report-contents-heading"') < html.index(
+        'id="faculty-summary-heading"'
+    )
+    assert html.index('id="faculty-summary-heading"') < html.index(
+        'id="executive-overview-heading"'
+    )
+    assert "12 attempts representing 10 studies" in normalized
+    assert "8 completed studies (80.0%)" in normalized
+    assert "4 used AI as the final authoring mode" in normalized
+    assert "4 were authored manually" in normalized
+    assert "3 completed studies had" in normalized
+    assert "1 of 3 reportable warning categories" in normalized
+    assert "2 AI-usefulness feedback responses" in normalized
+
+
+def test_html_report_toc_targets_unique_sections_in_report_order() -> None:
+    html = render_html_report(
+        records=feedback_records(),
+        overview_summary=overview_rows(),
+        author_handoff_summary=author_handoff_rows(),
+        data_quality_summary=quality_rows(),
+        charts=charts(),
+    )
+
+    expected_ids = (
+        "executive-overview-heading",
+        "data-quality-heading",
+        "study-pathways-heading",
+        "author-experience-heading",
+        "completed-study-author-context-heading",
+        "author-context-heading",
+        "study-mix-heading",
+        "field-adoption-heading",
+        "suggestion-choice-heading",
+        "readability-heading",
+        "content-source-heading",
+        "user-feedback-heading",
+    )
+
+    href_positions = []
+    target_positions = []
+
+    for section_id in expected_ids:
+        assert html.count(f'href="#{section_id}"') == 1
+        assert html.count(f'id="{section_id}"') == 1
+        href_positions.append(html.index(f'href="#{section_id}"'))
+        target_positions.append(html.index(f'id="{section_id}"'))
+
+    assert href_positions == sorted(href_positions)
+    assert target_positions == sorted(target_positions)
+
+
+def test_html_report_uses_progressive_disclosure_defaults() -> None:
+    html = render_html_report(
+        records=feedback_records(),
+        overview_summary=overview_rows(),
+        author_handoff_summary=author_handoff_rows(),
+        data_quality_summary=quality_rows(),
+        charts=charts(),
+    )
+
+    for section_id in (
+        "executive-overview-heading",
+        "data-quality-heading",
+        "study-pathways-heading",
+        "user-feedback-heading",
+    ):
+        assert (
+            f'<details class="report-section" open>\n    <summary id="{section_id}"'
+        ) in html
+
+    for section_id in (
+        "author-experience-heading",
+        "completed-study-author-context-heading",
+        "author-context-heading",
+        "study-mix-heading",
+        "field-adoption-heading",
+        "suggestion-choice-heading",
+        "readability-heading",
+        "content-source-heading",
+    ):
+        assert (
+            f'<details class="report-section">\n    <summary id="{section_id}"'
+        ) in html
+
+    assert html.count('<details class="report-section"') == 12
+    assert "details.report-section:not([open]) > section" in html
+    assert "display: block" in html
+
+
 def test_html_report_loads_plotly_before_first_chart() -> None:
     """Load Plotly before the first overview chart executes."""
     html = render_html_report(

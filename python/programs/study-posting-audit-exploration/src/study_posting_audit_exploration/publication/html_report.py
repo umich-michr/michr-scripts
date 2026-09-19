@@ -73,12 +73,60 @@ _TEMPLATE = """<!doctype html>
       margin: 0 auto;
       padding: 1rem;
     }
-    header, section {
+    header, section, nav, .faculty-summary, details.report-section {
       margin-bottom: 1.5rem;
       padding: 1.25rem;
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 0.5rem;
+    }
+    nav h2, .faculty-summary h2 { margin-top: 0; }
+    .report-toc {
+      columns: 2;
+      column-gap: 2rem;
+      margin: 0;
+      padding-left: 1.25rem;
+    }
+    .report-toc li {
+      break-inside: avoid;
+      margin-bottom: 0.4rem;
+    }
+    .report-toc a {
+      color: var(--accent);
+      text-decoration-thickness: 0.08em;
+      text-underline-offset: 0.15em;
+    }
+    .faculty-summary-list {
+      margin-bottom: 0;
+      padding-left: 1.25rem;
+    }
+    .faculty-summary-list li { margin-bottom: 0.5rem; }
+    details.report-section {
+      padding: 0;
+      overflow: visible;
+    }
+    details.report-section > summary {
+      padding: 1.25rem;
+      cursor: pointer;
+      color: var(--ink);
+      font-size: 1.5rem;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+    details.report-section > summary:hover {
+      background: var(--panel);
+    }
+    details.report-section > summary:focus {
+      outline: 3px solid var(--focus);
+      outline-offset: -3px;
+    }
+    details.report-section[open] > summary {
+      border-bottom: 1px solid var(--border);
+    }
+    details.report-section > section {
+      margin: 0;
+      border: 0;
+      border-radius: 0;
     }
     h1, h2 { line-height: 1.2; }
     h1 { margin-top: 0; }
@@ -192,11 +240,20 @@ _TEMPLATE = """<!doctype html>
       outline: 3px solid var(--focus);
       outline-offset: 2px;
     }
+    @media (max-width: 700px) {
+      .report-toc { columns: 1; }
+    }
     @media print {
       body { background: #ffffff; }
-      header, section {
+      header, section, nav, .faculty-summary, details.report-section {
         break-inside: avoid;
         border-color: #999999;
+      }
+      details.report-section > summary {
+        display: none;
+      }
+      details.report-section:not([open]) > section {
+        display: block;
       }
     }
   </style>
@@ -214,8 +271,72 @@ _TEMPLATE = """<!doctype html>
     </p>
   </header>
 
-  <section aria-labelledby="executive-overview-heading">
-    <h2 id="executive-overview-heading">Captured data at a glance</h2>
+  <nav aria-labelledby="report-contents-heading">
+    <h2 id="report-contents-heading">Report contents</h2>
+    <ol class="report-toc">
+      <li><a href="#executive-overview-heading">Captured data at a glance</a></li>
+      <li><a href="#data-quality-heading">Data quality</a></li>
+      <li><a href="#study-pathways-heading">Study pathways and author handoffs</a></li>
+      <li><a href="#author-experience-heading">Author experience and activity</a></li>
+      <li>
+        <a href="#completed-study-author-context-heading">
+          Completed-study author context
+        </a>
+      </li>
+      <li>
+          Completed-study author context
+        </a>
+      </li>
+      <li><a href="#author-context-heading">Appointment context</a></li>
+      <li><a href="#study-mix-heading">Participant and department mix</a></li>
+      <li><a href="#field-adoption-heading">AI field adoption and editing</a></li>
+      <li><a href="#suggestion-choice-heading">Suggestion choice</a></li>
+      <li><a href="#readability-heading">Readability indicators</a></li>
+      <li><a href="#content-source-heading">Content-source concordance</a></li>
+      <li><a href="#user-feedback-heading">User feedback on AI assistance</a></li>
+    </ol>
+  </nav>
+
+  <aside class="faculty-summary" aria-labelledby="faculty-summary-heading">
+    <h2 id="faculty-summary-heading">Faculty summary</h2>
+    <ul class="faculty-summary-list">
+      <li>
+        The report contains {{ faculty_summary.all_attempt_count }} attempts
+        representing {{ faculty_summary.distinct_study_count }} studies and
+        {{ faculty_summary.completed_study_count }} completed studies
+        ({{ faculty_summary.completion_percentage_text }}).
+      </li>
+      <li>
+        Among completed studies, {{ faculty_summary.completed_ai_count }} used
+        AI as the final authoring mode and
+        {{ faculty_summary.completed_manual_count }} were authored manually.
+      </li>
+      <li>
+        {{ faculty_summary.preceding_incomplete_count }} completed studies had
+        at least one preceding incomplete attempt.
+      </li>
+      <li>
+        {{ faculty_summary.warning_category_count }} of
+        {{ faculty_summary.warning_category_total }} reportable warning
+        categories affected attempts.
+      </li>
+      <li>
+        {{ faculty_summary.feedback_count }} AI-usefulness feedback
+        responses are available in the final section.
+      </li>
+    </ul>
+    <p class="caution">
+      Detailed sections below provide workflow, author, field, readability,
+      source-concordance, quality, and feedback context. These descriptive
+      results do not establish causal benefit or evaluate individuals.
+    </p>
+  </aside>
+
+    <details class="report-section" open>
+    <summary id="executive-overview-heading">
+      Captured data at a glance
+    </summary>
+    <section aria-labelledby="executive-overview-heading">
     <div class="kpi-grid">
       {% for card in kpi_cards %}
       <article class="kpi-card">
@@ -268,9 +389,13 @@ _TEMPLATE = """<!doctype html>
       completed study contributes one unique completed attempt.
     </p>
   </section>
+  </details>
 
-  <section aria-labelledby="data-quality-heading">
-    <h2 id="data-quality-heading">Data quality</h2>
+    <details class="report-section" open>
+    <summary id="data-quality-heading">
+      Data quality
+    </summary>
+    <section aria-labelledby="data-quality-heading">
     <p>
       This successful publication passed every fatal validation check.
       Fatal conditions stop publication, so affected fatal counts are zero
@@ -330,9 +455,13 @@ _TEMPLATE = """<!doctype html>
       checklist, definitions, denominators, and consequences.
     </p>
   </section>
+  </details>
 
-  <section aria-labelledby="study-pathways-heading">
-    <h2 id="study-pathways-heading">Study pathways and author handoffs</h2>
+    <details class="report-section" open>
+    <summary id="study-pathways-heading">
+      Study pathways and author handoffs
+    </summary>
+    <section aria-labelledby="study-pathways-heading">
     <p class="caution">
       A preceding attempt is an incomplete attempt ordered before the unique
       completed attempt for the same study. Author comparisons are made only
@@ -341,9 +470,13 @@ _TEMPLATE = """<!doctype html>
     <div class="chart">{{ study_pathways_html | safe }}</div>
     <div class="chart">{{ author_handoffs_html | safe }}</div>
   </section>
+  </details>
 
-  <section aria-labelledby="author-experience-heading">
-  <h2 id="author-experience-heading">Author experience and activity</h2>
+    <details class="report-section">
+    <summary id="author-experience-heading">
+      Author experience and activity
+    </summary>
+    <section aria-labelledby="author-experience-heading">
   <p>
     These charts describe attempt authors, not experience measures for
     named study principal investigators unless that principal investigator
@@ -391,11 +524,13 @@ _TEMPLATE = """<!doctype html>
     authoring-mode choice or study outcomes.
   </p>
 </section>
+  </details>
 
-  <section aria-labelledby="completed-study-author-context-heading">
-    <h2 id="completed-study-author-context-heading">
+    <details class="report-section">
+    <summary id="completed-study-author-context-heading">
       Completed studies by authoring mode and completion-author context
-    </h2>
+    </summary>
+    <section aria-labelledby="completed-study-author-context-heading">
     <p>
       Each completed study contributes exactly once through its unique
       completed attempt. AI or manual mode is the final authoring mode on that
@@ -416,11 +551,12 @@ _TEMPLATE = """<!doctype html>
       {{ completed_studies_by_completion_author_pi_status_html | safe }}
     </div>
   </section>
+  </details>
 
-  <section aria-labelledby="author-context-heading">
-    <h2 id="author-context-heading">
+    <details class="report-section">
+    <summary id="author-context-heading">
       Author and principal-investigator appointment context
-    </h2>
+    </summary>
     <p>
       Appointment values are parsed from comma-separated
       <code>Title:Department:School</code> entries. The charts summarize
@@ -439,9 +575,13 @@ _TEMPLATE = """<!doctype html>
     <div class="chart">{{ author_appointment_titles_html | safe }}</div>
     <div class="chart">{{ pi_appointment_titles_html | safe }}</div>
   </section>
+  </details>
 
-  <section aria-labelledby="study-mix-heading">
-    <h2 id="study-mix-heading">Participant and department mix</h2>
+    <details class="report-section">
+    <summary id="study-mix-heading">
+      Participant and department mix
+    </summary>
+    <section aria-labelledby="study-mix-heading">
     <p class="caution">
       These charts describe mutually exclusive categories among completed
       studies. Other and missing categories are retained rather than silently
@@ -450,9 +590,13 @@ _TEMPLATE = """<!doctype html>
     <div class="chart">{{ participant_mix_html | safe }}</div>
     <div class="chart">{{ department_mix_html | safe }}</div>
   </section>
+  </details>
 
-  <section aria-labelledby="field-adoption-heading">
-  <h2 id="field-adoption-heading">AI field adoption and editing</h2>
+    <details class="report-section">
+    <summary id="field-adoption-heading">
+      AI field adoption and editing
+    </summary>
+    <section aria-labelledby="field-adoption-heading">
   <p>
     These charts summarize completed AI attempts at the field level. An
     offer means at least one suggestion was available for the field; a
@@ -469,9 +613,13 @@ _TEMPLATE = """<!doctype html>
   <div class="chart">{{ field_suggestion_adoption_html | safe }}</div>
   <div class="chart">{{ field_selected_outcomes_html | safe }}</div>
 </section>
+  </details>
 
-<section aria-labelledby="suggestion-choice-heading">
-  <h2 id="suggestion-choice-heading">Suggestion choice</h2>
+  <details class="report-section">
+    <summary id="suggestion-choice-heading">
+    Suggestion choice
+  </summary>
+  <section aria-labelledby="suggestion-choice-heading">
   <p>
     These charts summarize completed AI attempts without displaying
     suggestion text. Attempt-level selection is the percentage of eligible
@@ -489,9 +637,13 @@ _TEMPLATE = """<!doctype html>
   <div class="chart">{{ suggestion_selection_by_kind_html | safe }}</div>
   <div class="chart">{{ suggestion_selection_by_index_html | safe }}</div>
 </section>
+  </details>
 
-<section aria-labelledby="readability-heading">
-  <h2 id="readability-heading">Readability indicators</h2>
+  <details class="report-section">
+    <summary id="readability-heading">
+    Readability indicators
+  </summary>
+  <section aria-labelledby="readability-heading">
   <p>
     These charts use Flesch-Kincaid grade as one descriptive indicator.
     Selected-to-final change is calculated as final minus selected.
@@ -606,17 +758,25 @@ _TEMPLATE = """<!doctype html>
     {{ edit_readability_relationship_html | safe }}
   </div>
 </section>
+  </details>
 
-  <section aria-labelledby="content-source-heading">
-    <h2 id="content-source-heading">Content-source concordance</h2>
+    <details class="report-section">
+    <summary id="content-source-heading">
+      Content-source concordance
+    </summary>
+    <section aria-labelledby="content-source-heading">
     <p class="caution">
       Agreement is descriptive and uses normalized aggregate source labels.
     </p>
     <div class="chart">{{ content_source_html | safe }}</div>
   </section>
+  </details>
 
-  <section aria-labelledby="user-feedback-heading">
-    <h2 id="user-feedback-heading">User feedback on AI assistance</h2>
+    <details class="report-section" open>
+    <summary id="user-feedback-heading">
+      User feedback on AI assistance
+    </summary>
+    <section aria-labelledby="user-feedback-heading">
     <p>
       These comments are self-reported feedback about the perceived usefulness
       of AI assistance. They are descriptive and do not establish causal
@@ -650,6 +810,7 @@ _TEMPLATE = """<!doctype html>
     <p>No user feedback about AI usefulness was available for this report.</p>
     {% endif %}
   </section>
+  </details>
 
 </main>
 </body>
@@ -683,6 +844,52 @@ class QualityHtmlContext:
     zero_warning_messages: tuple[str, ...]
 
 
+def _faculty_summary(
+    *,
+    overview_summary: pd.DataFrame,
+    quality: QualityHtmlContext,
+    feedback_rows: tuple[UserFeedbackView, ...],
+) -> FacultySummaryView:
+    """Return a concise summary from existing report values."""
+    rows = _overview_rows_by_name(overview_summary)
+
+    def count(metric_name: str) -> int:
+        row = _required_overview_row(rows, metric_name)
+        return int(
+            _finite_number(
+                row["metric_count"],
+                value_name=metric_name,
+            )
+        )
+
+    completed_row = _required_overview_row(
+        rows,
+        "distinct_completed_study_count",
+    )
+    completion_percentage = _percentage_text(completed_row["metric_percentage"])
+
+    return FacultySummaryView(
+        all_attempt_count=count("all_attempt_count"),
+        distinct_study_count=count("distinct_study_count_with_any_attempt"),
+        completed_study_count=count("distinct_completed_study_count"),
+        completion_percentage_text=(
+            completion_percentage
+            if completion_percentage is not None
+            else "percentage unavailable"
+        ),
+        completed_ai_count=count("distinct_completed_study_count_final_mode_ai"),
+        completed_manual_count=count(
+            "distinct_completed_study_count_final_mode_manual"
+        ),
+        preceding_incomplete_count=count(
+            "distinct_completed_study_count_with_preceding_incomplete_attempts"
+        ),
+        warning_category_count=quality.affected_warning_count,
+        warning_category_total=quality.warning_total,
+        feedback_count=len(feedback_rows),
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class KpiCard:
     """One executive-overview card."""
@@ -709,6 +916,22 @@ class UserFeedbackView:
 
     audit_record_id: int
     feedback_text: str
+
+
+@dataclass(frozen=True, slots=True)
+class FacultySummaryView:
+    """Concise existing metrics for faculty orientation."""
+
+    all_attempt_count: int
+    distinct_study_count: int
+    completed_study_count: int
+    completion_percentage_text: str
+    completed_ai_count: int
+    completed_manual_count: int
+    preceding_incomplete_count: int
+    warning_category_count: int
+    warning_category_total: int
+    feedback_count: int
 
 
 def _user_feedback_rows(
@@ -1189,10 +1412,16 @@ def render_html_report(
     )
     template = environment.from_string(_TEMPLATE)
     quality = _quality_html_context(data_quality_summary)
+    feedback_rows = _user_feedback_rows(records)
 
     return template.render(
         title=_REPORT_TITLE,
-        user_feedback_rows=_user_feedback_rows(records),
+        user_feedback_rows=feedback_rows,
+        faculty_summary=_faculty_summary(
+            overview_summary=overview_summary,
+            quality=quality,
+            feedback_rows=feedback_rows,
+        ),
         kpi_cards=_kpi_cards(overview_summary),
         pathway_callouts=_completion_pathway_callouts(
             overview_summary,
