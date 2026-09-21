@@ -22,11 +22,22 @@ from study_posting_audit_exploration.derivation.roles import (
     derive_role_columns,
     effective_author_role,
 )
+from study_posting_audit_exploration.derivation.source_context import (
+    COMPLETED_AI_SOURCE_PATHWAY_COLUMNS,
+    SUCCESSFUL_AI_GENERATION_COLUMNS,
+    SUCCESSFUL_AI_TRANSITION_COLUMNS,
+    SourceContextTables,
+    derive_source_context_tables,
+)
 from study_posting_audit_exploration.models import AppointmentQualityFinding
 
 __all__ = [
+    "COMPLETED_AI_SOURCE_PATHWAY_COLUMNS",
     "EDIT_INTENSITY_THRESHOLD_SCHEME",
+    "SUCCESSFUL_AI_GENERATION_COLUMNS",
+    "SUCCESSFUL_AI_TRANSITION_COLUMNS",
     "AppointmentQualityFinding",
+    "SourceContextTables",
     "author_changed",
     "classify_edit_intensity",
     "derive_appointments",
@@ -34,6 +45,7 @@ __all__ = [
     "derive_completed_ai_field_analysis",
     "derive_completed_ai_readability_pairs",
     "derive_role_columns",
+    "derive_source_context_tables",
     "effective_author_role",
     "same_author_within_study",
 ]

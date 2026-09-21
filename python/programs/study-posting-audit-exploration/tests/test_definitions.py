@@ -100,6 +100,10 @@ def test_metric_definitions_describe_special_policies() -> None:
     missing_final = definitions.loc[
         definitions["metric_name"].eq("final_text_attempt_count_missing_or_blank")
     ]
+    source_signature_rows = definitions.loc[
+        definitions["metric_name"].str.contains("source_signature")
+    ]
+    latency_rows = definitions.loc[definitions["metric_name"].str.contains("latency")]
 
     assert percentage_rows["denominator_definition"].ne("Not applicable.").all()
     assert percentage_rows["interpretation_notes"].str.contains("descriptive").all()
@@ -112,6 +116,8 @@ def test_metric_definitions_describe_special_policies() -> None:
         .str.contains("always published as missing")
         .all()
     )
+    assert source_signature_rows["interpretation_notes"].str.contains("proxy").all()
+    assert latency_rows["interpretation_notes"].str.contains("descriptive").all()
 
 
 def test_metric_definitions_accept_stable_schema_mapping() -> None:

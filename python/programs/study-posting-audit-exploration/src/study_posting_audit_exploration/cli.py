@@ -14,6 +14,7 @@ from study_posting_audit_exploration.aggregation import (
     build_overview_tables,
     build_quality_analysis_tables,
     build_readability_analysis_tables,
+    build_source_context_analysis_tables,
     build_study_analysis_tables,
 )
 from study_posting_audit_exploration.config import (
@@ -25,6 +26,7 @@ from study_posting_audit_exploration.derivation import (
     derive_attempt_histories,
     derive_completed_ai_field_analysis,
     derive_completed_ai_readability_pairs,
+    derive_source_context_tables,
 )
 from study_posting_audit_exploration.errors import AuditExplorationError
 from study_posting_audit_exploration.loading import load_audit_report
@@ -258,9 +260,11 @@ def _analysis_tables(
         report.readability_metrics,
         completed_ai_fields,
     )
+    source_context = derive_source_context_tables(report.records)
 
     return ExplorationAnalysisTables(
         histories=histories,
+        source_context=build_source_context_analysis_tables(source_context),
         quality=build_quality_analysis_tables(
             report=report,
             histories=histories,
@@ -271,7 +275,10 @@ def _analysis_tables(
             studies=histories.study_attempt_history,
             authors=histories.author_history,
         ),
-        attempts=build_attempt_analysis_tables(attempts),
+        attempts=build_attempt_analysis_tables(
+            attempts,
+            successful_ai_generations=(source_context.successful_ai_generations),
+        ),
         studies=build_study_analysis_tables(
             studies,
             study_attempt_author_history=(histories.study_attempt_author_history),
@@ -335,6 +342,18 @@ def _print_publication(
         (
             "Data quality findings CSV",
             published.data_quality_findings_path,
+        ),
+        (
+            "Repeated-attempt source consistency summary CSV",
+            published.repeated_attempt_source_consistency_summary_path,
+        ),
+        (
+            "Source context distribution summary CSV",
+            published.source_context_distribution_summary_path,
+        ),
+        (
+            "Source size and latency summary CSV",
+            published.source_size_latency_summary_path,
         ),
         (
             "Completed study author context summary CSV",

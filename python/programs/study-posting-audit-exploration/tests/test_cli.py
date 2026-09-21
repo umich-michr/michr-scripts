@@ -102,6 +102,8 @@ def _expected_paths(
     """Return the published paths checked by the CLI integration test."""
     quality_directory = output_directory / "quality"
     audit_directory = output_directory / "analysis-audit-records"
+    overview_directory = output_directory / "overview"
+    attempts_directory = output_directory / "attempts"
     studies_directory = output_directory / "studies"
     fields_directory = output_directory / "fields"
     readability_directory = output_directory / "readability"
@@ -113,6 +115,13 @@ def _expected_paths(
         "definitions": (output_directory / "definitions" / "metric_definitions.csv"),
         "quality": quality_directory / "data_quality_summary.csv",
         "quality_findings": (audit_directory / "data_quality_findings.csv"),
+        "repeated_source_consistency": (
+            overview_directory / "repeated_attempt_source_consistency_summary.csv"
+        ),
+        "source_context_distribution": (
+            attempts_directory / "source_context_distribution_summary.csv"
+        ),
+        "source_size_latency": (attempts_directory / "source_size_latency_summary.csv"),
         "completed_study_context": (
             studies_directory / "completed_study_author_context_summary.csv"
         ),
@@ -137,11 +146,15 @@ def _assert_manifest(manifest: dict[str, object]) -> None:
     """Assert current field and readability manifest counts."""
     quality_counts = manifest["quality_analysis_row_counts"]
     audit_counts = manifest["analysis_audit_record_row_counts"]
+    overview_counts = manifest["overview_row_counts"]
+    attempt_counts = manifest["attempt_analysis_row_counts"]
     study_counts = manifest["study_analysis_row_counts"]
     readability_counts = manifest["readability_analysis_row_counts"]
 
     assert isinstance(quality_counts, dict)
     assert isinstance(audit_counts, dict)
+    assert isinstance(overview_counts, dict)
+    assert isinstance(attempt_counts, dict)
     assert isinstance(study_counts, dict)
     assert isinstance(readability_counts, dict)
 
@@ -149,6 +162,9 @@ def _assert_manifest(manifest: dict[str, object]) -> None:
     assert "data_quality_findings" in audit_counts
     assert audit_counts["completed_ai_field_analysis"] > 0
     assert audit_counts["completed_ai_readability_pairs"] > 0
+    assert overview_counts["repeated_attempt_source_consistency_summary"] > 0
+    assert attempt_counts["source_context_distribution_summary"] > 0
+    assert attempt_counts["source_size_latency_summary"] > 0
     assert study_counts["completed_study_author_context_summary"] > 0
     assert readability_counts["field_readability_change_summary"] > 0
     assert readability_counts["field_readability_target_summary"] > 0
@@ -161,7 +177,7 @@ def _assert_manifest(manifest: dict[str, object]) -> None:
 
     assert isinstance(research_counts, dict)
     assert research_counts["candidate_research_questions"] == 14
-    assert manifest["output_file_count"] == 31
+    assert manifest["output_file_count"] == 34
     assert manifest["warning_count"] == 0
 
 
@@ -198,7 +214,7 @@ def _assert_cli_paths_printed(
         f"Field edit/readability cross summary CSV: {paths['cross']}",
         f"Final text metric summary CSV: {paths['final_metric']}",
         f"Candidate research questions CSV: {paths['research_questions']}",
-        "Published files: 31",
+        "Published files: 34",
     )
 
     for expected_line in expected_lines:

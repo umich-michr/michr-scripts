@@ -74,7 +74,7 @@ def _write_exploration(
     )
     manifest = {
         "source_report_directory": str(directory.parent / "report"),
-        "output_file_count": 31,
+        "output_file_count": 34,
         "quality_analysis_row_counts": {
             "data_quality_summary": len(rows),
         },
@@ -184,7 +184,7 @@ def test_rejects_missing_or_reordered_checks(tmp_path: Path) -> None:
 @pytest.mark.parametrize(
     ("manifest_field", "value", "message"),
     [
-        ("output_file_count", 30, "31-file contract"),
+        ("output_file_count", 33, "34-file contract"),
         ("warning_count", 99, "warning count does not match"),
     ],
 )

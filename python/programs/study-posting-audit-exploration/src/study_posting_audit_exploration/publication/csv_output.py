@@ -64,8 +64,15 @@ _COMPLETED_AI_READABILITY_PAIRS_FILENAME = "completed_ai_readability_pairs.csv"
 _OVERVIEW_SUMMARY_FILENAME = "overview_summary.csv"
 _STUDY_ATTEMPT_HISTORY_SUMMARY_FILENAME = "study_attempt_history_summary.csv"
 _AUTHOR_HANDOFF_SUMMARY_FILENAME = "author_handoff_summary.csv"
+_REPEATED_ATTEMPT_SOURCE_CONSISTENCY_SUMMARY_FILENAME = (
+    "repeated_attempt_source_consistency_summary.csv"
+)
 
 _GROUPED_ATTEMPT_SUMMARY_FILENAME = "grouped_attempt_summary.csv"
+_SOURCE_CONTEXT_DISTRIBUTION_SUMMARY_FILENAME = (
+    "source_context_distribution_summary.csv"
+)
+_SOURCE_SIZE_LATENCY_SUMMARY_FILENAME = "source_size_latency_summary.csv"
 _CONTENT_SOURCE_CONCORDANCE_SUMMARY_FILENAME = "content_source_concordance_summary.csv"
 _CONTENT_SOURCE_CONCORDANCE_MATRIX_FILENAME = "content_source_concordance_matrix.csv"
 
@@ -95,7 +102,7 @@ _FINAL_TEXT_METRIC_SUMMARY_FILENAME = "final_text_metric_summary.csv"
 
 _CANDIDATE_RESEARCH_QUESTIONS_FILENAME = "candidate_research_questions.csv"
 
-_OUTPUT_FILE_COUNT = 31
+_OUTPUT_FILE_COUNT = 34
 
 
 def _write_frame(
@@ -175,8 +182,20 @@ def _output_frames(
             overview_directory / _AUTHOR_HANDOFF_SUMMARY_FILENAME,
         ),
         (
+            tables.source_context.repeated_attempt_source_consistency_summary,
+            overview_directory / _REPEATED_ATTEMPT_SOURCE_CONSISTENCY_SUMMARY_FILENAME,
+        ),
+        (
             tables.attempts.grouped_attempt_summary,
             attempts_directory / _GROUPED_ATTEMPT_SUMMARY_FILENAME,
+        ),
+        (
+            tables.source_context.source_context_distribution_summary,
+            attempts_directory / _SOURCE_CONTEXT_DISTRIBUTION_SUMMARY_FILENAME,
+        ),
+        (
+            tables.source_context.source_size_latency_summary,
+            attempts_directory / _SOURCE_SIZE_LATENCY_SUMMARY_FILENAME,
         ),
         (
             tables.attempts.content_source_concordance_summary,
@@ -332,6 +351,15 @@ def _write_staging_output(
                 tables.readability.field_edit_readability_cross_summary
             ),
             content_source_matrix=(tables.attempts.content_source_concordance_matrix),
+            source_context_distribution_summary=(
+                tables.source_context.source_context_distribution_summary
+            ),
+            source_size_latency_summary=(
+                tables.source_context.source_size_latency_summary
+            ),
+            repeated_attempt_source_consistency_summary=(
+                tables.source_context.repeated_attempt_source_consistency_summary
+            ),
         )
     )
 
@@ -401,8 +429,17 @@ def _publication_result(
         author_handoff_summary_path=(
             overview_directory / _AUTHOR_HANDOFF_SUMMARY_FILENAME
         ),
+        repeated_attempt_source_consistency_summary_path=(
+            overview_directory / _REPEATED_ATTEMPT_SOURCE_CONSISTENCY_SUMMARY_FILENAME
+        ),
         grouped_attempt_summary_path=(
             attempts_directory / _GROUPED_ATTEMPT_SUMMARY_FILENAME
+        ),
+        source_context_distribution_summary_path=(
+            attempts_directory / _SOURCE_CONTEXT_DISTRIBUTION_SUMMARY_FILENAME
+        ),
+        source_size_latency_summary_path=(
+            attempts_directory / _SOURCE_SIZE_LATENCY_SUMMARY_FILENAME
         ),
         content_source_concordance_summary_path=(
             attempts_directory / _CONTENT_SOURCE_CONCORDANCE_SUMMARY_FILENAME

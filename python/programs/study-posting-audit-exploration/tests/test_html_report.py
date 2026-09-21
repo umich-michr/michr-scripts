@@ -545,6 +545,106 @@ def edit_readability_cross_rows() -> pd.DataFrame:
     )
 
 
+def source_context_distribution_rows() -> pd.DataFrame:
+    """Return aggregate-only source-context category rows."""
+    rows: list[dict[str, object]] = [
+        {
+            "population_name": "ALL_SUCCESSFUL_AI_GENERATIONS",
+            "summary_dimension_name": "INPUT_METHOD",
+            "summary_dimension_value": "docx_file",
+            "eligible_attempt_count": 5,
+            "category_attempt_count": 3,
+            "category_attempt_percentage": 60.0,
+        },
+        {
+            "population_name": "ALL_SUCCESSFUL_AI_GENERATIONS",
+            "summary_dimension_name": "INPUT_METHOD",
+            "summary_dimension_value": "pdf_file",
+            "eligible_attempt_count": 5,
+            "category_attempt_count": 2,
+            "category_attempt_percentage": 40.0,
+        },
+    ]
+
+    return pd.DataFrame.from_records(rows)
+
+
+def source_size_latency_rows() -> pd.DataFrame:
+    """Return aggregate-only source-size-band latency rows."""
+    rows: list[dict[str, object]] = [
+        {
+            "population_name": "ALL_SUCCESSFUL_AI_GENERATIONS",
+            "source_size_band_name": "Q1_OF_2",
+            "source_size_band_sequence": 1,
+            "source_size_band_lower_bound_chars": 100.0,
+            "source_size_band_upper_bound_chars": 200.0,
+            "reported_source_group": "ALL",
+            "band_attempt_count": 3,
+            "attempt_count_with_latency": 3,
+            "attempt_count_missing_latency": 0,
+            "median_source_size_chars": 150.0,
+            "percentile_25_latency_ms": 900.0,
+            "median_latency_ms": 1_000.0,
+            "percentile_75_latency_ms": 1_100.0,
+            "percentile_90_latency_ms": 1_200.0,
+        },
+        {
+            "population_name": "ALL_SUCCESSFUL_AI_GENERATIONS",
+            "source_size_band_name": "Q2_OF_2",
+            "source_size_band_sequence": 2,
+            "source_size_band_lower_bound_chars": 300.0,
+            "source_size_band_upper_bound_chars": 500.0,
+            "reported_source_group": "ALL",
+            "band_attempt_count": 2,
+            "attempt_count_with_latency": 1,
+            "attempt_count_missing_latency": 1,
+            "median_source_size_chars": 400.0,
+            "percentile_25_latency_ms": 1_800.0,
+            "median_latency_ms": 2_000.0,
+            "percentile_75_latency_ms": 2_200.0,
+            "percentile_90_latency_ms": 2_300.0,
+        },
+    ]
+
+    return pd.DataFrame.from_records(rows)
+
+
+def repeated_source_rows() -> pd.DataFrame:
+    """Return aggregate-only completed-path transition rows."""
+    rows: list[dict[str, object]] = []
+
+    for dimension in (
+        "SOURCE_SIZE",
+        "REPORTED_CONTENT_SOURCE",
+        "INPUT_METHOD",
+        "SOURCE_SIGNATURE_PROXY",
+    ):
+        for category, count, percentage in (
+            ("SAME", 3, 60.0),
+            ("CHANGED", 2, 40.0),
+            ("MISSING", 0, 0.0),
+        ):
+            rows.append(
+                {
+                    "summary_grain": (
+                        "COMPLETED_AI_PATH_CONSECUTIVE_SUCCESSFUL_AI_TRANSITION"
+                    ),
+                    "comparison_dimension_name": dimension,
+                    "comparison_category": category,
+                    "population_unit_count": 5,
+                    "eligible_unit_count": 5,
+                    "category_unit_count": count,
+                    "category_unit_percentage": percentage,
+                    "unit_count_with_latency_change": count,
+                    "median_latency_change_ms": (
+                        100.0 if category == "CHANGED" else 0.0
+                    ),
+                }
+            )
+
+    return pd.DataFrame.from_records(rows)
+
+
 def content_rows() -> pd.DataFrame:
     """Return aggregate-only content-source rows."""
     return pd.DataFrame.from_records(
@@ -554,6 +654,8 @@ def content_rows() -> pd.DataFrame:
                 "reported_study_content_source": "registry",
                 "inferred_study_content_source": "registry",
                 "ai_attempt_count": 4,
+                "reported_source_attempt_count": 4,
+                "attempt_percentage_within_reported_source": 100.0,
             }
         ]
     )
@@ -771,6 +873,9 @@ def charts() -> ExplorationCharts:
             selected_vs_unselected_readability_summary=(selected_comparison_rows()),
             field_edit_readability_cross_summary=edit_readability_cross_rows(),
             content_source_matrix=content_rows(),
+            source_context_distribution_summary=(source_context_distribution_rows()),
+            source_size_latency_summary=source_size_latency_rows(),
+            repeated_attempt_source_consistency_summary=(repeated_source_rows()),
         )
     )
 
@@ -830,6 +935,37 @@ def test_html_report_is_self_contained_and_accessible() -> None:
     assert "Field populations and denominators can differ" in normalized_html
     assert "Edited-unclassified is kept separate from replaced" in normalized_html
     assert "do not establish writing quality" in normalized_html
+
+
+def test_html_report_explains_source_context_and_latency() -> None:
+    """Explain successful-generation and completed-path source lenses."""
+    rendered = render_html_report(
+        records=feedback_records(),
+        overview_summary=overview_rows(),
+        author_handoff_summary=author_handoff_rows(),
+        data_quality_summary=quality_rows(),
+        charts=charts(),
+    )
+    normalized = " ".join(rendered.split())
+
+    assert "Source context, repeated attempts, and latency" in rendered
+    assert "All successful AI generation attempts" in rendered
+    assert "How source material was supplied" in rendered
+    assert "Generation latency by source-size band" in rendered
+    assert "Reported versus inferred content source" in rendered
+    assert "Source consistency across completed AI pathways" in rendered
+    assert (
+        "A successful generation is not the same as a completed or created study."
+    ) in normalized
+    assert "25th-to-75th-percentile latency range" in normalized
+    assert "unchanged-source proxy" in normalized
+    assert "not proof that source text was identical" in normalized
+    assert "do not establish" in normalized
+    assert "caused a latency difference" in normalized
+
+    assert rendered.count('href="#completed-study-author-context-heading"') == 1
+    assert rendered.count('id="completed-study-author-context-heading"') == 1
+    assert "<li> Completed-study author context </a> </li>" not in normalized
 
 
 def test_html_report_explains_appointment_context() -> None:

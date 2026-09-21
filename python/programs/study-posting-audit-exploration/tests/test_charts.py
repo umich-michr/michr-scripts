@@ -21,6 +21,9 @@ from study_posting_audit_exploration.publication import (
     build_content_source_concordance_chart,
     build_edit_readability_relationship_chart,
     build_exploration_charts,
+    build_repeated_source_consistency_chart,
+    build_source_input_method_chart,
+    build_source_size_latency_chart,
     build_study_completion_pathways_chart,
     build_suggestion_selection_by_index_chart,
     build_suggestion_selection_by_kind_chart,
@@ -877,6 +880,106 @@ def edit_readability_cross_rows() -> pd.DataFrame:
     )
 
 
+def source_context_distribution_rows() -> pd.DataFrame:
+    """Return aggregate-only source-context category rows."""
+    rows: list[dict[str, object]] = [
+        {
+            "population_name": "ALL_SUCCESSFUL_AI_GENERATIONS",
+            "summary_dimension_name": "INPUT_METHOD",
+            "summary_dimension_value": "docx_file",
+            "eligible_attempt_count": 5,
+            "category_attempt_count": 3,
+            "category_attempt_percentage": 60.0,
+        },
+        {
+            "population_name": "ALL_SUCCESSFUL_AI_GENERATIONS",
+            "summary_dimension_name": "INPUT_METHOD",
+            "summary_dimension_value": "pdf_file",
+            "eligible_attempt_count": 5,
+            "category_attempt_count": 2,
+            "category_attempt_percentage": 40.0,
+        },
+    ]
+
+    return pd.DataFrame.from_records(rows)
+
+
+def source_size_latency_rows() -> pd.DataFrame:
+    """Return aggregate-only source-size-band latency rows."""
+    rows: list[dict[str, object]] = [
+        {
+            "population_name": "ALL_SUCCESSFUL_AI_GENERATIONS",
+            "source_size_band_name": "Q1_OF_2",
+            "source_size_band_sequence": 1,
+            "source_size_band_lower_bound_chars": 100.0,
+            "source_size_band_upper_bound_chars": 200.0,
+            "reported_source_group": "ALL",
+            "band_attempt_count": 3,
+            "attempt_count_with_latency": 3,
+            "attempt_count_missing_latency": 0,
+            "median_source_size_chars": 150.0,
+            "percentile_25_latency_ms": 900.0,
+            "median_latency_ms": 1_000.0,
+            "percentile_75_latency_ms": 1_100.0,
+            "percentile_90_latency_ms": 1_200.0,
+        },
+        {
+            "population_name": "ALL_SUCCESSFUL_AI_GENERATIONS",
+            "source_size_band_name": "Q2_OF_2",
+            "source_size_band_sequence": 2,
+            "source_size_band_lower_bound_chars": 300.0,
+            "source_size_band_upper_bound_chars": 500.0,
+            "reported_source_group": "ALL",
+            "band_attempt_count": 2,
+            "attempt_count_with_latency": 1,
+            "attempt_count_missing_latency": 1,
+            "median_source_size_chars": 400.0,
+            "percentile_25_latency_ms": 1_800.0,
+            "median_latency_ms": 2_000.0,
+            "percentile_75_latency_ms": 2_200.0,
+            "percentile_90_latency_ms": 2_300.0,
+        },
+    ]
+
+    return pd.DataFrame.from_records(rows)
+
+
+def repeated_source_rows() -> pd.DataFrame:
+    """Return aggregate-only completed-path transition rows."""
+    rows: list[dict[str, object]] = []
+
+    for dimension in (
+        "SOURCE_SIZE",
+        "REPORTED_CONTENT_SOURCE",
+        "INPUT_METHOD",
+        "SOURCE_SIGNATURE_PROXY",
+    ):
+        for category, count, percentage in (
+            ("SAME", 3, 60.0),
+            ("CHANGED", 2, 40.0),
+            ("MISSING", 0, 0.0),
+        ):
+            rows.append(
+                {
+                    "summary_grain": (
+                        "COMPLETED_AI_PATH_CONSECUTIVE_SUCCESSFUL_AI_TRANSITION"
+                    ),
+                    "comparison_dimension_name": dimension,
+                    "comparison_category": category,
+                    "population_unit_count": 5,
+                    "eligible_unit_count": 5,
+                    "category_unit_count": count,
+                    "category_unit_percentage": percentage,
+                    "unit_count_with_latency_change": count,
+                    "median_latency_change_ms": (
+                        100.0 if category == "CHANGED" else 0.0
+                    ),
+                }
+            )
+
+    return pd.DataFrame.from_records(rows)
+
+
 def content_source_rows() -> pd.DataFrame:
     """Return synthetic aggregate-only concordance rows."""
     return pd.DataFrame.from_records(
@@ -886,18 +989,24 @@ def content_source_rows() -> pd.DataFrame:
                 "reported_study_content_source": "registry",
                 "inferred_study_content_source": "registry",
                 "ai_attempt_count": 3,
+                "reported_source_attempt_count": 4,
+                "attempt_percentage_within_reported_source": 75.0,
             },
             {
                 "attempt_completion_group": "ALL",
                 "reported_study_content_source": "registry",
                 "inferred_study_content_source": "other",
                 "ai_attempt_count": 1,
+                "reported_source_attempt_count": 4,
+                "attempt_percentage_within_reported_source": 25.0,
             },
             {
                 "attempt_completion_group": "COMPLETE",
                 "reported_study_content_source": "registry",
                 "inferred_study_content_source": "registry",
                 "ai_attempt_count": 2,
+                "reported_source_attempt_count": 2,
+                "attempt_percentage_within_reported_source": 100.0,
             },
         ]
     )
@@ -1436,6 +1545,60 @@ def test_edit_readability_chart_preserves_categories_and_denominators() -> None:
     assert "Published percentage" not in hovertemplate
 
 
+def test_source_input_method_chart_uses_measure_specific_denominator() -> None:
+    figure = build_source_input_method_chart(source_context_distribution_rows())
+    bar = figure.data[0]
+
+    assert figure.layout.title.text == "How source material was supplied"
+    assert bar.orientation == "h"
+    assert list(bar.y) == ["Pdf File", "Docx File"]
+    assert list(bar.x) == [2, 3]
+    assert [list(value) for value in bar.customdata] == [
+        [40.0, 5],
+        [60.0, 5],
+    ]
+    assert "Successful AI generations" in str(bar.hovertemplate)
+    assert "reported input method" in str(bar.hovertemplate)
+
+
+def test_source_size_latency_chart_uses_seconds_and_interquartile_ranges() -> None:
+    figure = build_source_size_latency_chart(source_size_latency_rows())
+    bar = figure.data[0]
+
+    assert figure.layout.title.text == ("Generation latency by source-size band")
+    assert list(bar.y) == [1.0, 2.0]
+    assert list(bar.error_y.arrayminus) == [0.1, 0.2]
+    assert list(bar.error_y.array) == [0.1, 0.2]
+    assert [list(value) for value in bar.customdata] == [
+        [3, 3, 0, 150.0, 1.2],
+        [2, 1, 1, 400.0, 2.3],
+    ]
+    assert "90th percentile" in str(bar.hovertemplate)
+    assert "Attempts missing latency" in str(bar.hovertemplate)
+
+
+def test_repeated_source_consistency_chart_uses_completed_path_transitions() -> None:
+    figure = build_repeated_source_consistency_chart(repeated_source_rows())
+    traces = {str(trace.name): trace for trace in figure.data}
+
+    assert figure.layout.title.text == (
+        "Source consistency across completed AI pathways"
+    )
+    assert figure.layout.barmode == "stack"
+    assert list(traces["Unchanged"].x) == [60.0, 60.0, 60.0, 60.0]
+    assert list(traces["Changed"].x) == [40.0, 40.0, 40.0, 40.0]
+    assert list(traces["Missing or unavailable"].x) == [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+    ]
+    assert "Transitions: %{customdata[1]} of %{customdata[2]}" in str(
+        traces["Changed"].hovertemplate
+    )
+    assert "Median latency change" in str(traces["Changed"].hovertemplate)
+
+
 def test_content_source_chart_uses_all_attempt_population() -> None:
     figure = build_content_source_concordance_chart(content_source_rows())
     heatmap = figure.data[0]
@@ -1467,6 +1630,9 @@ def test_chart_bundle_contains_all_figures() -> None:
             selected_vs_unselected_readability_summary=(selected_comparison_rows()),
             field_edit_readability_cross_summary=edit_readability_cross_rows(),
             content_source_matrix=content_source_rows(),
+            source_context_distribution_summary=(source_context_distribution_rows()),
+            source_size_latency_summary=source_size_latency_rows(),
+            repeated_attempt_source_consistency_summary=(repeated_source_rows()),
         )
     )
 
@@ -1479,6 +1645,9 @@ def test_chart_bundle_contains_all_figures() -> None:
     assert charts.author_experience_studies.data
     assert charts.author_experience_days.data
     assert charts.content_source_concordance.data
+    assert charts.source_input_method_preference.data
+    assert charts.source_size_latency_by_band.data
+    assert charts.repeated_attempt_source_consistency.data
     assert charts.completed_study_participant_mix.data
     assert charts.completed_study_department_mix.data
     assert charts.completed_studies_by_completion_author_role.data

@@ -19,7 +19,7 @@ from study_posting_audit_exploration.quality import (
 
 _MANIFEST_FILENAME = "analysis_manifest.json"
 _QUALITY_RELATIVE_PATH = Path("quality/data_quality_summary.csv")
-_EXPECTED_OUTPUT_FILE_COUNT = 31
+_EXPECTED_OUTPUT_FILE_COUNT = 34
 _NULL_VALUE = "\\N"
 _FATAL = "FATAL"
 _WARNING = "WARNING"
@@ -300,7 +300,7 @@ def _validate_manifest(
     if output_file_count != _EXPECTED_OUTPUT_FILE_COUNT:
         raise ExplorationValidationError(
             "Exploration manifest output-file count does not match the "
-            "current 31-file contract"
+            "current 34-file contract"
         )
 
     quality_counts = manifest.get("quality_analysis_row_counts")

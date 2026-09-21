@@ -20,11 +20,13 @@ from study_posting_audit_exploration import (
     build_overview_tables,
     build_quality_analysis_tables,
     build_readability_analysis_tables,
+    build_source_context_analysis_tables,
     build_study_analysis_tables,
     derive_appointments,
     derive_attempt_histories,
     derive_completed_ai_field_analysis,
     derive_completed_ai_readability_pairs,
+    derive_source_context_tables,
     load_audit_report,
     publish_exploration,
 )
@@ -162,9 +164,11 @@ def _analysis_tables(
         report.readability_metrics,
         completed_ai_fields,
     )
+    source_context = derive_source_context_tables(report.records)
 
     return ExplorationAnalysisTables(
         histories=histories,
+        source_context=build_source_context_analysis_tables(source_context),
         quality=build_quality_analysis_tables(
             report=report,
             histories=histories,
@@ -175,7 +179,10 @@ def _analysis_tables(
             studies=histories.study_attempt_history,
             authors=histories.author_history,
         ),
-        attempts=build_attempt_analysis_tables(attempts),
+        attempts=build_attempt_analysis_tables(
+            attempts,
+            successful_ai_generations=(source_context.successful_ai_generations),
+        ),
         studies=build_study_analysis_tables(
             studies,
             study_attempt_author_history=(histories.study_attempt_author_history),
@@ -234,7 +241,10 @@ def _publication_paths(
         publication.overview_summary_path,
         publication.study_attempt_history_summary_path,
         publication.author_handoff_summary_path,
+        publication.repeated_attempt_source_consistency_summary_path,
         publication.grouped_attempt_summary_path,
+        publication.source_context_distribution_summary_path,
+        publication.source_size_latency_summary_path,
         publication.content_source_concordance_summary_path,
         publication.content_source_concordance_matrix_path,
         publication.completed_study_author_context_summary_path,
@@ -276,6 +286,15 @@ def _assert_derived_outputs(
     completed_study_context = read_published_csv(
         publication.completed_study_author_context_summary_path
     )
+    source_context_distribution = read_published_csv(
+        publication.source_context_distribution_summary_path
+    )
+    source_size_latency = read_published_csv(
+        publication.source_size_latency_summary_path
+    )
+    repeated_source_consistency = read_published_csv(
+        publication.repeated_attempt_source_consistency_summary_path
+    )
 
     for frame in (
         quality_summary,
@@ -286,6 +305,9 @@ def _assert_derived_outputs(
         readability_target,
         final_metrics,
         completed_study_context,
+        source_context_distribution,
+        source_size_latency,
+        repeated_source_consistency,
     ):
         assert not frame.empty
 
@@ -339,6 +361,19 @@ def _assert_derived_outputs(
     assert "study_num" not in completed_study_context.columns
     assert "attempt_author_user_name" not in completed_study_context.columns
 
+    for source_frame in (
+        source_context_distribution,
+        source_size_latency,
+        repeated_source_consistency,
+    ):
+        assert "audit_record_id" not in source_frame.columns
+        assert "study_num" not in source_frame.columns
+        assert "attempt_author_user_name" not in source_frame.columns
+        assert "study_content_source_other_value" not in source_frame.columns
+        assert (
+            "llm_inferred_study_content_source_other_value" not in source_frame.columns
+        )
+
 
 def _assert_html_privacy(
     publication: ExplorationPublication,
@@ -368,7 +403,7 @@ def test_publish_exploration_writes_atomic_html_output(
     )
 
     assert publication.output_directory == output_directory
-    assert publication.output_file_count == 31
+    assert publication.output_file_count == 34
 
     for path in _publication_paths(publication):
         assert path.is_file()
@@ -384,7 +419,7 @@ def test_publish_exploration_writes_atomic_html_output(
     }
 
     assert published_inventory == expected_inventory
-    assert len(published_inventory) == 31
+    assert len(published_inventory) == 34
 
     assert list(tmp_path.glob(".exploration.*")) == []
 
@@ -450,7 +485,7 @@ def test_manifest_contains_readability_analysis_counts(
     assert manifest["readability_analysis_row_counts"]["final_text_metric_summary"] > 0
     assert manifest["definition_row_counts"]["metric_definitions"] > 0
     assert manifest["research_row_counts"]["candidate_research_questions"] == 14
-    assert manifest["output_file_count"] == 31
+    assert manifest["output_file_count"] == 34
     assert manifest["warning_count"] == 0
     assert manifest_filename() == "analysis_manifest.json"
 

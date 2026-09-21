@@ -150,11 +150,10 @@ def _summary_row(
 def build_content_source_concordance_summary(
     attempts: pd.DataFrame,
 ) -> pd.DataFrame:
-    """Return all, complete, and incomplete AI-attempt concordance rows."""
-    ai_attempts = attempts.loc[attempts["attempt_authoring_mode"].eq(_AI)]
+    """Return successful-generation concordance by completion group."""
     rows = [
         _summary_row(
-            ai_attempts,
+            attempts,
             completion_group=completion_group,
         )
         for completion_group in (
@@ -175,8 +174,8 @@ def _matrix_population(
     *,
     completion_group: str,
 ) -> pd.DataFrame:
-    """Return comparable AI rows for one matrix population."""
-    population = attempts.loc[attempts["attempt_authoring_mode"].eq(_AI)]
+    """Return comparable successful-generation rows for one population."""
+    population = attempts
 
     if completion_group != _ALL:
         population = population.loc[

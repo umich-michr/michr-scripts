@@ -138,7 +138,7 @@ days, and login-history span as of the report query.
 
 ## Current output
 
-A successful `analyze` run publishes 31 files: `report.html`, one JSON
+A successful `analyze` run publishes 34 files: `report.html`, one JSON
 manifest, and 29 CSV files.
 
 ~~~~text

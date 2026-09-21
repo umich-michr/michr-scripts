@@ -41,6 +41,7 @@ def write_manifest(
     quality_tables = tables.quality
     overview_tables = tables.overview
     attempt_tables = tables.attempts
+    source_context_tables = tables.source_context
     study_tables = tables.studies
     author_tables = tables.authors
     field_tables = tables.fields
@@ -89,9 +90,18 @@ def write_manifest(
                 overview_tables.study_attempt_history_summary
             ),
             "author_handoff_summary": len(overview_tables.author_handoff_summary),
+            "repeated_attempt_source_consistency_summary": len(
+                source_context_tables.repeated_attempt_source_consistency_summary
+            ),
         },
         "attempt_analysis_row_counts": {
             "grouped_attempt_summary": len(attempt_tables.grouped_attempt_summary),
+            "source_context_distribution_summary": len(
+                source_context_tables.source_context_distribution_summary
+            ),
+            "source_size_latency_summary": len(
+                source_context_tables.source_size_latency_summary
+            ),
             "content_source_concordance_summary": len(
                 attempt_tables.content_source_concordance_summary
             ),

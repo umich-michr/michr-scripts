@@ -25,7 +25,10 @@ AGGREGATE_FILE_ORDER: tuple[str, ...] = (
     "overview/overview_summary.csv",
     "overview/study_attempt_history_summary.csv",
     "overview/author_handoff_summary.csv",
+    "overview/repeated_attempt_source_consistency_summary.csv",
     "attempts/grouped_attempt_summary.csv",
+    "attempts/source_context_distribution_summary.csv",
+    "attempts/source_size_latency_summary.csv",
     "attempts/content_source_concordance_summary.csv",
     "attempts/content_source_concordance_matrix.csv",
     "studies/completed_study_author_context_summary.csv",
@@ -146,6 +149,17 @@ _DENOMINATOR_RULES: tuple[tuple[str, str], ...] = (
     (
         "within_edit_intensity_category",
         "Completed AI attempts in the same field and edit-intensity category.",
+    ),
+    (
+        "category_",
+        "Eligible unit count published in the same aggregate row.",
+    ),
+    (
+        "band_",
+        (
+            "Successful AI generation attempts with nonmissing source size "
+            "in the same population."
+        ),
     ),
     (
         "within_population",
@@ -336,6 +350,20 @@ def _interpretation(metric_name: str) -> str:
                 (
                     "Appointment groups may overlap and are not intended "
                     "to sum to 100 percent."
+                ),
+            ),
+            (
+                "source_signature" in metric_name,
+                (
+                    "Equal source size and reported source are an "
+                    "unchanged-source proxy, not proof of identical text."
+                ),
+            ),
+            (
+                "latency" in metric_name,
+                (
+                    "Latency is descriptive and may reflect source size, "
+                    "service conditions, and other unmeasured factors."
                 ),
             ),
         )

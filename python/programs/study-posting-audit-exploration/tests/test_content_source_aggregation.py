@@ -1,58 +1,45 @@
-from pathlib import Path
+"""Tests for successful-generation content-source concordance."""
 
 import pandas as pd
 
 from study_posting_audit_exploration import (
-    ExplorationInputConfig,
     build_content_source_concordance_matrix,
     build_content_source_concordance_summary,
-    derive_attempt_histories,
-    load_audit_report,
 )
 
 
-def attempts_for(path: Path) -> pd.DataFrame:
-    """Return derived attempts with source-comparison columns."""
-    report = load_audit_report(
-        ExplorationInputConfig(
-            report_directory=path,
-        )
-    )
-    attempts = derive_attempt_histories(report.records).study_attempt_author_history
-    attempts["study_content_source"] = pd.Series(
-        ["Study Protocol", "Study Protocol"],
-        dtype="string",
-    )
-    attempts["llm_inferred_study_content_source"] = pd.Series(
-        [" study protocol ", "Informed Consent"],
-        dtype="string",
-    )
-    attempts["study_content_source_other_value"] = pd.Series(
-        [pd.NA, "Synthetic other"],
-        dtype="string",
-    )
-    attempts["llm_inferred_study_content_source_other_value"] = pd.Series(
-        [pd.NA, "synthetic OTHER"],
-        dtype="string",
-    )
+def successful_generations() -> pd.DataFrame:
+    """Return synthetic successful-generation source rows."""
+    rows: list[dict[str, object]] = [
+        {
+            "attempt_completion_group": "INCOMPLETE",
+            "study_content_source": "Study Protocol",
+            "llm_inferred_study_content_source": " study protocol ",
+            "study_content_source_other_value": None,
+            "llm_inferred_study_content_source_other_value": None,
+        },
+        {
+            "attempt_completion_group": "COMPLETE",
+            "study_content_source": "Study Protocol",
+            "llm_inferred_study_content_source": "Informed Consent",
+            "study_content_source_other_value": "Synthetic other",
+            "llm_inferred_study_content_source_other_value": ("synthetic OTHER"),
+        },
+    ]
 
-    return attempts
+    return pd.DataFrame.from_records(rows)
 
 
 def population_row(
     summary: pd.DataFrame,
     completion_group: str,
 ) -> pd.Series:
-    """Return one concordance population row."""
+    """Return one successful-generation population row."""
     return summary.loc[summary["attempt_completion_group"].eq(completion_group)].iloc[0]
 
 
-def test_content_source_summary_separates_completion_groups(
-    valid_report_directory: Path,
-) -> None:
-    attempts = attempts_for(valid_report_directory)
-
-    summary = build_content_source_concordance_summary(attempts)
+def test_content_source_summary_separates_completion_groups() -> None:
+    summary = build_content_source_concordance_summary(successful_generations())
 
     assert summary["attempt_completion_group"].tolist() == [
         "ALL",
@@ -67,7 +54,8 @@ def test_content_source_summary_separates_completion_groups(
     assert all_row["ai_attempt_count_with_different_content_source"] == 1
     assert (
         all_row[
-            "ai_attempt_percentage_with_different_content_source_among_comparable_attempts"
+            "ai_attempt_percentage_with_different_content_source_"
+            "among_comparable_attempts"
         ]
         == 50.0
     )
@@ -84,12 +72,8 @@ def test_content_source_summary_separates_completion_groups(
     assert incomplete["ai_attempt_count_with_matching_content_source"] == 1
 
 
-def test_content_source_matrix_uses_normalized_values(
-    valid_report_directory: Path,
-) -> None:
-    attempts = attempts_for(valid_report_directory)
-
-    matrix = build_content_source_concordance_matrix(attempts)
+def test_content_source_matrix_uses_normalized_values() -> None:
+    matrix = build_content_source_concordance_matrix(successful_generations())
     all_rows = matrix.loc[matrix["attempt_completion_group"].eq("ALL")]
 
     assert set(all_rows["reported_study_content_source"]) == {"study protocol"}
@@ -104,10 +88,8 @@ def test_content_source_matrix_uses_normalized_values(
     ]
 
 
-def test_missing_comparable_values_produce_null_percentage(
-    valid_report_directory: Path,
-) -> None:
-    attempts = attempts_for(valid_report_directory)
+def test_missing_comparable_values_produce_null_percentage() -> None:
+    attempts = successful_generations()
     attempts["study_content_source"] = pd.Series(
         [pd.NA, pd.NA],
         dtype="string",
@@ -119,6 +101,7 @@ def test_missing_comparable_values_produce_null_percentage(
     assert all_row["ai_attempt_count_with_both_content_source_values"] == 0
     assert pd.isna(
         all_row[
-            "ai_attempt_percentage_with_different_content_source_among_comparable_attempts"
+            "ai_attempt_percentage_with_different_content_source_"
+            "among_comparable_attempts"
         ]
     )

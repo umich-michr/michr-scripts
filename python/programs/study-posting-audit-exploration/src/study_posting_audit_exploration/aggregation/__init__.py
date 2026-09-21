@@ -60,6 +60,15 @@ from study_posting_audit_exploration.aggregation.readability import (
     build_field_readability_change_summary,
     build_selected_vs_unselected_readability_summary,
 )
+from study_posting_audit_exploration.aggregation.source_context import (
+    REPEATED_ATTEMPT_SOURCE_CONSISTENCY_COLUMNS,
+    SOURCE_CONTEXT_DISTRIBUTION_COLUMNS,
+    SOURCE_SIZE_LATENCY_COLUMNS,
+    build_repeated_attempt_source_consistency_summary,
+    build_source_context_analysis_tables,
+    build_source_context_distribution_summary,
+    build_source_size_latency_summary,
+)
 from study_posting_audit_exploration.aggregation.studies import (
     GROUPED_STUDY_COLUMNS,
     build_grouped_study_summary,
@@ -78,6 +87,7 @@ from study_posting_audit_exploration.models import (
     OverviewTables,
     QualityAnalysisTables,
     ReadabilityAnalysisTables,
+    SourceContextAnalysisTables,
     StudyAnalysisTables,
 )
 from study_posting_audit_exploration.quality import (
@@ -93,7 +103,14 @@ AGGREGATE_OUTPUT_COLUMNS: dict[str, tuple[str, ...]] = {
     "overview/overview_summary.csv": OVERVIEW_COLUMNS,
     "overview/study_attempt_history_summary.csv": (STUDY_ATTEMPT_HISTORY_COLUMNS),
     "overview/author_handoff_summary.csv": AUTHOR_HANDOFF_COLUMNS,
+    "overview/repeated_attempt_source_consistency_summary.csv": (
+        REPEATED_ATTEMPT_SOURCE_CONSISTENCY_COLUMNS
+    ),
     "attempts/grouped_attempt_summary.csv": GROUPED_ATTEMPT_COLUMNS,
+    "attempts/source_context_distribution_summary.csv": (
+        SOURCE_CONTEXT_DISTRIBUTION_COLUMNS
+    ),
+    "attempts/source_size_latency_summary.csv": SOURCE_SIZE_LATENCY_COLUMNS,
     "attempts/content_source_concordance_summary.csv": (
         CONTENT_SOURCE_CONCORDANCE_SUMMARY_COLUMNS
     ),
@@ -176,15 +193,17 @@ def build_overview_tables(
 
 def build_attempt_analysis_tables(
     attempts: pd.DataFrame,
+    *,
+    successful_ai_generations: pd.DataFrame,
 ) -> AttemptAnalysisTables:
-    """Build grouped attempt and content-source aggregate tables."""
+    """Build grouped-attempt and successful-generation source tables."""
     return AttemptAnalysisTables(
         grouped_attempt_summary=build_grouped_attempt_summary(attempts),
         content_source_concordance_summary=(
-            build_content_source_concordance_summary(attempts)
+            build_content_source_concordance_summary(successful_ai_generations)
         ),
         content_source_concordance_matrix=(
-            build_content_source_concordance_matrix(attempts)
+            build_content_source_concordance_matrix(successful_ai_generations)
         ),
     )
 
@@ -298,12 +317,16 @@ __all__ = [
     "AGGREGATE_OUTPUT_COLUMNS",
     "COMPLETED_STUDY_AUTHOR_CONTEXT_COLUMNS",
     "DATA_QUALITY_SUMMARY_COLUMNS",
+    "REPEATED_ATTEMPT_SOURCE_CONSISTENCY_COLUMNS",
+    "SOURCE_CONTEXT_DISTRIBUTION_COLUMNS",
+    "SOURCE_SIZE_LATENCY_COLUMNS",
     "AttemptAnalysisTables",
     "AuthorAnalysisTables",
     "FieldAnalysisTables",
     "OverviewTables",
     "QualityAnalysisTables",
     "ReadabilityAnalysisTables",
+    "SourceContextAnalysisTables",
     "StudyAnalysisTables",
     "build_attempt_analysis_tables",
     "build_attempt_start_experience_summary",
@@ -328,7 +351,11 @@ __all__ = [
     "build_overview_tables",
     "build_quality_analysis_tables",
     "build_readability_analysis_tables",
+    "build_repeated_attempt_source_consistency_summary",
     "build_selected_vs_unselected_readability_summary",
+    "build_source_context_analysis_tables",
+    "build_source_context_distribution_summary",
+    "build_source_size_latency_summary",
     "build_study_analysis_tables",
     "build_study_attempt_history_summary",
     "build_suggestion_selection_summary",

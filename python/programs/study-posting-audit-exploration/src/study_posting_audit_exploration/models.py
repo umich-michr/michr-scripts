@@ -130,10 +130,20 @@ class ReadabilityAnalysisTables:
 
 
 @dataclass(frozen=True, slots=True)
+class SourceContextAnalysisTables:
+    """Identifier-free source-context aggregate tables."""
+
+    source_context_distribution_summary: pd.DataFrame
+    source_size_latency_summary: pd.DataFrame
+    repeated_attempt_source_consistency_summary: pd.DataFrame
+
+
+@dataclass(frozen=True, slots=True)
 class ExplorationAnalysisTables:
     """All derived and aggregate tables published by one analysis run."""
 
     histories: AttemptHistoryTables
+    source_context: SourceContextAnalysisTables
     quality: QualityAnalysisTables
     overview: OverviewTables
     attempts: AttemptAnalysisTables
@@ -161,7 +171,10 @@ class ExplorationPublication:
     overview_summary_path: Path
     study_attempt_history_summary_path: Path
     author_handoff_summary_path: Path
+    repeated_attempt_source_consistency_summary_path: Path
     grouped_attempt_summary_path: Path
+    source_context_distribution_summary_path: Path
+    source_size_latency_summary_path: Path
     content_source_concordance_summary_path: Path
     content_source_concordance_matrix_path: Path
     completed_study_author_context_summary_path: Path

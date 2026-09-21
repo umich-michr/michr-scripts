@@ -46,6 +46,46 @@ _REQUIRED_CONTENT_SOURCE_COLUMNS: tuple[str, ...] = (
     "reported_study_content_source",
     "inferred_study_content_source",
     "ai_attempt_count",
+    "reported_source_attempt_count",
+    "attempt_percentage_within_reported_source",
+)
+
+_REQUIRED_SOURCE_CONTEXT_DISTRIBUTION_COLUMNS: tuple[str, ...] = (
+    "population_name",
+    "summary_dimension_name",
+    "summary_dimension_value",
+    "eligible_attempt_count",
+    "category_attempt_count",
+    "category_attempt_percentage",
+)
+
+_REQUIRED_SOURCE_SIZE_LATENCY_COLUMNS: tuple[str, ...] = (
+    "population_name",
+    "source_size_band_name",
+    "source_size_band_sequence",
+    "source_size_band_lower_bound_chars",
+    "source_size_band_upper_bound_chars",
+    "reported_source_group",
+    "band_attempt_count",
+    "attempt_count_with_latency",
+    "attempt_count_missing_latency",
+    "median_source_size_chars",
+    "percentile_25_latency_ms",
+    "median_latency_ms",
+    "percentile_75_latency_ms",
+    "percentile_90_latency_ms",
+)
+
+_REQUIRED_REPEATED_SOURCE_COLUMNS: tuple[str, ...] = (
+    "summary_grain",
+    "comparison_dimension_name",
+    "comparison_category",
+    "population_unit_count",
+    "eligible_unit_count",
+    "category_unit_count",
+    "category_unit_percentage",
+    "unit_count_with_latency_change",
+    "median_latency_change_ms",
 )
 
 _REQUIRED_STUDY_HISTORY_COLUMNS: tuple[str, ...] = (
@@ -487,6 +527,9 @@ class ExplorationChartInputs:
     selected_vs_unselected_readability_summary: pd.DataFrame
     field_edit_readability_cross_summary: pd.DataFrame
     content_source_matrix: pd.DataFrame
+    source_context_distribution_summary: pd.DataFrame
+    source_size_latency_summary: pd.DataFrame
+    repeated_attempt_source_consistency_summary: pd.DataFrame
 
 
 @dataclass(frozen=True, slots=True)
@@ -519,6 +562,9 @@ class ExplorationCharts:
     selected_vs_unselected_readability: go.Figure
     edit_readability_relationship: go.Figure
     content_source_concordance: go.Figure
+    source_input_method_preference: go.Figure
+    source_size_latency_by_band: go.Figure
+    repeated_attempt_source_consistency: go.Figure
 
 
 def _require_columns(
@@ -2514,6 +2560,281 @@ def build_edit_readability_relationship_chart(
     return figure
 
 
+def build_source_input_method_chart(
+    source_context_distribution: pd.DataFrame,
+) -> go.Figure:
+    """Return successful-generation input-method preference counts."""
+    _require_columns(
+        source_context_distribution,
+        required=_REQUIRED_SOURCE_CONTEXT_DISTRIBUTION_COLUMNS,
+        frame_name="source_context_distribution_summary",
+    )
+    rows = source_context_distribution.loc[
+        source_context_distribution["population_name"].eq(
+            "ALL_SUCCESSFUL_AI_GENERATIONS"
+        )
+        & source_context_distribution["summary_dimension_name"].eq("INPUT_METHOD")
+    ].sort_values(
+        by=[
+            "category_attempt_count",
+            "summary_dimension_value",
+        ],
+        kind="stable",
+    )
+
+    if rows.empty:
+        return _empty_figure(
+            title="How source material was supplied",
+            message="No successful-generation input-method aggregates are available.",
+        )
+
+    labels = [
+        str(value).replace("_", " ").title()
+        for value in rows["summary_dimension_value"]
+    ]
+    counts = [int(value) for value in rows["category_attempt_count"]]
+    percentages = [float(value) for value in rows["category_attempt_percentage"]]
+    denominators = [int(value) for value in rows["eligible_attempt_count"]]
+    figure = go.Figure()
+    figure.add_bar(
+        orientation="h",
+        x=counts,
+        y=labels,
+        text=[
+            f"{count} ({percentage:.1f}%)"
+            for count, percentage in zip(
+                counts,
+                percentages,
+                strict=True,
+            )
+        ],
+        textposition="auto",
+        customdata=[
+            [percentage, denominator]
+            for percentage, denominator in zip(
+                percentages,
+                denominators,
+                strict=True,
+            )
+        ],
+        hovertemplate=(
+            "Input method: %{y}<br>"
+            "Successful AI generations: %{x}<br>"
+            "Share with a reported input method: %{customdata[0]:.1f}% "
+            "(%{x} of %{customdata[1]})<extra></extra>"
+        ),
+    )
+    figure.update_layout(
+        title="How source material was supplied",
+        template="plotly_white",
+        height=max(360, 70 * len(labels) + 160),
+        margin={"l": 150, "r": 40, "t": 80, "b": 60},
+        xaxis_title="Successful AI generation attempt count",
+        yaxis_title="Input method",
+    )
+
+    return figure
+
+
+def build_source_size_latency_chart(
+    source_size_latency: pd.DataFrame,
+) -> go.Figure:
+    """Return all-successful median latency by source-size band."""
+    _require_columns(
+        source_size_latency,
+        required=_REQUIRED_SOURCE_SIZE_LATENCY_COLUMNS,
+        frame_name="source_size_latency_summary",
+    )
+    rows = source_size_latency.loc[
+        source_size_latency["population_name"].eq("ALL_SUCCESSFUL_AI_GENERATIONS")
+        & source_size_latency["reported_source_group"].eq(_ALL)
+    ].sort_values(
+        by="source_size_band_sequence",
+        kind="stable",
+    )
+
+    if rows.empty:
+        return _empty_figure(
+            title="Generation latency by source-size band",
+            message="No source-size and latency aggregates are available.",
+        )
+
+    labels = [
+        (
+            f"{row['source_size_band_name']} "
+            f"({float(row['source_size_band_lower_bound_chars']):,.0f}-"
+            f"{float(row['source_size_band_upper_bound_chars']):,.0f} chars)"
+        )
+        for row in rows.to_dict(orient="records")
+    ]
+    median_seconds = [float(value) / 1_000.0 for value in rows["median_latency_ms"]]
+    lower_errors = [
+        (float(median) - float(lower)) / 1_000.0
+        for median, lower in zip(
+            rows["median_latency_ms"],
+            rows["percentile_25_latency_ms"],
+            strict=True,
+        )
+    ]
+    upper_errors = [
+        (float(upper) - float(median)) / 1_000.0
+        for upper, median in zip(
+            rows["percentile_75_latency_ms"],
+            rows["median_latency_ms"],
+            strict=True,
+        )
+    ]
+    customdata = [
+        [
+            int(row["band_attempt_count"]),
+            int(row["attempt_count_with_latency"]),
+            int(row["attempt_count_missing_latency"]),
+            float(row["median_source_size_chars"]),
+            float(row["percentile_90_latency_ms"]) / 1_000.0,
+        ]
+        for row in rows.to_dict(orient="records")
+    ]
+    figure = go.Figure()
+    figure.add_bar(
+        x=labels,
+        y=median_seconds,
+        error_y={
+            "type": "data",
+            "symmetric": False,
+            "array": upper_errors,
+            "arrayminus": lower_errors,
+        },
+        customdata=customdata,
+        hovertemplate=(
+            "Source-size band: %{x}<br>"
+            "Median latency: %{y:.2f} seconds<br>"
+            "Median source size: %{customdata[3]:,.0f} characters<br>"
+            "25th-75th percentile shown by error bar<br>"
+            "90th percentile: %{customdata[4]:.2f} seconds<br>"
+            "Attempts in band: %{customdata[0]}<br>"
+            "Attempts with latency: %{customdata[1]}<br>"
+            "Attempts missing latency: %{customdata[2]}"
+            "<extra></extra>"
+        ),
+    )
+    figure.update_layout(
+        title="Generation latency by source-size band",
+        template="plotly_white",
+        height=460,
+        margin={"l": 80, "r": 40, "t": 80, "b": 100},
+        xaxis_title="Quartile-ranked source-size band",
+        yaxis_title="Median generation latency (seconds)",
+    )
+
+    return figure
+
+
+def build_repeated_source_consistency_chart(
+    repeated_summary: pd.DataFrame,
+) -> go.Figure:
+    """Return completed-path transition source-comparison percentages."""
+    _require_columns(
+        repeated_summary,
+        required=_REQUIRED_REPEATED_SOURCE_COLUMNS,
+        frame_name="repeated_attempt_source_consistency_summary",
+    )
+    rows = repeated_summary.loc[
+        repeated_summary["summary_grain"].eq(
+            "COMPLETED_AI_PATH_CONSECUTIVE_SUCCESSFUL_AI_TRANSITION"
+        )
+    ]
+
+    if rows.empty:
+        return _empty_figure(
+            title="Source consistency across completed AI pathways",
+            message="No comparable completed-path transitions are available.",
+        )
+
+    dimensions = (
+        ("SOURCE_SIZE", "Source size"),
+        ("REPORTED_CONTENT_SOURCE", "Reported content source"),
+        ("INPUT_METHOD", "Input method"),
+        ("SOURCE_SIGNATURE_PROXY", "Source-signature proxy"),
+    )
+    categories = (
+        ("SAME", "Unchanged"),
+        ("CHANGED", "Changed"),
+        ("MISSING", "Missing or unavailable"),
+    )
+    figure = go.Figure()
+
+    for category, label in categories:
+        percentages: list[float] = []
+        customdata: list[list[object]] = []
+
+        for dimension, display in dimensions:
+            matching = rows.loc[
+                rows["comparison_dimension_name"].eq(dimension)
+                & rows["comparison_category"].eq(category)
+            ]
+
+            if matching.empty:
+                percentage = 0.0
+                count = 0
+                denominator = 0
+                latency_count = 0
+                median_latency_seconds = None
+            else:
+                row = matching.iloc[0]
+                percentage_value = row["category_unit_percentage"]
+                percentage = (
+                    0.0 if pd.isna(percentage_value) else float(percentage_value)
+                )
+                count = int(row["category_unit_count"])
+                denominator = int(row["eligible_unit_count"])
+                latency_count = int(row["unit_count_with_latency_change"])
+                latency_value = row["median_latency_change_ms"]
+                median_latency_seconds = (
+                    None if pd.isna(latency_value) else float(latency_value) / 1_000.0
+                )
+
+            percentages.append(percentage)
+            customdata.append(
+                [
+                    display,
+                    count,
+                    denominator,
+                    latency_count,
+                    median_latency_seconds,
+                ]
+            )
+
+        figure.add_bar(
+            name=label,
+            orientation="h",
+            y=[display for _, display in dimensions],
+            x=percentages,
+            customdata=customdata,
+            hovertemplate=(
+                "Comparison: %{customdata[0]}<br>"
+                f"Result: {label}<br>"
+                "Transitions: %{customdata[1]} of %{customdata[2]}<br>"
+                "Share: %{x:.1f}%<br>"
+                "Transitions with latency change: %{customdata[3]}<br>"
+                "Median latency change: %{customdata[4]:.2f} seconds"
+                "<extra></extra>"
+            ),
+        )
+
+    figure.update_layout(
+        title="Source consistency across completed AI pathways",
+        template="plotly_white",
+        barmode="stack",
+        height=460,
+        margin={"l": 190, "r": 40, "t": 80, "b": 70},
+        xaxis_title="Percentage within comparison availability",
+        yaxis_title="Captured source characteristic",
+        legend_title_text="Comparison result",
+    )
+
+    return figure
+
+
 def build_content_source_concordance_chart(
     content_source_matrix: pd.DataFrame,
 ) -> go.Figure:
@@ -2705,5 +3026,16 @@ def build_exploration_charts(
         ),
         content_source_concordance=build_content_source_concordance_chart(
             inputs.content_source_matrix
+        ),
+        source_input_method_preference=build_source_input_method_chart(
+            inputs.source_context_distribution_summary
+        ),
+        source_size_latency_by_band=build_source_size_latency_chart(
+            inputs.source_size_latency_summary
+        ),
+        repeated_attempt_source_consistency=(
+            build_repeated_source_consistency_chart(
+                inputs.repeated_attempt_source_consistency_summary
+            )
         ),
     )

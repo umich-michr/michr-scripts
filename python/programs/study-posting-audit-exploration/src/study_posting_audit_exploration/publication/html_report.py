@@ -283,16 +283,16 @@ _TEMPLATE = """<!doctype html>
           Completed-study author context
         </a>
       </li>
-      <li>
-          Completed-study author context
-        </a>
-      </li>
       <li><a href="#author-context-heading">Appointment context</a></li>
       <li><a href="#study-mix-heading">Participant and department mix</a></li>
       <li><a href="#field-adoption-heading">AI field adoption and editing</a></li>
       <li><a href="#suggestion-choice-heading">Suggestion choice</a></li>
       <li><a href="#readability-heading">Readability indicators</a></li>
-      <li><a href="#content-source-heading">Content-source concordance</a></li>
+      <li>
+        <a href="#content-source-heading">
+          Source context, repeated attempts, and latency
+        </a>
+      </li>
       <li><a href="#user-feedback-heading">User feedback on AI assistance</a></li>
     </ol>
   </nav>
@@ -762,13 +762,71 @@ _TEMPLATE = """<!doctype html>
 
     <details class="report-section">
     <summary id="content-source-heading">
-      Content-source concordance
+      Source context, repeated attempts, and latency
     </summary>
     <section aria-labelledby="content-source-heading">
+    <p>
+      This section has two distinct analytical lenses. The first describes
+      successful AI generation attempts, including eligible incomplete
+      attempts such as user-dropped attempts when generation succeeded. A
+      successful generation is not the same as a completed or created study.
+      The second lens describes comparable successful-generation transitions
+      within pathways that end in a completed AI attempt.
+    </p>
+
+    <h3>All successful AI generation attempts</h3>
+    <p>
+      Input method describes how source material was supplied. It is shown as
+      user workflow context, not as the primary explanation for source size or
+      generation latency.
+    </p>
+    <div class="chart">{{ source_input_method_html | safe }}</div>
+
+    <h3>Source size and generation latency</h3>
+    <p>
+      Source size is the captured character count of text supplied to
+      generation. Bands are ranked from the source-size quartiles observed
+      among all successful AI generation attempts. Completed AI attempts use
+      the same boundaries so populations remain comparable. Error bars show
+      the 25th-to-75th-percentile latency range, and hover text includes the
+      90th percentile plus missing and nonmissing latency counts.
+    </p>
+    <div class="chart">{{ source_size_latency_html | safe }}</div>
     <p class="caution">
-      Agreement is descriptive and uses normalized aggregate source labels.
+      The source-size bands improve descriptive comparison but do not remove
+      all differences within a band. Latency may also reflect service
+      conditions and other unmeasured factors. These results do not establish
+      that source size or source category caused a latency difference.
+    </p>
+
+    <h3>Reported versus inferred content source</h3>
+    <p>
+      The heatmap compares the author-reported semantic source category with
+      the model-inferred category for successful AI generations where both
+      categories are available. Counts use normalized aggregate labels.
     </p>
     <div class="chart">{{ content_source_html | safe }}</div>
+    <p class="caution">
+      Agreement is descriptive. It does not establish that either category is
+      objectively correct, and missing reported categories are not silently
+      replaced with inferred categories.
+    </p>
+
+    <h3>Completed AI pathways with repeated successful generations</h3>
+    <p>
+      This chart summarizes consecutive successful-generation transitions at
+      or before the unique completed AI attempt. Study-level pathway counts
+      and transition-level counts are different analytical units and should
+      not be combined.
+    </p>
+    <div class="chart">{{ repeated_source_consistency_html | safe }}</div>
+    <p class="caution">
+      Equal source size and equal reported source category form an
+      unchanged-source proxy, not proof that source text was identical.
+      Different text can have the same character count and category. Latency
+      changes are descriptive and may reflect source changes, service
+      conditions, or other unmeasured factors.
+    </p>
   </section>
   </details>
 
@@ -1536,6 +1594,18 @@ def render_html_report(
         ),
         content_source_html=_figure_html(
             charts.content_source_concordance,
+            include_plotlyjs=False,
+        ),
+        source_input_method_html=_figure_html(
+            charts.source_input_method_preference,
+            include_plotlyjs=False,
+        ),
+        source_size_latency_html=_figure_html(
+            charts.source_size_latency_by_band,
+            include_plotlyjs=False,
+        ),
+        repeated_source_consistency_html=_figure_html(
+            charts.repeated_attempt_source_consistency,
             include_plotlyjs=False,
         ),
     )
