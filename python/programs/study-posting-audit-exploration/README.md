@@ -459,6 +459,34 @@ faculty-facing summaries.
 - `content_source_concordance_matrix.csv` contains reported-versus-inferred
   content-source counts and percentages.
 
+### Source-context outputs
+
+- `source_context_distribution_summary.csv` separates all AI generations that
+  returned a result from completed AI-assisted attempts. It reports
+  measure-specific input-method and content-source counts plus source-size and
+  latency distributions. “Returned a result” excludes both recorded AI-error
+  categories, includes eligible user-dropped attempts, and does not mean that
+  a study posting was created.
+- `source_size_latency_summary.csv` reports source-size and latency summaries in
+  deterministic quartile-ranked bands. Band edges are derived from all AI
+  generations that returned a result and reused for completed AI-assisted
+  attempts so the populations remain comparable.
+- `repeated_attempt_source_consistency_summary.csv` keeps completed-study,
+  all-transition, completed-path-transition, first-to-completion, and
+  preceding-to-completion grains explicit. It reports dynamic contributing
+  study counts, transition counts, comparable denominators, unavailable
+  counts, and latency changes.
+
+For consecutive-generation comparisons, changed and unchanged percentages use
+transitions with usable values on both sides. Unavailable counts use all
+completed-path transitions. One study may contribute multiple transitions.
+Latency change is later minus earlier: positive means the later generation took
+longer, negative means less time, and zero means no captured change.
+
+Equal source size plus equal reported source is an unchanged-source proxy, not
+proof of identical source text. Source and latency associations are descriptive
+and do not establish causality.
+
 ### Study outputs
 
 - `completed_study_author_context_summary.csv` reports completed-study counts

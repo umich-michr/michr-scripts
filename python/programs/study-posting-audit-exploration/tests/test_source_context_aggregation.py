@@ -267,6 +267,8 @@ def test_repeated_summary_keeps_study_and_transition_grains_separate() -> None:
 
     assert study_size_changed["eligible_unit_count"] == 1
     assert study_size_changed["category_unit_count"] == 1
+    assert transition_size_changed["population_unit_count"] == 2
+    assert transition_size_changed["contributing_study_count"] == 1
     assert transition_size_changed["eligible_unit_count"] == 2
     assert transition_size_changed["category_unit_count"] == 1
     assert transition_size_same["category_unit_count"] == 1
@@ -404,6 +406,8 @@ def test_repeated_summary_separates_all_and_completed_path_transitions() -> None
 
     assert all_changed["eligible_unit_count"] == 2
     assert all_changed["category_unit_count"] == 2
+    assert completed_changed["population_unit_count"] == 1
+    assert completed_changed["contributing_study_count"] == 1
     assert completed_changed["eligible_unit_count"] == 1
     assert completed_changed["category_unit_count"] == 1
 

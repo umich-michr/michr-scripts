@@ -10,6 +10,7 @@ from study_posting_audit_exploration import (
 from study_posting_audit_exploration.publication import (
     ExplorationChartInputs,
     ExplorationCharts,
+    SourcePopulationChartSpec,
     build_attempt_outcomes_chart,
     build_attempt_timing_chart,
     build_author_appointment_context_chart,
@@ -899,6 +900,22 @@ def source_context_distribution_rows() -> pd.DataFrame:
             "category_attempt_count": 2,
             "category_attempt_percentage": 40.0,
         },
+        {
+            "population_name": "COMPLETED_AI_ATTEMPTS",
+            "summary_dimension_name": "INPUT_METHOD",
+            "summary_dimension_value": "docx_file",
+            "eligible_attempt_count": 3,
+            "category_attempt_count": 2,
+            "category_attempt_percentage": 200 / 3,
+        },
+        {
+            "population_name": "COMPLETED_AI_ATTEMPTS",
+            "summary_dimension_name": "INPUT_METHOD",
+            "summary_dimension_value": "pdf_file",
+            "eligible_attempt_count": 3,
+            "category_attempt_count": 1,
+            "category_attempt_percentage": 100 / 3,
+        },
     ]
 
     return pd.DataFrame.from_records(rows)
@@ -939,6 +956,38 @@ def source_size_latency_rows() -> pd.DataFrame:
             "percentile_75_latency_ms": 2_200.0,
             "percentile_90_latency_ms": 2_300.0,
         },
+        {
+            "population_name": "COMPLETED_AI_ATTEMPTS",
+            "source_size_band_name": "Q1_OF_2",
+            "source_size_band_sequence": 1,
+            "source_size_band_lower_bound_chars": 100.0,
+            "source_size_band_upper_bound_chars": 200.0,
+            "reported_source_group": "ALL",
+            "band_attempt_count": 2,
+            "attempt_count_with_latency": 2,
+            "attempt_count_missing_latency": 0,
+            "median_source_size_chars": 160.0,
+            "percentile_25_latency_ms": 1_100.0,
+            "median_latency_ms": 1_200.0,
+            "percentile_75_latency_ms": 1_300.0,
+            "percentile_90_latency_ms": 1_400.0,
+        },
+        {
+            "population_name": "COMPLETED_AI_ATTEMPTS",
+            "source_size_band_name": "Q2_OF_2",
+            "source_size_band_sequence": 2,
+            "source_size_band_lower_bound_chars": 300.0,
+            "source_size_band_upper_bound_chars": 500.0,
+            "reported_source_group": "ALL",
+            "band_attempt_count": 1,
+            "attempt_count_with_latency": 1,
+            "attempt_count_missing_latency": 0,
+            "median_source_size_chars": 420.0,
+            "percentile_25_latency_ms": 2_400.0,
+            "median_latency_ms": 2_400.0,
+            "percentile_75_latency_ms": 2_400.0,
+            "percentile_90_latency_ms": 2_400.0,
+        },
     ]
 
     return pd.DataFrame.from_records(rows)
@@ -957,7 +1006,7 @@ def repeated_source_rows() -> pd.DataFrame:
         for category, count, percentage in (
             ("SAME", 3, 60.0),
             ("CHANGED", 2, 40.0),
-            ("MISSING", 0, 0.0),
+            ("MISSING", 2, 100.0),
         ):
             rows.append(
                 {
@@ -966,8 +1015,9 @@ def repeated_source_rows() -> pd.DataFrame:
                     ),
                     "comparison_dimension_name": dimension,
                     "comparison_category": category,
-                    "population_unit_count": 5,
-                    "eligible_unit_count": 5,
+                    "population_unit_count": 7,
+                    "contributing_study_count": 3,
+                    "eligible_unit_count": (2 if category == "MISSING" else 5),
                     "category_unit_count": count,
                     "category_unit_percentage": percentage,
                     "unit_count_with_latency_change": count,
@@ -1545,58 +1595,133 @@ def test_edit_readability_chart_preserves_categories_and_denominators() -> None:
     assert "Published percentage" not in hovertemplate
 
 
-def test_source_input_method_chart_uses_measure_specific_denominator() -> None:
-    figure = build_source_input_method_chart(source_context_distribution_rows())
-    bar = figure.data[0]
+def test_source_input_method_charts_use_explicit_populations() -> None:
+    returned = build_source_input_method_chart(
+        source_context_distribution_rows(),
+        spec=SourcePopulationChartSpec(
+            population_name="ALL_SUCCESSFUL_AI_GENERATIONS",
+            input_method_title=(
+                "Input method for AI generations that returned a result"
+            ),
+            latency_title="Unused latency title",
+            count_label="Generation attempts returning a result",
+            denominator_label=(
+                "Share among generation attempts with a recorded input method"
+            ),
+            empty_population_label="AI generations that returned a result",
+        ),
+    )
+    completed = build_source_input_method_chart(
+        source_context_distribution_rows(),
+        spec=SourcePopulationChartSpec(
+            population_name="COMPLETED_AI_ATTEMPTS",
+            input_method_title=("Input method for completed AI-assisted attempts"),
+            latency_title="Unused latency title",
+            count_label="Completed AI-assisted attempts",
+            denominator_label=(
+                "Share among completed AI-assisted attempts with a "
+                "recorded input method"
+            ),
+            empty_population_label="completed AI-assisted attempts",
+        ),
+    )
 
-    assert figure.layout.title.text == "How source material was supplied"
-    assert bar.orientation == "h"
-    assert list(bar.y) == ["Pdf File", "Docx File"]
-    assert list(bar.x) == [2, 3]
-    assert [list(value) for value in bar.customdata] == [
-        [40.0, 5],
-        [60.0, 5],
-    ]
-    assert "Successful AI generations" in str(bar.hovertemplate)
-    assert "reported input method" in str(bar.hovertemplate)
+    returned_bar = returned.data[0]
+    completed_bar = completed.data[0]
+
+    assert returned.layout.title.text == (
+        "Input method for AI generations that returned a result"
+    )
+    assert list(returned_bar.x) == [2, 3]
+    assert "Generation attempts returning a result" in str(returned_bar.hovertemplate)
+    assert "Successful AI generations" not in str(returned_bar.hovertemplate)
+
+    assert completed.layout.title.text == (
+        "Input method for completed AI-assisted attempts"
+    )
+    assert list(completed_bar.x) == [1, 2]
+    assert "Completed AI-assisted attempts" in str(completed_bar.hovertemplate)
 
 
-def test_source_size_latency_chart_uses_seconds_and_interquartile_ranges() -> None:
-    figure = build_source_size_latency_chart(source_size_latency_rows())
-    bar = figure.data[0]
+def test_source_size_latency_charts_use_explicit_populations() -> None:
+    returned = build_source_size_latency_chart(
+        source_size_latency_rows(),
+        spec=SourcePopulationChartSpec(
+            population_name="ALL_SUCCESSFUL_AI_GENERATIONS",
+            input_method_title="Unused input title",
+            latency_title=(
+                "Latency by source-size band for AI generations that returned a result"
+            ),
+            count_label="Generation attempts returning a result",
+            denominator_label="Unused denominator label",
+            empty_population_label="AI generations that returned a result",
+        ),
+    )
+    completed = build_source_size_latency_chart(
+        source_size_latency_rows(),
+        spec=SourcePopulationChartSpec(
+            population_name="COMPLETED_AI_ATTEMPTS",
+            input_method_title="Unused input title",
+            latency_title=(
+                "Latency by source-size band for completed AI-assisted attempts"
+            ),
+            count_label="Completed AI-assisted attempts",
+            denominator_label="Unused denominator label",
+            empty_population_label="completed AI-assisted attempts",
+        ),
+    )
 
-    assert figure.layout.title.text == ("Generation latency by source-size band")
-    assert list(bar.y) == [1.0, 2.0]
-    assert list(bar.error_y.arrayminus) == [0.1, 0.2]
-    assert list(bar.error_y.array) == [0.1, 0.2]
-    assert [list(value) for value in bar.customdata] == [
-        [3, 3, 0, 150.0, 1.2],
-        [2, 1, 1, 400.0, 2.3],
-    ]
-    assert "90th percentile" in str(bar.hovertemplate)
-    assert "Attempts missing latency" in str(bar.hovertemplate)
+    returned_bar = returned.data[0]
+    completed_bar = completed.data[0]
+
+    assert list(returned_bar.y) == [1.0, 2.0]
+    assert list(completed_bar.y) == [1.2, 2.4]
+    assert list(returned_bar.error_y.arrayminus) == [0.1, 0.2]
+    assert list(completed_bar.error_y.arrayminus) == [0.1, 0.0]
+    assert "Generation attempts returning a result in band" in str(
+        returned_bar.hovertemplate
+    )
+    assert "Completed AI-assisted attempts in band" in str(completed_bar.hovertemplate)
+    assert "Attempts missing captured latency" in str(returned_bar.hovertemplate)
 
 
-def test_repeated_source_consistency_chart_uses_completed_path_transitions() -> None:
+def test_repeated_source_consistency_chart_separates_denominators() -> None:
     figure = build_repeated_source_consistency_chart(repeated_source_rows())
     traces = {str(trace.name): trace for trace in figure.data}
 
     assert figure.layout.title.text == (
-        "Source consistency across completed AI pathways"
+        "Captured source changes between AI generations before completion"
     )
     assert figure.layout.barmode == "stack"
     assert list(traces["Unchanged"].x) == [60.0, 60.0, 60.0, 60.0]
     assert list(traces["Changed"].x) == [40.0, 40.0, 40.0, 40.0]
-    assert list(traces["Missing or unavailable"].x) == [
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-    ]
-    assert "Transitions: %{customdata[1]} of %{customdata[2]}" in str(
+    assert "Missing or unavailable" not in traces
+    assert "Comparable transitions" in str(traces["Changed"].hovertemplate)
+    assert "Percentage among comparable transitions" in str(
         traces["Changed"].hovertemplate
     )
-    assert "Median latency change" in str(traces["Changed"].hovertemplate)
+    assert "Positive means the later generation took longer" in str(
+        traces["Changed"].hovertemplate
+    )
+    assert len(figure.layout.annotations) == 4
+    assert {str(annotation.text) for annotation in figure.layout.annotations} == {
+        "Unavailable: 2 of 7 transitions (28.6%)"
+    }
+    assert figure.layout.xaxis.title.text == ("Percentage among comparable transitions")
+
+
+def test_repeated_source_chart_suppresses_zero_unavailable_labels() -> None:
+    rows = repeated_source_rows()
+    missing = rows["comparison_category"].eq("MISSING")
+    rows.loc[missing, "population_unit_count"] = 5
+    rows.loc[missing, "eligible_unit_count"] = 0
+    rows.loc[missing, "category_unit_count"] = 0
+    rows.loc[missing, "category_unit_percentage"] = pd.NA
+
+    figure = build_repeated_source_consistency_chart(rows)
+
+    assert len(figure.layout.annotations) == 0
+    assert figure.layout.margin.r == 70
 
 
 def test_content_source_chart_uses_all_attempt_population() -> None:
@@ -1645,8 +1770,10 @@ def test_chart_bundle_contains_all_figures() -> None:
     assert charts.author_experience_studies.data
     assert charts.author_experience_days.data
     assert charts.content_source_concordance.data
-    assert charts.source_input_method_preference.data
-    assert charts.source_size_latency_by_band.data
+    assert charts.returned_result_input_method_preference.data
+    assert charts.returned_result_source_size_latency.data
+    assert charts.completed_ai_input_method_preference.data
+    assert charts.completed_ai_source_size_latency.data
     assert charts.repeated_attempt_source_consistency.data
     assert charts.completed_study_participant_mix.data
     assert charts.completed_study_department_mix.data

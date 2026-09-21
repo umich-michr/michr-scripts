@@ -369,6 +369,9 @@ def _write_staging_output(
         overview_summary=tables.overview.overview_summary,
         author_handoff_summary=tables.overview.author_handoff_summary,
         data_quality_summary=tables.quality.data_quality_summary,
+        repeated_attempt_source_consistency_summary=(
+            tables.source_context.repeated_attempt_source_consistency_summary
+        ),
         charts=charts,
     )
     write_manifest(

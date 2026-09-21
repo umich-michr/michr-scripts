@@ -3,6 +3,7 @@
 from study_posting_audit_exploration.publication.charts import (
     ExplorationChartInputs,
     ExplorationCharts,
+    SourcePopulationChartSpec,
     build_attempt_outcomes_chart,
     build_attempt_timing_chart,
     build_author_appointment_context_chart,
@@ -40,6 +41,7 @@ __all__ = [
     "ExplorationChartInputs",
     "ExplorationCharts",
     "KpiCard",
+    "SourcePopulationChartSpec",
     "build_attempt_outcomes_chart",
     "build_attempt_timing_chart",
     "build_author_appointment_context_chart",

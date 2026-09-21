@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from pathlib import Path
 
 import pandas as pd
@@ -564,6 +565,22 @@ def source_context_distribution_rows() -> pd.DataFrame:
             "category_attempt_count": 2,
             "category_attempt_percentage": 40.0,
         },
+        {
+            "population_name": "COMPLETED_AI_ATTEMPTS",
+            "summary_dimension_name": "INPUT_METHOD",
+            "summary_dimension_value": "docx_file",
+            "eligible_attempt_count": 3,
+            "category_attempt_count": 2,
+            "category_attempt_percentage": 200 / 3,
+        },
+        {
+            "population_name": "COMPLETED_AI_ATTEMPTS",
+            "summary_dimension_name": "INPUT_METHOD",
+            "summary_dimension_value": "pdf_file",
+            "eligible_attempt_count": 3,
+            "category_attempt_count": 1,
+            "category_attempt_percentage": 100 / 3,
+        },
     ]
 
     return pd.DataFrame.from_records(rows)
@@ -604,6 +621,38 @@ def source_size_latency_rows() -> pd.DataFrame:
             "percentile_75_latency_ms": 2_200.0,
             "percentile_90_latency_ms": 2_300.0,
         },
+        {
+            "population_name": "COMPLETED_AI_ATTEMPTS",
+            "source_size_band_name": "Q1_OF_2",
+            "source_size_band_sequence": 1,
+            "source_size_band_lower_bound_chars": 100.0,
+            "source_size_band_upper_bound_chars": 200.0,
+            "reported_source_group": "ALL",
+            "band_attempt_count": 2,
+            "attempt_count_with_latency": 2,
+            "attempt_count_missing_latency": 0,
+            "median_source_size_chars": 160.0,
+            "percentile_25_latency_ms": 1_100.0,
+            "median_latency_ms": 1_200.0,
+            "percentile_75_latency_ms": 1_300.0,
+            "percentile_90_latency_ms": 1_400.0,
+        },
+        {
+            "population_name": "COMPLETED_AI_ATTEMPTS",
+            "source_size_band_name": "Q2_OF_2",
+            "source_size_band_sequence": 2,
+            "source_size_band_lower_bound_chars": 300.0,
+            "source_size_band_upper_bound_chars": 500.0,
+            "reported_source_group": "ALL",
+            "band_attempt_count": 1,
+            "attempt_count_with_latency": 1,
+            "attempt_count_missing_latency": 0,
+            "median_source_size_chars": 420.0,
+            "percentile_25_latency_ms": 2_400.0,
+            "median_latency_ms": 2_400.0,
+            "percentile_75_latency_ms": 2_400.0,
+            "percentile_90_latency_ms": 2_400.0,
+        },
     ]
 
     return pd.DataFrame.from_records(rows)
@@ -622,7 +671,7 @@ def repeated_source_rows() -> pd.DataFrame:
         for category, count, percentage in (
             ("SAME", 3, 60.0),
             ("CHANGED", 2, 40.0),
-            ("MISSING", 0, 0.0),
+            ("MISSING", 2, 100.0),
         ):
             rows.append(
                 {
@@ -631,8 +680,9 @@ def repeated_source_rows() -> pd.DataFrame:
                     ),
                     "comparison_dimension_name": dimension,
                     "comparison_category": category,
-                    "population_unit_count": 5,
-                    "eligible_unit_count": 5,
+                    "population_unit_count": 7,
+                    "contributing_study_count": 3,
+                    "eligible_unit_count": (2 if category == "MISSING" else 5),
                     "category_unit_count": count,
                     "category_unit_percentage": percentage,
                     "unit_count_with_latency_change": count,
@@ -886,6 +936,7 @@ def test_html_report_is_self_contained_and_accessible() -> None:
         overview_summary=overview_rows(),
         author_handoff_summary=author_handoff_rows(),
         data_quality_summary=quality_rows(),
+        repeated_attempt_source_consistency_summary=(repeated_source_rows()),
         charts=charts(),
     )
     normalized_html = " ".join(html.split())
@@ -938,34 +989,50 @@ def test_html_report_is_self_contained_and_accessible() -> None:
 
 
 def test_html_report_explains_source_context_and_latency() -> None:
-    """Explain successful-generation and completed-path source lenses."""
+    """Explain both populations and dynamic completed-path context."""
     rendered = render_html_report(
         records=feedback_records(),
         overview_summary=overview_rows(),
         author_handoff_summary=author_handoff_rows(),
         data_quality_summary=quality_rows(),
+        repeated_attempt_source_consistency_summary=(repeated_source_rows()),
         charts=charts(),
     )
     normalized = " ".join(rendered.split())
 
     assert "Source context, repeated attempts, and latency" in rendered
-    assert "All successful AI generation attempts" in rendered
-    assert "How source material was supplied" in rendered
-    assert "Generation latency by source-size band" in rendered
-    assert "Reported versus inferred content source" in rendered
-    assert "Source consistency across completed AI pathways" in rendered
+    assert "All AI generations that returned a result" in rendered
+    assert "Completed AI-assisted attempts" in rendered
+    assert "Input method for AI generations that returned a result" in rendered
     assert (
-        "A successful generation is not the same as a completed or created study."
-    ) in normalized
-    assert "25th-to-75th-percentile latency range" in normalized
+        "Latency by source-size band for AI generations "
+        "that returned a result" in rendered
+    )
+    assert "Input method for completed AI-assisted attempts" in rendered
+    assert "Latency by source-size band for completed AI-assisted attempts" in rendered
+    assert "AI generation that returned a result" in rendered
+    assert "It does not mean that the study posting was created." in normalized
+    assert (
+        "Each completed study contributes its unique completed "
+        "AI-assisted attempt once." in normalized
+    )
+    assert "<strong>7</strong>" in rendered
+    assert "<strong>3</strong>" in rendered
+    assert "consecutive-generation transitions from" in normalized
+    assert "completed AI studies are represented." in normalized
+    assert "5 comparable and 2 unavailable" in normalized
+    assert (
+        "Captured source changes between AI generations before completion" in rendered
+    )
+    assert "generation 1 to generation 2" in normalized
+    assert "4,200 source characters" in normalized
+    assert "captured latency increased by 1.5 seconds" in normalized
     assert "unchanged-source proxy" in normalized
     assert "not proof that source text was identical" in normalized
-    assert "do not establish" in normalized
-    assert "caused a latency difference" in normalized
-
-    assert rendered.count('href="#completed-study-author-context-heading"') == 1
-    assert rendered.count('id="completed-study-author-context-heading"') == 1
-    assert "<li> Completed-study author context </a> </li>" not in normalized
+    assert (
+        "Positive latency change means the later generation took longer" in normalized
+    )
+    assert "successful AI generation" not in rendered.casefold()
 
 
 def test_html_report_explains_appointment_context() -> None:
@@ -975,6 +1042,7 @@ def test_html_report_explains_appointment_context() -> None:
         overview_summary=overview_rows(),
         author_handoff_summary=author_handoff_rows(),
         data_quality_summary=quality_rows(),
+        repeated_attempt_source_consistency_summary=(repeated_source_rows()),
         charts=charts(),
     )
     normalized_html = " ".join(html.split())
@@ -1001,6 +1069,7 @@ def test_html_report_explains_completed_study_author_context() -> None:
         overview_summary=overview_rows(),
         author_handoff_summary=author_handoff_rows(),
         data_quality_summary=quality_rows(),
+        repeated_attempt_source_consistency_summary=(repeated_source_rows()),
         charts=charts(),
     )
     normalized_html = " ".join(html.split())
@@ -1029,6 +1098,7 @@ def test_html_report_has_navigation_and_faculty_summary() -> None:
         overview_summary=overview_rows(),
         author_handoff_summary=author_handoff_rows(),
         data_quality_summary=quality_rows(),
+        repeated_attempt_source_consistency_summary=(repeated_source_rows()),
         charts=charts(),
     )
     normalized = " ".join(html.split())
@@ -1057,6 +1127,7 @@ def test_html_report_toc_targets_unique_sections_in_report_order() -> None:
         overview_summary=overview_rows(),
         author_handoff_summary=author_handoff_rows(),
         data_quality_summary=quality_rows(),
+        repeated_attempt_source_consistency_summary=(repeated_source_rows()),
         charts=charts(),
     )
 
@@ -1094,6 +1165,7 @@ def test_html_report_uses_progressive_disclosure_defaults() -> None:
         overview_summary=overview_rows(),
         author_handoff_summary=author_handoff_rows(),
         data_quality_summary=quality_rows(),
+        repeated_attempt_source_consistency_summary=(repeated_source_rows()),
         charts=charts(),
     )
 
@@ -1133,6 +1205,7 @@ def test_html_report_loads_plotly_before_first_chart() -> None:
         overview_summary=overview_rows(),
         author_handoff_summary=author_handoff_rows(),
         data_quality_summary=quality_rows(),
+        repeated_attempt_source_consistency_summary=(repeated_source_rows()),
         charts=charts(),
     )
 
@@ -1157,6 +1230,7 @@ def test_html_report_explains_workflow_timing() -> None:
         overview_summary=overview_rows(),
         author_handoff_summary=author_handoff_rows(),
         data_quality_summary=quality_rows(),
+        repeated_attempt_source_consistency_summary=(repeated_source_rows()),
         charts=charts(),
     )
     normalized_html = " ".join(html.split())
@@ -1178,6 +1252,7 @@ def test_html_report_explains_suggestion_choice_denominators() -> None:
         overview_summary=overview_rows(),
         author_handoff_summary=author_handoff_rows(),
         data_quality_summary=quality_rows(),
+        repeated_attempt_source_consistency_summary=(repeated_source_rows()),
         charts=charts(),
     )
     normalized_html = " ".join(html.split())
@@ -1198,6 +1273,7 @@ def test_html_report_explains_readability_indicators() -> None:
         overview_summary=overview_rows(),
         author_handoff_summary=author_handoff_rows(),
         data_quality_summary=quality_rows(),
+        repeated_attempt_source_consistency_summary=(repeated_source_rows()),
         charts=charts(),
     )
     normalized_html = " ".join(html.split())
@@ -1243,6 +1319,7 @@ def test_html_report_displays_authorized_user_feedback_table() -> None:
         overview_summary=overview_rows(),
         author_handoff_summary=author_handoff_rows(),
         data_quality_summary=quality_rows(),
+        repeated_attempt_source_consistency_summary=(repeated_source_rows()),
         charts=charts(),
     )
     normalized_html = " ".join(html.split())
@@ -1283,6 +1360,7 @@ def test_html_report_displays_feedback_empty_state() -> None:
         overview_summary=overview_rows(),
         author_handoff_summary=author_handoff_rows(),
         data_quality_summary=quality_rows(),
+        repeated_attempt_source_consistency_summary=(repeated_source_rows()),
         charts=charts(),
     )
 
@@ -1343,6 +1421,7 @@ def test_html_report_validates_feedback_records(
             overview_summary=overview_rows(),
             author_handoff_summary=author_handoff_rows(),
             data_quality_summary=quality_rows(),
+            repeated_attempt_source_consistency_summary=(repeated_source_rows()),
             charts=charts(),
         )
 
@@ -1353,6 +1432,7 @@ def test_html_report_excludes_identifier_and_payload_values() -> None:
         overview_summary=overview_rows(),
         author_handoff_summary=author_handoff_rows(),
         data_quality_summary=quality_rows(),
+        repeated_attempt_source_consistency_summary=(repeated_source_rows()),
         charts=charts(),
     )
 
@@ -1388,6 +1468,7 @@ def test_write_html_report_creates_utf8_file(
         overview_summary=overview_rows(),
         author_handoff_summary=author_handoff_rows(),
         data_quality_summary=quality_rows(),
+        repeated_attempt_source_consistency_summary=(repeated_source_rows()),
         charts=charts(),
     )
 
@@ -1420,6 +1501,7 @@ def test_write_html_report_wraps_io_failure(
             overview_summary=overview_rows(),
             author_handoff_summary=author_handoff_rows(),
             data_quality_summary=quality_rows(),
+            repeated_attempt_source_consistency_summary=(repeated_source_rows()),
             charts=charts(),
         )
 
@@ -1438,6 +1520,7 @@ def test_html_report_rejects_missing_overview_columns() -> None:
             ),
             author_handoff_summary=author_handoff_rows(),
             data_quality_summary=quality_rows(),
+            repeated_attempt_source_consistency_summary=(repeated_source_rows()),
             charts=charts(),
         )
 
@@ -1458,6 +1541,7 @@ def test_html_report_rejects_missing_required_kpi_metric() -> None:
             overview_summary=rows,
             author_handoff_summary=author_handoff_rows(),
             data_quality_summary=quality_rows(),
+            repeated_attempt_source_consistency_summary=(repeated_source_rows()),
             charts=charts(),
         )
 
@@ -1480,6 +1564,7 @@ def test_html_report_rejects_pathway_count_above_completed_population() -> None:
             overview_summary=rows,
             author_handoff_summary=author_handoff_rows(),
             data_quality_summary=quality_rows(),
+            repeated_attempt_source_consistency_summary=(repeated_source_rows()),
             charts=charts(),
         )
 
@@ -1498,8 +1583,111 @@ def test_html_report_requires_author_handoff_columns() -> None:
                 }
             ),
             data_quality_summary=quality_rows(),
+            repeated_attempt_source_consistency_summary=(repeated_source_rows()),
             charts=charts(),
         )
+
+
+def test_html_report_requires_repeated_source_columns() -> None:
+    """Reject incomplete repeated-source aggregate input."""
+    with pytest.raises(
+        ExplorationValidationError,
+        match="lacks required HTML columns",
+    ):
+        render_html_report(
+            records=feedback_records(),
+            overview_summary=overview_rows(),
+            author_handoff_summary=author_handoff_rows(),
+            data_quality_summary=quality_rows(),
+            repeated_attempt_source_consistency_summary=pd.DataFrame(
+                {
+                    "summary_grain": [
+                        "COMPLETED_AI_PATH_CONSECUTIVE_SUCCESSFUL_AI_TRANSITION"
+                    ]
+                }
+            ),
+            charts=charts(),
+        )
+
+
+@pytest.mark.parametrize(
+    ("mutator", "message"),
+    [
+        (
+            lambda rows: rows.assign(
+                population_unit_count=[
+                    8,
+                    *rows["population_unit_count"].iloc[1:].tolist(),
+                ]
+            ),
+            "inconsistent population counts",
+        ),
+        (
+            lambda rows: rows.loc[
+                ~(
+                    rows["comparison_dimension_name"].eq("SOURCE_SIZE")
+                    & rows["comparison_category"].eq("MISSING")
+                )
+            ],
+            "requires SAME, CHANGED, and MISSING",
+        ),
+        (
+            lambda rows: rows.assign(
+                eligible_unit_count=[
+                    (4 if index == 1 else value)
+                    for index, value in enumerate(rows["eligible_unit_count"])
+                ]
+            ),
+            "inconsistent comparable denominators",
+        ),
+        (
+            lambda rows: rows.assign(
+                category_unit_count=[
+                    (1 if index == 2 else value)
+                    for index, value in enumerate(rows["category_unit_count"])
+                ]
+            ),
+            "comparison counts do not reconcile",
+        ),
+    ],
+)
+def test_html_report_validates_repeated_source_context(
+    mutator: Callable[[pd.DataFrame], pd.DataFrame],
+    message: str,
+) -> None:
+    """Reject internally contradictory repeated-source aggregates."""
+    with pytest.raises(
+        ExplorationValidationError,
+        match=message,
+    ):
+        render_html_report(
+            records=feedback_records(),
+            overview_summary=overview_rows(),
+            author_handoff_summary=author_handoff_rows(),
+            data_quality_summary=quality_rows(),
+            repeated_attempt_source_consistency_summary=mutator(repeated_source_rows()),
+            charts=charts(),
+        )
+
+
+def test_html_report_explains_empty_repeated_source_pathways() -> None:
+    """Provide an explicit empty state for completed-path transitions."""
+    empty = pd.DataFrame(columns=repeated_source_rows().columns)
+    rendered = render_html_report(
+        records=feedback_records(),
+        overview_summary=overview_rows(),
+        author_handoff_summary=author_handoff_rows(),
+        data_quality_summary=quality_rows(),
+        repeated_attempt_source_consistency_summary=empty,
+        charts=charts(),
+    )
+    normalized = " ".join(rendered.split())
+
+    assert (
+        "No completed AI pathway contained two generation attempts "
+        "that returned a result"
+    ) in normalized
+    assert "Available comparisons" not in rendered
 
 
 def test_html_report_displays_aggregate_data_quality() -> None:
@@ -1509,6 +1697,7 @@ def test_html_report_displays_aggregate_data_quality() -> None:
         overview_summary=overview_rows(),
         author_handoff_summary=author_handoff_rows(),
         data_quality_summary=quality_rows(),
+        repeated_attempt_source_consistency_summary=(repeated_source_rows()),
         charts=charts(),
     )
     normalized_html = " ".join(html.split())
@@ -1541,6 +1730,7 @@ def test_html_report_displays_no_warning_state() -> None:
         overview_summary=overview_rows(),
         author_handoff_summary=author_handoff_rows(),
         data_quality_summary=quality_rows(malformed_appointment_count=0),
+        repeated_attempt_source_consistency_summary=(repeated_source_rows()),
         charts=charts(),
     )
     normalized_html = " ".join(html.split())
@@ -1566,5 +1756,6 @@ def test_html_report_requires_quality_columns() -> None:
                     "severity_level": ["WARNING"],
                 }
             ),
+            repeated_attempt_source_consistency_summary=(repeated_source_rows()),
             charts=charts(),
         )

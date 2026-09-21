@@ -96,6 +96,7 @@ REPEATED_ATTEMPT_SOURCE_CONSISTENCY_COLUMNS: tuple[str, ...] = (
     "comparison_dimension_name",
     "comparison_category",
     "population_unit_count",
+    "contributing_study_count",
     "eligible_unit_count",
     "category_unit_count",
     "category_unit_percentage",
@@ -134,6 +135,16 @@ class SourceSizeBandScheme:
     q50: float | None
     q75: float | None
     boundaries: tuple[float, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class _ConsistencyLabels:
+    """Labels and counts shared by one consistency summary row."""
+
+    summary_grain: str
+    dimension_name: str
+    category: str
+    contributing_study_count: int
 
 
 def _percentage(
@@ -705,9 +716,7 @@ def _latency_summary(
 def _consistency_row(
     population: pd.DataFrame,
     *,
-    summary_grain: str,
-    dimension_name: str,
-    category: str,
+    labels: _ConsistencyLabels,
     category_mask: pd.Series,
     eligible_mask: pd.Series,
     latency_column: str,
@@ -726,10 +735,11 @@ def _consistency_row(
     )
 
     return {
-        "summary_grain": summary_grain,
-        "comparison_dimension_name": dimension_name,
-        "comparison_category": category,
+        "summary_grain": labels.summary_grain,
+        "comparison_dimension_name": labels.dimension_name,
+        "comparison_category": labels.category,
         "population_unit_count": len(population),
+        "contributing_study_count": labels.contributing_study_count,
         "eligible_unit_count": len(eligible),
         "category_unit_count": len(selected),
         "category_unit_percentage": _percentage(
@@ -748,6 +758,7 @@ def _comparison_rows(
     summary_grain: str,
     dimension_name: str,
     comparison_column: str,
+    contributing_study_count: int,
     latency_column: str,
     absolute_size_change_column: str | None = None,
 ) -> list[dict[str, object]]:
@@ -764,9 +775,12 @@ def _comparison_rows(
     return [
         _consistency_row(
             population,
-            summary_grain=summary_grain,
-            dimension_name=dimension_name,
-            category=category,
+            labels=_ConsistencyLabels(
+                summary_grain=summary_grain,
+                dimension_name=dimension_name,
+                category=category,
+                contributing_study_count=contributing_study_count,
+            ),
             category_mask=(missing if category == "MISSING" else values.eq(category)),
             eligible_mask=(missing if category == "MISSING" else comparable),
             latency_column=latency_column,
@@ -801,9 +815,12 @@ def _study_any_change_rows(
             rows.append(
                 _consistency_row(
                     eligible,
-                    summary_grain="COMPLETED_AI_STUDY",
-                    dimension_name=dimension_name,
-                    category=category,
+                    labels=_ConsistencyLabels(
+                        summary_grain="COMPLETED_AI_STUDY",
+                        dimension_name=dimension_name,
+                        category=category,
+                        contributing_study_count=len(eligible),
+                    ),
                     category_mask=mask,
                     eligible_mask=pd.Series(
                         True,
@@ -858,14 +875,16 @@ def build_repeated_attempt_source_consistency_summary(
     )
     rows = _study_any_change_rows(pathways)
 
-    for transition_population, grain in (
+    for transition_population, grain, study_count in (
         (
             transitions,
             "ALL_CONSECUTIVE_SUCCESSFUL_AI_TRANSITION",
+            int(transitions["study_num"].astype("string").nunique()),
         ),
         (
             completed_path_transitions,
             ("COMPLETED_AI_PATH_CONSECUTIVE_SUCCESSFUL_AI_TRANSITION"),
+            int(completed_path_transitions["study_num"].astype("string").nunique()),
         ),
     ):
         for dimension_name, comparison_column in (
@@ -886,6 +905,7 @@ def build_repeated_attempt_source_consistency_summary(
                     summary_grain=grain,
                     dimension_name=dimension_name,
                     comparison_column=comparison_column,
+                    contributing_study_count=study_count,
                     latency_column="latency_change_ms",
                     absolute_size_change_column=(
                         "absolute_source_size_change_chars"
@@ -917,6 +937,9 @@ def build_repeated_attempt_source_consistency_summary(
                     summary_grain=grain,
                     dimension_name=dimension_name,
                     comparison_column=f"{prefix}_{suffix}",
+                    contributing_study_count=int(
+                        pathways["study_num"].astype("string").nunique()
+                    ),
                     latency_column=f"{prefix}_latency_change_ms",
                     absolute_size_change_column=None,
                 )

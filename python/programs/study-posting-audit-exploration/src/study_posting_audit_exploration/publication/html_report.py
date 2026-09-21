@@ -766,66 +766,136 @@ _TEMPLATE = """<!doctype html>
     </summary>
     <section aria-labelledby="content-source-heading">
     <p>
-      This section has two distinct analytical lenses. The first describes
-      successful AI generation attempts, including eligible incomplete
-      attempts such as user-dropped attempts when generation succeeded. A
-      successful generation is not the same as a completed or created study.
-      The second lens describes comparable successful-generation transitions
-      within pathways that end in a completed AI attempt.
+      This section separates generation activity from completed study
+      creation. An <strong>AI generation that returned a result</strong> is an
+      AI generation that did not end in either recorded AI-error category. It
+      includes completed and user-dropped attempts. It does not mean that the
+      study posting was created.
     </p>
 
-    <h3>All successful AI generation attempts</h3>
+    <h3>All AI generations that returned a result</h3>
     <p>
-      Input method describes how source material was supplied. It is shown as
-      user workflow context, not as the primary explanation for source size or
-      generation latency.
+      One study can contribute more than one generation attempt to these
+      charts. Input method describes how source material was supplied; it is
+      workflow context, not the primary explanation for source size or
+      latency.
     </p>
-    <div class="chart">{{ source_input_method_html | safe }}</div>
+    <div class="chart">
+      {{ returned_result_input_method_html | safe }}
+    </div>
+    <div class="chart">
+      {{ returned_result_source_size_latency_html | safe }}
+    </div>
 
-    <h3>Source size and generation latency</h3>
+    <h3>Completed AI-assisted attempts</h3>
+    <p>
+      Each completed study contributes its unique completed AI-assisted
+      attempt once. These charts use the same source-size band boundaries as
+      the all-generation charts so the populations remain comparable.
+    </p>
+    <div class="chart">
+      {{ completed_ai_input_method_html | safe }}
+    </div>
+    <div class="chart">
+      {{ completed_ai_source_size_latency_html | safe }}
+    </div>
+
+    <h3>How source-size bands and latency are summarized</h3>
     <p>
       Source size is the captured character count of text supplied to
-      generation. Bands are ranked from the source-size quartiles observed
-      among all successful AI generation attempts. Completed AI attempts use
-      the same boundaries so populations remain comparable. Error bars show
-      the 25th-to-75th-percentile latency range, and hover text includes the
-      90th percentile plus missing and nonmissing latency counts.
+      generation. Bands are ranked from source-size quartiles among all AI
+      generations that returned a result. Error bars show the
+      25th-to-75th-percentile latency range. Hover text includes the 90th
+      percentile and missing or nonmissing latency counts. Faculty-facing
+      latency is displayed in seconds.
     </p>
-    <div class="chart">{{ source_size_latency_html | safe }}</div>
     <p class="caution">
-      The source-size bands improve descriptive comparison but do not remove
-      all differences within a band. Latency may also reflect service
-      conditions and other unmeasured factors. These results do not establish
-      that source size or source category caused a latency difference.
+      Bands improve descriptive comparability but do not remove every
+      within-band difference. Latency may also reflect service conditions and
+      other unmeasured factors. The results do not establish that source size,
+      source category, or input method caused a latency difference.
     </p>
 
     <h3>Reported versus inferred content source</h3>
     <p>
-      The heatmap compares the author-reported semantic source category with
-      the model-inferred category for successful AI generations where both
-      categories are available. Counts use normalized aggregate labels.
+      This heatmap compares the author-reported semantic source category with
+      the model-inferred category for AI generations that returned a result
+      and had both categories available. Counts use normalized aggregate
+      labels.
     </p>
     <div class="chart">{{ content_source_html | safe }}</div>
     <p class="caution">
       Agreement is descriptive. It does not establish that either category is
-      objectively correct, and missing reported categories are not silently
-      replaced with inferred categories.
+      objectively correct, and a missing reported category is not silently
+      replaced with an inferred category.
     </p>
 
-    <h3>Completed AI pathways with repeated successful generations</h3>
+    <h3>Source changes before completed AI-assisted attempts</h3>
+    {% if source_context.has_repeated_pathways %}
     <p>
-      This chart summarizes consecutive successful-generation transitions at
-      or before the unique completed AI attempt. Study-level pathway counts
-      and transition-level counts are different analytical units and should
-      not be combined.
+      <strong>{{ source_context.transition_count }}</strong>
+      consecutive-generation transitions from
+      <strong>{{ source_context.contributing_study_count }}</strong>
+      completed AI studies are represented. Each transition compares two
+      adjacent AI generations that returned a result within a pathway ending
+      in a completed AI-assisted attempt. A study can contribute more than one
+      transition.
     </p>
-    <div class="chart">{{ repeated_source_consistency_html | safe }}</div>
+    {% else %}
+    <p>
+      No completed AI pathway contained two generation attempts that returned
+      a result, so no consecutive-generation transition was available.
+    </p>
+    {% endif %}
+
+    <h4>What is being compared?</h4>
+    <p>
+      Each comparison uses two adjacent AI generations for the same study.
+      Manual attempts and AI-error attempts are not treated as source
+      comparisons. The completed-path analysis stops at the completed
+      AI-assisted attempt.
+    </p>
+    <p>
+      If a study had three qualifying AI generations before completion, it
+      contributes two transitions: generation 1 to generation 2, and
+      generation 2 to the completed generation.
+    </p>
+
+    {% if source_context.has_repeated_pathways %}
+    <h4>Available comparisons</h4>
+    <ul>
+      {% for comparison in source_context.comparisons %}
+      <li>
+        <strong>{{ comparison.label }}:</strong>
+        {{ comparison.comparable_transition_count }} comparable and
+        {{ comparison.unavailable_transition_count }} unavailable among
+        {{ comparison.all_transition_count }} total completed-path
+        transitions.
+      </li>
+      {% endfor %}
+    </ul>
+    <div class="chart">
+      {{ repeated_source_consistency_html | safe }}
+    </div>
+    {% endif %}
+
+    <h4>Illustrative example</h4>
+    <p>
+      Suppose generation 1 used DOCX, reported informed consent, contained
+      4,200 source characters, and took 12.0 seconds. Generation 2 used DOCX,
+      reported informed consent, contained 5,100 characters, and took 13.5
+      seconds. Source size changed; reported source and input method were
+      unchanged; the source-signature proxy changed because source size
+      changed; and captured latency increased by 1.5 seconds. This example
+      does not show that the source-size change caused the latency increase.
+    </p>
     <p class="caution">
       Equal source size and equal reported source category form an
       unchanged-source proxy, not proof that source text was identical.
-      Different text can have the same character count and category. Latency
-      changes are descriptive and may reflect source changes, service
-      conditions, or other unmeasured factors.
+      Different text can have the same character count and category. Positive
+      latency change means the later generation took longer; negative means
+      it took less time; zero means no captured latency change. These
+      associations remain descriptive.
     </p>
   </section>
   </details>
@@ -877,6 +947,26 @@ _TEMPLATE = """<!doctype html>
 
 
 @dataclass(frozen=True, slots=True)
+class SourceComparisonView:
+    """One faculty-facing completed-path comparison denominator."""
+
+    label: str
+    comparable_transition_count: int
+    unavailable_transition_count: int
+    all_transition_count: int
+
+
+@dataclass(frozen=True, slots=True)
+class SourceContextHtmlContext:
+    """Aggregate completed-path counts for source-context explanation."""
+
+    contributing_study_count: int
+    transition_count: int
+    comparisons: tuple[SourceComparisonView, ...]
+    has_repeated_pathways: bool
+
+
+@dataclass(frozen=True, slots=True)
 class QualityWarningView:
     """One aggregate warning shown in the faculty-facing report."""
 
@@ -900,6 +990,120 @@ class QualityHtmlContext:
     warning_occurrences: int
     warning_rows: tuple[QualityWarningView, ...]
     zero_warning_messages: tuple[str, ...]
+
+
+def _source_context_html_context(
+    repeated_summary: pd.DataFrame,
+) -> SourceContextHtmlContext:
+    """Return validated aggregate context for completed-path transitions."""
+    required = (
+        "summary_grain",
+        "comparison_dimension_name",
+        "comparison_category",
+        "population_unit_count",
+        "contributing_study_count",
+        "eligible_unit_count",
+        "category_unit_count",
+    )
+    missing_columns = tuple(
+        column for column in required if column not in repeated_summary.columns
+    )
+
+    if missing_columns:
+        raise ExplorationValidationError(
+            "repeated_attempt_source_consistency_summary lacks required "
+            f"HTML columns: {missing_columns!r}"
+        )
+
+    rows = repeated_summary.loc[
+        repeated_summary["summary_grain"].eq(
+            "COMPLETED_AI_PATH_CONSECUTIVE_SUCCESSFUL_AI_TRANSITION"
+        )
+    ]
+    dimension_labels = (
+        ("SOURCE_SIZE", "Source size"),
+        ("REPORTED_CONTENT_SOURCE", "Reported content source"),
+        ("INPUT_METHOD", "Input method"),
+        ("SOURCE_SIGNATURE_PROXY", "Source-signature proxy"),
+    )
+
+    if rows.empty:
+        return SourceContextHtmlContext(
+            contributing_study_count=0,
+            transition_count=0,
+            comparisons=tuple(
+                SourceComparisonView(
+                    label=label,
+                    comparable_transition_count=0,
+                    unavailable_transition_count=0,
+                    all_transition_count=0,
+                )
+                for _, label in dimension_labels
+            ),
+            has_repeated_pathways=False,
+        )
+
+    transition_counts = {int(value) for value in rows["population_unit_count"]}
+    study_counts = {int(value) for value in rows["contributing_study_count"]}
+
+    if len(transition_counts) != 1 or len(study_counts) != 1:
+        raise ExplorationValidationError(
+            "completed-path source summary has inconsistent population counts"
+        )
+
+    transition_count = transition_counts.pop()
+    study_count = study_counts.pop()
+    comparisons: list[SourceComparisonView] = []
+
+    for dimension, label in dimension_labels:
+        dimension_rows = rows.loc[rows["comparison_dimension_name"].eq(dimension)]
+        categories = {
+            str(row["comparison_category"]): row
+            for row in dimension_rows.to_dict(orient="records")
+        }
+
+        if set(categories) != {
+            "SAME",
+            "CHANGED",
+            "MISSING",
+        }:
+            raise ExplorationValidationError(
+                "completed-path source summary requires SAME, CHANGED, "
+                f"and MISSING rows for {dimension!r}"
+            )
+
+        same_eligible = int(categories["SAME"]["eligible_unit_count"])
+        changed_eligible = int(categories["CHANGED"]["eligible_unit_count"])
+
+        if same_eligible != changed_eligible:
+            raise ExplorationValidationError(
+                "completed-path source summary has inconsistent comparable "
+                f"denominators for {dimension!r}"
+            )
+
+        unavailable = int(categories["MISSING"]["category_unit_count"])
+
+        if same_eligible + unavailable != transition_count:
+            raise ExplorationValidationError(
+                "completed-path source summary comparison counts do not "
+                f"reconcile for {dimension!r}"
+            )
+
+        comparisons.append(
+            SourceComparisonView(
+                label=label,
+                comparable_transition_count=same_eligible,
+                unavailable_transition_count=unavailable,
+                all_transition_count=transition_count,
+            )
+        )
+
+    return SourceContextHtmlContext(
+        contributing_study_count=study_count,
+        transition_count=transition_count,
+        comparisons=tuple(comparisons),
+        has_repeated_pathways=transition_count > 0,
+    )
 
 
 def _faculty_summary(
@@ -1460,6 +1664,7 @@ def render_html_report(
     overview_summary: pd.DataFrame,
     author_handoff_summary: pd.DataFrame,
     data_quality_summary: pd.DataFrame,
+    repeated_attempt_source_consistency_summary: pd.DataFrame,
     charts: ExplorationCharts,
 ) -> str:
     """Return one self-contained faculty-facing HTML report."""
@@ -1471,10 +1676,14 @@ def render_html_report(
     template = environment.from_string(_TEMPLATE)
     quality = _quality_html_context(data_quality_summary)
     feedback_rows = _user_feedback_rows(records)
+    source_context = _source_context_html_context(
+        repeated_attempt_source_consistency_summary
+    )
 
     return template.render(
         title=_REPORT_TITLE,
         user_feedback_rows=feedback_rows,
+        source_context=source_context,
         faculty_summary=_faculty_summary(
             overview_summary=overview_summary,
             quality=quality,
@@ -1596,12 +1805,20 @@ def render_html_report(
             charts.content_source_concordance,
             include_plotlyjs=False,
         ),
-        source_input_method_html=_figure_html(
-            charts.source_input_method_preference,
+        returned_result_input_method_html=_figure_html(
+            charts.returned_result_input_method_preference,
             include_plotlyjs=False,
         ),
-        source_size_latency_html=_figure_html(
-            charts.source_size_latency_by_band,
+        returned_result_source_size_latency_html=_figure_html(
+            charts.returned_result_source_size_latency,
+            include_plotlyjs=False,
+        ),
+        completed_ai_input_method_html=_figure_html(
+            charts.completed_ai_input_method_preference,
+            include_plotlyjs=False,
+        ),
+        completed_ai_source_size_latency_html=_figure_html(
+            charts.completed_ai_source_size_latency,
             include_plotlyjs=False,
         ),
         repeated_source_consistency_html=_figure_html(
@@ -1618,6 +1835,7 @@ def write_html_report(
     overview_summary: pd.DataFrame,
     author_handoff_summary: pd.DataFrame,
     data_quality_summary: pd.DataFrame,
+    repeated_attempt_source_consistency_summary: pd.DataFrame,
     charts: ExplorationCharts,
 ) -> None:
     """Write one self-contained HTML report."""
@@ -1628,6 +1846,9 @@ def write_html_report(
                 overview_summary=overview_summary,
                 author_handoff_summary=author_handoff_summary,
                 data_quality_summary=data_quality_summary,
+                repeated_attempt_source_consistency_summary=(
+                    repeated_attempt_source_consistency_summary
+                ),
                 charts=charts,
             ),
             encoding="utf-8",

@@ -81,6 +81,7 @@ _REQUIRED_REPEATED_SOURCE_COLUMNS: tuple[str, ...] = (
     "comparison_dimension_name",
     "comparison_category",
     "population_unit_count",
+    "contributing_study_count",
     "eligible_unit_count",
     "category_unit_count",
     "category_unit_percentage",
@@ -508,6 +509,18 @@ _FIELD_EDIT_OUTCOMES: tuple[tuple[str, str], ...] = (
 
 
 @dataclass(frozen=True, slots=True)
+class SourcePopulationChartSpec:
+    """Faculty-facing labels for one source-context population."""
+
+    population_name: str
+    input_method_title: str
+    latency_title: str
+    count_label: str
+    denominator_label: str
+    empty_population_label: str
+
+
+@dataclass(frozen=True, slots=True)
 class ExplorationChartInputs:
     """Aggregate-only DataFrames consumed by the HTML chart bundle."""
 
@@ -562,8 +575,10 @@ class ExplorationCharts:
     selected_vs_unselected_readability: go.Figure
     edit_readability_relationship: go.Figure
     content_source_concordance: go.Figure
-    source_input_method_preference: go.Figure
-    source_size_latency_by_band: go.Figure
+    returned_result_input_method_preference: go.Figure
+    returned_result_source_size_latency: go.Figure
+    completed_ai_input_method_preference: go.Figure
+    completed_ai_source_size_latency: go.Figure
     repeated_attempt_source_consistency: go.Figure
 
 
@@ -2562,17 +2577,17 @@ def build_edit_readability_relationship_chart(
 
 def build_source_input_method_chart(
     source_context_distribution: pd.DataFrame,
+    *,
+    spec: SourcePopulationChartSpec,
 ) -> go.Figure:
-    """Return successful-generation input-method preference counts."""
+    """Return input-method counts for one explicit generation population."""
     _require_columns(
         source_context_distribution,
         required=_REQUIRED_SOURCE_CONTEXT_DISTRIBUTION_COLUMNS,
         frame_name="source_context_distribution_summary",
     )
     rows = source_context_distribution.loc[
-        source_context_distribution["population_name"].eq(
-            "ALL_SUCCESSFUL_AI_GENERATIONS"
-        )
+        source_context_distribution["population_name"].eq(spec.population_name)
         & source_context_distribution["summary_dimension_name"].eq("INPUT_METHOD")
     ].sort_values(
         by=[
@@ -2584,8 +2599,11 @@ def build_source_input_method_chart(
 
     if rows.empty:
         return _empty_figure(
-            title="How source material was supplied",
-            message="No successful-generation input-method aggregates are available.",
+            title=spec.input_method_title,
+            message=(
+                f"No {spec.empty_population_label} input-method "
+                "aggregates are available."
+            ),
         )
 
     labels = [
@@ -2619,17 +2637,18 @@ def build_source_input_method_chart(
         ],
         hovertemplate=(
             "Input method: %{y}<br>"
-            "Successful AI generations: %{x}<br>"
-            "Share with a reported input method: %{customdata[0]:.1f}% "
+            f"{spec.count_label}: %{{x}}<br>"
+            f"{spec.denominator_label}: "
+            "%{customdata[0]:.1f}% "
             "(%{x} of %{customdata[1]})<extra></extra>"
         ),
     )
     figure.update_layout(
-        title="How source material was supplied",
+        title=spec.input_method_title,
         template="plotly_white",
         height=max(360, 70 * len(labels) + 160),
         margin={"l": 150, "r": 40, "t": 80, "b": 60},
-        xaxis_title="Successful AI generation attempt count",
+        xaxis_title=spec.count_label,
         yaxis_title="Input method",
     )
 
@@ -2638,15 +2657,17 @@ def build_source_input_method_chart(
 
 def build_source_size_latency_chart(
     source_size_latency: pd.DataFrame,
+    *,
+    spec: SourcePopulationChartSpec,
 ) -> go.Figure:
-    """Return all-successful median latency by source-size band."""
+    """Return median latency by source-size band for one population."""
     _require_columns(
         source_size_latency,
         required=_REQUIRED_SOURCE_SIZE_LATENCY_COLUMNS,
         frame_name="source_size_latency_summary",
     )
     rows = source_size_latency.loc[
-        source_size_latency["population_name"].eq("ALL_SUCCESSFUL_AI_GENERATIONS")
+        source_size_latency["population_name"].eq(spec.population_name)
         & source_size_latency["reported_source_group"].eq(_ALL)
     ].sort_values(
         by="source_size_band_sequence",
@@ -2655,8 +2676,11 @@ def build_source_size_latency_chart(
 
     if rows.empty:
         return _empty_figure(
-            title="Generation latency by source-size band",
-            message="No source-size and latency aggregates are available.",
+            title=spec.latency_title,
+            message=(
+                f"No {spec.empty_population_label} source-size and "
+                "latency aggregates are available."
+            ),
         )
 
     labels = [
@@ -2711,14 +2735,14 @@ def build_source_size_latency_chart(
             "Median source size: %{customdata[3]:,.0f} characters<br>"
             "25th-75th percentile shown by error bar<br>"
             "90th percentile: %{customdata[4]:.2f} seconds<br>"
-            "Attempts in band: %{customdata[0]}<br>"
-            "Attempts with latency: %{customdata[1]}<br>"
-            "Attempts missing latency: %{customdata[2]}"
+            f"{spec.count_label} in band: %{{customdata[0]}}<br>"
+            "Attempts with captured latency: %{customdata[1]}<br>"
+            "Attempts missing captured latency: %{customdata[2]}"
             "<extra></extra>"
         ),
     )
     figure.update_layout(
-        title="Generation latency by source-size band",
+        title=spec.latency_title,
         template="plotly_white",
         height=460,
         margin={"l": 80, "r": 40, "t": 80, "b": 100},
@@ -2732,7 +2756,7 @@ def build_source_size_latency_chart(
 def build_repeated_source_consistency_chart(
     repeated_summary: pd.DataFrame,
 ) -> go.Figure:
-    """Return completed-path transition source-comparison percentages."""
+    """Return comparable changes plus separately labeled unavailable counts."""
     _require_columns(
         repeated_summary,
         required=_REQUIRED_REPEATED_SOURCE_COLUMNS,
@@ -2746,8 +2770,11 @@ def build_repeated_source_consistency_chart(
 
     if rows.empty:
         return _empty_figure(
-            title="Source consistency across completed AI pathways",
-            message="No comparable completed-path transitions are available.",
+            title=("Captured source changes between AI generations before completion"),
+            message=(
+                "No completed AI pathways contained consecutive "
+                "generation attempts returning a result."
+            ),
         )
 
     dimensions = (
@@ -2759,7 +2786,6 @@ def build_repeated_source_consistency_chart(
     categories = (
         ("SAME", "Unchanged"),
         ("CHANGED", "Changed"),
-        ("MISSING", "Missing or unavailable"),
     )
     figure = go.Figure()
 
@@ -2811,25 +2837,71 @@ def build_repeated_source_consistency_chart(
             x=percentages,
             customdata=customdata,
             hovertemplate=(
-                "Comparison: %{customdata[0]}<br>"
-                f"Result: {label}<br>"
-                "Transitions: %{customdata[1]} of %{customdata[2]}<br>"
-                "Share: %{x:.1f}%<br>"
-                "Transitions with latency change: %{customdata[3]}<br>"
-                "Median latency change: %{customdata[4]:.2f} seconds"
+                "Captured characteristic: %{customdata[0]}<br>"
+                f"Comparison result: {label}<br>"
+                "Comparable transitions: %{customdata[1]} of "
+                "%{customdata[2]}<br>"
+                "Percentage among comparable transitions: %{x:.1f}%<br>"
+                "Transitions in this result group with latency on both "
+                "sides: %{customdata[3]}<br>"
+                "Median latency change: %{customdata[4]:.2f} seconds<br>"
+                "Positive means the later generation took longer; "
+                "negative means it took less time; zero means no "
+                "captured latency change."
                 "<extra></extra>"
             ),
         )
 
+    has_unavailable_annotations = False
+
+    for position, (dimension, _display) in enumerate(dimensions):
+        missing = rows.loc[
+            rows["comparison_dimension_name"].eq(dimension)
+            & rows["comparison_category"].eq("MISSING")
+        ]
+
+        if missing.empty:
+            continue
+
+        row = missing.iloc[0]
+        missing_count = int(row["category_unit_count"])
+        total_count = int(row["population_unit_count"])
+
+        if missing_count == 0:
+            continue
+
+        has_unavailable_annotations = True
+        missing_percentage = 100.0 * missing_count / total_count
+        figure.add_annotation(
+            x=100,
+            y=position,
+            text=(
+                f"Unavailable: {missing_count} of {total_count} transitions "
+                f"({missing_percentage:.1f}%)"
+            ),
+            showarrow=False,
+            xanchor="left",
+            xshift=12,
+            font={"size": 12},
+        )
+
     figure.update_layout(
-        title="Source consistency across completed AI pathways",
+        title=("Captured source changes between AI generations before completion"),
         template="plotly_white",
         barmode="stack",
         height=460,
-        margin={"l": 190, "r": 40, "t": 80, "b": 70},
-        xaxis_title="Percentage within comparison availability",
+        margin={
+            "l": 190,
+            "r": 230 if has_unavailable_annotations else 70,
+            "t": 80,
+            "b": 70,
+        },
+        xaxis={
+            "title": "Percentage among comparable transitions",
+            "range": [0, 100],
+        },
         yaxis_title="Captured source characteristic",
-        legend_title_text="Comparison result",
+        legend_title_text="Comparable-transition result",
     )
 
     return figure
@@ -3027,11 +3099,85 @@ def build_exploration_charts(
         content_source_concordance=build_content_source_concordance_chart(
             inputs.content_source_matrix
         ),
-        source_input_method_preference=build_source_input_method_chart(
-            inputs.source_context_distribution_summary
+        returned_result_input_method_preference=(
+            build_source_input_method_chart(
+                inputs.source_context_distribution_summary,
+                spec=SourcePopulationChartSpec(
+                    population_name="ALL_SUCCESSFUL_AI_GENERATIONS",
+                    input_method_title=(
+                        "Input method for AI generations that returned a result"
+                    ),
+                    latency_title=(
+                        "Latency by source-size band for AI generations "
+                        "that returned a result"
+                    ),
+                    count_label="Generation attempts returning a result",
+                    denominator_label=(
+                        "Share among generation attempts with a recorded input method"
+                    ),
+                    empty_population_label=("AI generations that returned a result"),
+                ),
+            )
         ),
-        source_size_latency_by_band=build_source_size_latency_chart(
-            inputs.source_size_latency_summary
+        returned_result_source_size_latency=(
+            build_source_size_latency_chart(
+                inputs.source_size_latency_summary,
+                spec=SourcePopulationChartSpec(
+                    population_name="ALL_SUCCESSFUL_AI_GENERATIONS",
+                    input_method_title=(
+                        "Input method for AI generations that returned a result"
+                    ),
+                    latency_title=(
+                        "Latency by source-size band for AI generations "
+                        "that returned a result"
+                    ),
+                    count_label="Generation attempts returning a result",
+                    denominator_label=(
+                        "Share among generation attempts with a recorded input method"
+                    ),
+                    empty_population_label=("AI generations that returned a result"),
+                ),
+            )
+        ),
+        completed_ai_input_method_preference=(
+            build_source_input_method_chart(
+                inputs.source_context_distribution_summary,
+                spec=SourcePopulationChartSpec(
+                    population_name="COMPLETED_AI_ATTEMPTS",
+                    input_method_title=(
+                        "Input method for completed AI-assisted attempts"
+                    ),
+                    latency_title=(
+                        "Latency by source-size band for completed AI-assisted attempts"
+                    ),
+                    count_label="Completed AI-assisted attempts",
+                    denominator_label=(
+                        "Share among completed AI-assisted attempts with "
+                        "a recorded input method"
+                    ),
+                    empty_population_label="completed AI-assisted attempts",
+                ),
+            )
+        ),
+        completed_ai_source_size_latency=(
+            build_source_size_latency_chart(
+                inputs.source_size_latency_summary,
+                spec=SourcePopulationChartSpec(
+                    population_name="COMPLETED_AI_ATTEMPTS",
+                    input_method_title=(
+                        "Input method for completed AI-assisted attempts"
+                    ),
+                    latency_title=(
+                        "Latency by source-size band for completed AI-assisted attempts"
+                    ),
+                    count_label="Completed AI-assisted attempts",
+                    denominator_label=(
+                        "Share among completed AI-assisted attempts with "
+                        "a recorded input method"
+                    ),
+                    empty_population_label="completed AI-assisted attempts",
+                ),
+            )
         ),
         repeated_attempt_source_consistency=(
             build_repeated_source_consistency_chart(
