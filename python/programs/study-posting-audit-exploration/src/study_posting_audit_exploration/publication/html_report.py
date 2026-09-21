@@ -236,6 +236,34 @@ _TEMPLATE = """<!doctype html>
       margin-top: 1rem;
     }
     .chart + .chart { margin-top: 2rem; }
+    .explanation-panel {
+      margin: 1.25rem 0;
+      border: 1px solid var(--border);
+      border-radius: 0.5rem;
+      background: var(--panel);
+    }
+    .explanation-panel > summary {
+      padding: 0.9rem 1rem;
+      cursor: pointer;
+      font-weight: 700;
+    }
+    .explanation-panel > summary:hover {
+      background: var(--surface);
+    }
+    .explanation-panel > summary:focus {
+      outline: 3px solid var(--focus);
+      outline-offset: -3px;
+    }
+    .explanation-panel-content {
+      padding: 0 1rem 1rem;
+    }
+    .explanation-panel-content dt {
+      margin-top: 0.8rem;
+      font-weight: 700;
+    }
+    .explanation-panel-content dd {
+      margin: 0.2rem 0 0 1.25rem;
+    }
     a:focus, button:focus, [tabindex]:focus {
       outline: 3px solid var(--focus);
       outline-offset: 2px;
@@ -253,6 +281,13 @@ _TEMPLATE = """<!doctype html>
         display: none;
       }
       details.report-section:not([open]) > section {
+        display: block;
+      }
+      details.explanation-panel > summary {
+        display: none;
+      }
+      details.explanation-panel:not([open])
+        > .explanation-panel-content {
         display: block;
       }
     }
@@ -468,6 +503,72 @@ _TEMPLATE = """<!doctype html>
       within a study.
     </p>
     <div class="chart">{{ study_pathways_html | safe }}</div>
+
+    <details class="explanation-panel">
+      <summary>How to read the author-handoff categories</summary>
+      <div class="explanation-panel-content">
+        <p>
+          Each completed study appears in exactly one category. The
+          <strong>completion author</strong> is the person who made the final
+          attempt that created the study posting.
+        </p>
+        <dl>
+          <dt>No preceding attempt</dt>
+          <dd>
+            The study posting was created on its first recorded attempt.
+          </dd>
+
+          <dt>All preceding attempts by completion author</dt>
+          <dd>
+            The study had one or more earlier incomplete attempts, and every
+            earlier attempt was made by the same person who ultimately created
+            the posting. No author handoff occurred.
+          </dd>
+
+          <dt>All preceding attempts by other authors</dt>
+          <dd>
+            The study had one or more earlier incomplete attempts, and every
+            earlier attempt was made by someone other than the person who
+            ultimately created the posting.
+          </dd>
+
+          <dt>Mixed completion and other authors</dt>
+          <dd>
+            Earlier incomplete attempts included both the person who
+            ultimately created the posting and at least one other author.
+          </dd>
+        </dl>
+
+        <h4>Brief example</h4>
+        <p>
+          Suppose Alex made the completed attempt:
+        </p>
+        <ul>
+          <li>
+            No earlier attempt means <strong>No preceding attempt</strong>.
+          </li>
+          <li>
+            Only Alex made earlier attempts means
+            <strong>All preceding attempts by completion author</strong>.
+          </li>
+          <li>
+            Only people other than Alex made earlier attempts means
+            <strong>All preceding attempts by other authors</strong>.
+          </li>
+          <li>
+            Alex and at least one other person made earlier attempts means
+            <strong>Mixed completion and other authors</strong>.
+          </li>
+        </ul>
+
+        <p class="caution">
+          These categories describe the recorded sequence of attempt authors.
+          They do not explain why an author changed, how responsibility was
+          assigned, or whether collaboration occurred outside the application.
+        </p>
+      </div>
+    </details>
+
     <div class="chart">{{ author_handoffs_html | safe }}</div>
   </section>
   </details>

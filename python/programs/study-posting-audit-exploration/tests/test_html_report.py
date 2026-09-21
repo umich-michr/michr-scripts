@@ -1035,6 +1035,42 @@ def test_html_report_explains_source_context_and_latency() -> None:
     assert "successful AI generation" not in rendered.casefold()
 
 
+def test_html_report_explains_author_handoff_categories() -> None:
+    """Provide a collapsed, accessible explanation beside the handoff chart."""
+    html = render_html_report(
+        records=feedback_records(),
+        overview_summary=overview_rows(),
+        author_handoff_summary=author_handoff_rows(),
+        data_quality_summary=quality_rows(),
+        repeated_attempt_source_consistency_summary=(repeated_source_rows()),
+        charts=charts(),
+    )
+    normalized = " ".join(html.split())
+
+    panel_start = html.index('<details class="explanation-panel">')
+    panel_end = html.index("</details>", panel_start)
+    panel = html[panel_start:panel_end]
+
+    assert "<details" in panel
+    assert '<details class="explanation-panel" open' not in panel
+    assert "How to read the author-handoff categories" in panel
+    assert "completion author" in panel
+    assert "No preceding attempt" in panel
+    assert "All preceding attempts by completion author" in panel
+    assert "All preceding attempts by other authors" in panel
+    assert "Mixed completion and other authors" in panel
+    assert "Suppose Alex made the completed attempt" in normalized
+    assert "Each completed study appears in exactly one category." in normalized
+    assert "do not explain why an author changed" in normalized
+    assert (
+        html.index("Completed-study pathways by final authoring mode")
+        < panel_start
+        < html.index("Author handoffs before study completion")
+    )
+    assert "details.explanation-panel:not([open])" in html
+    assert "display: block" in html
+
+
 def test_html_report_explains_appointment_context() -> None:
     """Explain parsed appointment facets and overlapping groups."""
     html = render_html_report(
