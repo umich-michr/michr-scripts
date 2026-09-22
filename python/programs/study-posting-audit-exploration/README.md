@@ -106,6 +106,8 @@ no-completion-observed comparisons remain deferred unless provenance is
 
 For no-completion-observed studies, the internal retry context now keeps three distinct durations when validated metadata provides `REPORT_RUN_CUTOFF`: first attempt to latest observed attempt, latest attempt to report-run cutoff, and first attempt to report-run cutoff. Legacy `UNAVAILABLE` metadata leaves the cutoff-based durations missing. No minimum follow-up threshold or adjusted unresolved rate is applied.
 
+The two published retry summaries include the count of unresolved studies with a validated report-run cutoff and median minutes from the latest attempt to cutoff and from the first attempt to cutoff. Completed rows keep these cutoff medians missing. The publication inventory remains exactly 36 files.
+
 ## Validation
 
 The current validation contract checks:

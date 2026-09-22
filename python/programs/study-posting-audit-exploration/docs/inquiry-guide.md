@@ -282,3 +282,5 @@ changes were intentional experiments, why an author handoff occurred, or
 whether a study was abandoned.
 
 When `REPORT_RUN_CUTOFF` is available, distinguish observed activity span from follow-up after the latest attempt and from the total observation window. These durations remain descriptive. No study is follow-up eligible until a minimum threshold is explicitly selected.
+
+In the retry summaries, use `study_count_with_report_run_cutoff` as the contributing count for cutoff medians. Do not compare those medians as threshold-qualified outcomes; no minimum follow-up threshold is defined.

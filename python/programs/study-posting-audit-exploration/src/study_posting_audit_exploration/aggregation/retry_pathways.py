@@ -44,6 +44,9 @@ STUDY_RETRY_PATHWAY_SUMMARY_COLUMNS: tuple[str, ...] = (
     "median_minutes_first_to_completion",
     "study_count_with_unresolved_observed_span",
     "median_minutes_first_to_last_observed_attempt",
+    "study_count_with_report_run_cutoff",
+    "median_minutes_latest_attempt_to_report_run_cutoff",
+    "median_minutes_first_attempt_to_report_run_cutoff",
     "timing_definition",
     "interpretation_note",
 )
@@ -85,6 +88,9 @@ RETRY_CHARACTERISTICS_SUMMARY_COLUMNS: tuple[str, ...] = (
     "median_minutes_first_to_completion",
     "study_count_with_unresolved_observed_span",
     "median_minutes_first_to_last_observed_attempt",
+    "study_count_with_report_run_cutoff",
+    "median_minutes_latest_attempt_to_report_run_cutoff",
+    "median_minutes_first_attempt_to_report_run_cutoff",
     "timing_definition",
     "interpretation_note",
 )
@@ -262,6 +268,7 @@ def _pathway_row(
     unresolved_span_count = int(
         rows["minutes_first_attempt_to_last_observed_attempt"].notna().sum()
     )
+    report_run_cutoff_count = int(rows["report_run_cutoff_timestamp"].notna().sum())
 
     timing_definition = (
         _COMPLETED_TIMING_DEFINITION
@@ -327,6 +334,15 @@ def _pathway_row(
         "median_minutes_first_to_last_observed_attempt": _median(
             rows,
             "minutes_first_attempt_to_last_observed_attempt",
+        ),
+        "study_count_with_report_run_cutoff": report_run_cutoff_count,
+        "median_minutes_latest_attempt_to_report_run_cutoff": _median(
+            rows,
+            "minutes_latest_attempt_to_report_run_cutoff",
+        ),
+        "median_minutes_first_attempt_to_report_run_cutoff": _median(
+            rows,
+            "minutes_first_attempt_to_report_run_cutoff",
         ),
         "timing_definition": timing_definition,
         "interpretation_note": _INTERPRETATION_NOTE,
@@ -491,6 +507,7 @@ def _characteristics_row(
     unresolved_span_count = int(
         rows["minutes_first_attempt_to_last_observed_attempt"].notna().sum()
     )
+    report_run_cutoff_count = int(rows["report_run_cutoff_timestamp"].notna().sum())
 
     timing_definition = (
         _UNRESOLVED_TIMING_DEFINITION
@@ -535,6 +552,15 @@ def _characteristics_row(
         "median_minutes_first_to_last_observed_attempt": _median(
             rows,
             "minutes_first_attempt_to_last_observed_attempt",
+        ),
+        "study_count_with_report_run_cutoff": report_run_cutoff_count,
+        "median_minutes_latest_attempt_to_report_run_cutoff": _median(
+            rows,
+            "minutes_latest_attempt_to_report_run_cutoff",
+        ),
+        "median_minutes_first_attempt_to_report_run_cutoff": _median(
+            rows,
+            "minutes_first_attempt_to_report_run_cutoff",
         ),
         "timing_definition": timing_definition,
         "interpretation_note": _INTERPRETATION_NOTE,

@@ -1029,6 +1029,15 @@ def study_retry_pathway_rows() -> pd.DataFrame:
                 "median_minutes_first_to_last_observed_attempt": 45.0
                 if state == "NO_COMPLETION_OBSERVED" and count
                 else None,
+                "study_count_with_report_run_cutoff": count
+                if state == "NO_COMPLETION_OBSERVED"
+                else 0,
+                "median_minutes_latest_attempt_to_report_run_cutoff": 1_440.0
+                if state == "NO_COMPLETION_OBSERVED" and count
+                else None,
+                "median_minutes_first_attempt_to_report_run_cutoff": 1_485.0
+                if state == "NO_COMPLETION_OBSERVED" and count
+                else None,
                 "timing_definition": "Synthetic timing definition.",
                 "interpretation_note": "Synthetic descriptive caution.",
             }
@@ -1077,6 +1086,15 @@ def retry_characteristic_rows() -> pd.DataFrame:
                 if group == "NO_COMPLETION_OBSERVED"
                 else 0,
                 "median_minutes_first_to_last_observed_attempt": 45.0
+                if group == "NO_COMPLETION_OBSERVED"
+                else None,
+                "study_count_with_report_run_cutoff": count
+                if group == "NO_COMPLETION_OBSERVED"
+                else 0,
+                "median_minutes_latest_attempt_to_report_run_cutoff": 1_440.0
+                if group == "NO_COMPLETION_OBSERVED"
+                else None,
+                "median_minutes_first_attempt_to_report_run_cutoff": 1_485.0
                 if group == "NO_COMPLETION_OBSERVED"
                 else None,
                 "timing_definition": "Synthetic timing definition.",

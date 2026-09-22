@@ -43,6 +43,22 @@ def _integer_override(
     return value
 
 
+def _nullable_float_override(
+    overrides: dict[str, object],
+    key: str,
+) -> float | None:
+    """Return one checked nullable-float synthetic override."""
+    value = overrides.pop(key, None)
+
+    if value is None:
+        return None
+
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise TypeError(f"{key} must be numeric or None")
+
+    return float(value)
+
+
 def _retry_row(
     *,
     study_num: str,
@@ -63,8 +79,14 @@ def _retry_row(
     signature_eligible = bool(overrides.pop("signature_eligible", False))
     signature_changed = bool(overrides.pop("signature_changed", False))
     feedback_recorded = bool(overrides.pop("feedback_recorded", False))
-    completion_minutes = overrides.pop("completion_minutes", None)
-    unresolved_minutes = overrides.pop("unresolved_minutes", None)
+    completion_minutes = _nullable_float_override(
+        overrides,
+        "completion_minutes",
+    )
+    unresolved_minutes = _nullable_float_override(
+        overrides,
+        "unresolved_minutes",
+    )
 
     if overrides:
         raise AssertionError(
@@ -123,8 +145,19 @@ def _retry_row(
                 if completion_state == "COMPLETED"
                 else None
             ),
+            "report_run_cutoff_timestamp": (
+                pd.Timestamp("2026-01-02T10:00:00")
+                if unresolved_minutes is not None
+                else None
+            ),
             "minutes_first_attempt_to_completion": completion_minutes,
             "minutes_first_attempt_to_last_observed_attempt": (unresolved_minutes),
+            "minutes_latest_attempt_to_report_run_cutoff": (
+                1_440.0 if unresolved_minutes is not None else None
+            ),
+            "minutes_first_attempt_to_report_run_cutoff": (
+                1_440.0 + unresolved_minutes if unresolved_minutes is not None else None
+            ),
         }
     )
 
@@ -216,6 +249,9 @@ def test_pathway_summary_counts_characteristics_and_distinct_timing() -> None:
     assert pd.isna(completed["median_minutes_first_to_last_observed_attempt"])
 
     assert unresolved["median_minutes_first_to_last_observed_attempt"] == 45.0
+    assert unresolved["study_count_with_report_run_cutoff"] == 1
+    assert unresolved["median_minutes_latest_attempt_to_report_run_cutoff"] == 1_440.0
+    assert unresolved["median_minutes_first_attempt_to_report_run_cutoff"] == 1_485.0
     assert pd.isna(unresolved["median_minutes_first_to_completion"])
     assert "not follow-up time" in unresolved["timing_definition"]
 
@@ -261,6 +297,9 @@ def test_retry_characteristics_has_explicit_denominators() -> None:
     assert unresolved["ai_exposed_study_count"] == 0
     assert pd.isna(unresolved["percentage_with_feedback_recorded_among_ai_exposed"])
     assert unresolved["median_minutes_first_to_last_observed_attempt"] == 45.0
+    assert unresolved["study_count_with_report_run_cutoff"] == 1
+    assert unresolved["median_minutes_latest_attempt_to_report_run_cutoff"] == 1_440.0
+    assert unresolved["median_minutes_first_attempt_to_report_run_cutoff"] == 1_485.0
     assert "final unresolved outcome" in unresolved["interpretation_note"]
 
 
@@ -370,3 +409,32 @@ def test_retry_card_summary_uses_true_study_level_median() -> None:
     assert repeated_completed["ai_only_study_count"] == 2
     assert repeated_completed["both_modes_study_count"] == 2
     assert repeated_completed["manual_only_study_count"] == 0
+
+
+def test_completed_retry_aggregate_cutoff_values_are_missing() -> None:
+    """Keep unresolved cutoff measures out of completed rows."""
+    summary = build_retry_characteristics_summary(_contexts())
+    completed = summary.loc[
+        summary["study_outcome_group"].isin(["COMPLETED_AI", "COMPLETED_MANUAL"])
+    ]
+
+    assert completed["study_count_with_report_run_cutoff"].eq(0).all()
+    assert completed["median_minutes_latest_attempt_to_report_run_cutoff"].isna().all()
+    assert completed["median_minutes_first_attempt_to_report_run_cutoff"].isna().all()
+
+
+def test_empty_retry_cutoff_aggregates_are_missing() -> None:
+    """Use missing medians and zero contributing counts for empty input."""
+    empty = pd.DataFrame(columns=list(STUDY_RETRY_CONTEXT_COLUMNS))
+
+    pathways = build_study_retry_pathway_summary(empty)
+    characteristics = build_retry_characteristics_summary(empty)
+
+    assert pathways["study_count_with_report_run_cutoff"].eq(0).all()
+    assert pathways["median_minutes_latest_attempt_to_report_run_cutoff"].isna().all()
+    assert characteristics["study_count_with_report_run_cutoff"].eq(0).all()
+    assert (
+        characteristics["median_minutes_first_attempt_to_report_run_cutoff"]
+        .isna()
+        .all()
+    )
