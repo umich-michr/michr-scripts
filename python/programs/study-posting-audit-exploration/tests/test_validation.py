@@ -29,6 +29,7 @@ def report_with_ai_metrics(
         records=report.records,
         ai_assistance_metrics=metrics,
         readability_metrics=report.readability_metrics,
+        metadata=report.metadata,
     )
 
 
@@ -465,6 +466,7 @@ def test_duplicate_readability_identity_is_rejected(
         records=report.records,
         ai_assistance_metrics=report.ai_assistance_metrics,
         readability_metrics=duplicated_readability,
+        metadata=report.metadata,
     )
 
     with pytest.raises(
@@ -523,6 +525,7 @@ def test_multiple_final_readability_rows_are_rejected(
         records=report.records,
         ai_assistance_metrics=report.ai_assistance_metrics,
         readability_metrics=duplicated,
+        metadata=report.metadata,
     )
 
     with pytest.raises(
@@ -551,6 +554,7 @@ def test_multiple_selected_readability_suggestions_are_rejected(
         records=report.records,
         ai_assistance_metrics=report.ai_assistance_metrics,
         readability_metrics=duplicated,
+        metadata=report.metadata,
     )
 
     with pytest.raises(
@@ -605,6 +609,7 @@ def test_assisted_ai_text_may_lack_selected_readability(
         records=report.records,
         ai_assistance_metrics=report.ai_assistance_metrics,
         readability_metrics=readability,
+        metadata=report.metadata,
     )
 
     summary = validate_audit_report(valid_report)
@@ -623,6 +628,7 @@ def test_assisted_ai_text_may_lack_final_readability(
         records=report.records,
         ai_assistance_metrics=report.ai_assistance_metrics,
         readability_metrics=readability,
+        metadata=report.metadata,
     )
 
     summary = validate_audit_report(valid_report)

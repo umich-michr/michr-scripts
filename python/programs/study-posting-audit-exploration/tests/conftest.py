@@ -2,6 +2,7 @@
 
 import csv
 from dataclasses import dataclass
+import json
 from pathlib import Path
 from typing import Any
 
@@ -17,6 +18,9 @@ from study_posting_audit_exploration.input_contracts import (
     RECORD_DATETIME_COLUMNS,
     RECORD_INTEGER_COLUMNS,
     RECORDS_FILENAME,
+    REPORT_METADATA_FILENAME,
+    REPORT_METADATA_SCHEMA_VERSION,
+    SOURCE_SNAPSHOT_PROVENANCE_UNAVAILABLE,
 )
 
 
@@ -280,6 +284,20 @@ def valid_report_directory(tmp_path: Path) -> Path:
         directory / READABILITY_METRICS_FILENAME,
         columns=READABILITY_COLUMNS,
         rows=readability_rows(audit_id=1002),
+    )
+    (directory / REPORT_METADATA_FILENAME).write_text(
+        json.dumps(
+            {
+                "schema_version": REPORT_METADATA_SCHEMA_VERSION,
+                "report_generated_at_utc": "2026-06-03T12:00:00+00:00",
+                "source_snapshot_as_of_utc": None,
+                "source_snapshot_provenance": (SOURCE_SNAPSHOT_PROVENANCE_UNAVAILABLE),
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
     )
 
     return directory

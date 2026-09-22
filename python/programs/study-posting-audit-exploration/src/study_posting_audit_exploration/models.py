@@ -1,9 +1,20 @@
 """Loaded-input, derived-data, aggregation, publication, and validation models."""
 
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
+
+
+@dataclass(frozen=True, slots=True)
+class NormalizedReportMetadata:
+    """Validated metadata for one normalized report snapshot."""
+
+    schema_version: int
+    report_generated_at_utc: datetime
+    source_snapshot_as_of_utc: datetime | None
+    source_snapshot_provenance: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -13,6 +24,7 @@ class LoadedAuditReport:
     records: pd.DataFrame
     ai_assistance_metrics: pd.DataFrame
     readability_metrics: pd.DataFrame
+    metadata: NormalizedReportMetadata
 
 
 @dataclass(frozen=True, slots=True)

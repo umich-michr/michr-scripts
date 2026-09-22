@@ -416,3 +416,21 @@ The extract currently has no formal observation-window end available to
 exploration. No-completion-observed timing therefore ends at the latest captured
 attempt and must not be interpreted as follow-up time, drop-off, abandonment, or
 a final outcome.
+
+## Normalized report metadata lineage
+
+The normalized report producer atomically publishes `report_metadata.json` with
+the three CSV files. Exploration loads and validates that document before any
+analysis:
+
+1. `schema_version` must equal `1`.
+2. `report_generated_at_utc` must be timezone-aware and is normalized to UTC.
+3. `source_snapshot_provenance=UNAVAILABLE` requires a null source snapshot.
+4. `source_snapshot_provenance=SOURCE_PROVIDED` requires a timezone-aware source
+   snapshot no later than report generation.
+
+The generation timestamp documents when the normalized report was created. It
+does not establish when source querying completed or when observation ended.
+Only a source-provided snapshot timestamp can potentially anchor later
+follow-up eligibility, and no follow-up threshold or adjusted unresolved rate
+is implemented by this metadata-loading milestone.

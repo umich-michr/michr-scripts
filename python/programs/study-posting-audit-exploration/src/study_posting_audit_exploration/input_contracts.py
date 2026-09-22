@@ -3,6 +3,19 @@
 RECORDS_FILENAME = "records.csv"
 AI_ASSISTANCE_METRICS_FILENAME = "ai_assistance_metrics.csv"
 READABILITY_METRICS_FILENAME = "readability_metrics.csv"
+REPORT_METADATA_FILENAME = "report_metadata.json"
+REPORT_METADATA_SCHEMA_VERSION = 1
+SOURCE_SNAPSHOT_PROVENANCE_UNAVAILABLE = "UNAVAILABLE"
+SOURCE_SNAPSHOT_PROVENANCE_SOURCE_PROVIDED = "SOURCE_PROVIDED"
+
+REPORT_METADATA_KEYS: frozenset[str] = frozenset(
+    {
+        "schema_version",
+        "report_generated_at_utc",
+        "source_snapshot_as_of_utc",
+        "source_snapshot_provenance",
+    }
+)
 
 RECORD_COLUMNS: tuple[str, ...] = (
     "ID",

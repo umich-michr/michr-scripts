@@ -28,6 +28,7 @@ files:
 - `records.csv`
 - `ai_assistance_metrics.csv`
 - `readability_metrics.csv`
+- `report_metadata.json`
 
 The input report remains read-only.
 
@@ -80,6 +81,25 @@ uv run study-posting-audit-exploration summarize-quality \
 `--fail-on-warning` prints the complete summary and then returns status 3 when
 at least one warning check has affected attempts. Invalid or inconsistent
 exploration output returns status 2.
+
+
+### Normalized report metadata
+
+`report_metadata.json` is required alongside the three normalized CSV files.
+Exploration validates its exact version 1 shape:
+
+- `report_generated_at_utc` is a timezone-aware UTC report-generation instant;
+- `source_snapshot_as_of_utc` is nullable;
+- `source_snapshot_provenance` is `UNAVAILABLE` or `SOURCE_PROVIDED`;
+- `UNAVAILABLE` requires a null snapshot;
+- `SOURCE_PROVIDED` requires a timezone-aware snapshot no later than report
+  generation.
+
+Report generation time is not automatically a source-query or observation-window
+endpoint. Exploration does not infer a source snapshot from attempt, creation,
+login, filesystem, or downstream publication timestamps. Follow-up-adjusted
+no-completion-observed comparisons remain deferred unless provenance is
+`SOURCE_PROVIDED` and a separate threshold policy is defined.
 
 ## Validation
 
