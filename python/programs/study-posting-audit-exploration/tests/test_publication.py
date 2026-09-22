@@ -179,6 +179,19 @@ def _ai_feedback_records(records: pd.DataFrame) -> pd.DataFrame:
     ]
 
 
+def _report_run_cutoff(
+    report: LoadedAuditReport,
+) -> pd.Timestamp | None:
+    """Return the validated synthetic report-run cutoff."""
+    if report.metadata.source_snapshot_provenance != "REPORT_RUN_CUTOFF":
+        return None
+
+    cutoff = report.metadata.source_snapshot_as_of_utc
+    assert cutoff is not None
+
+    return pd.Timestamp(cutoff)
+
+
 def _analysis_tables(
     report: LoadedAuditReport,
 ) -> ExplorationAnalysisTables:
@@ -208,6 +221,7 @@ def _analysis_tables(
         successful_ai_generations=(source_context.successful_ai_generations),
         successful_ai_transitions=(source_context.successful_ai_transitions),
         ai_feedback_records=_ai_feedback_records(report.records),
+        report_run_cutoff_timestamp=_report_run_cutoff(report),
     )
     retry_context = retry.study_retry_context
 

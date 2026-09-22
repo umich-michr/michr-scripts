@@ -104,6 +104,8 @@ login, filesystem, or downstream publication timestamps. Follow-up-adjusted
 no-completion-observed comparisons remain deferred unless provenance is
 `SOURCE_PROVIDED` and a separate threshold policy is defined.
 
+For no-completion-observed studies, the internal retry context now keeps three distinct durations when validated metadata provides `REPORT_RUN_CUTOFF`: first attempt to latest observed attempt, latest attempt to report-run cutoff, and first attempt to report-run cutoff. Legacy `UNAVAILABLE` metadata leaves the cutoff-based durations missing. No minimum follow-up threshold or adjusted unresolved rate is applied.
+
 ## Validation
 
 The current validation contract checks:

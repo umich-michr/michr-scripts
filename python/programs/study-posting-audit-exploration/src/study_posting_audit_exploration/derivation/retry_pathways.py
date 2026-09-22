@@ -75,8 +75,11 @@ STUDY_RETRY_CONTEXT_COLUMNS: tuple[str, ...] = (
     "first_attempt_timestamp",
     "latest_observed_attempt_timestamp",
     "completed_timestamp",
+    "report_run_cutoff_timestamp",
     "minutes_first_attempt_to_completion",
     "minutes_first_attempt_to_last_observed_attempt",
+    "minutes_latest_attempt_to_report_run_cutoff",
+    "minutes_first_attempt_to_report_run_cutoff",
 )
 
 
@@ -299,6 +302,7 @@ def _study_row(
     successful_ai_generations: pd.DataFrame,
     successful_ai_transitions: pd.DataFrame,
     feedback_count: int,
+    report_run_cutoff_timestamp: pd.Timestamp | None,
 ) -> dict[str, object]:
     """Return one internal retry-context row."""
     applicable = _ordered_applicable_attempts(group)
@@ -379,6 +383,27 @@ def _study_row(
         if completed or first_timestamp is None or latest_timestamp is None
         else (latest_timestamp - first_timestamp).total_seconds() / 60.0
     )
+    unresolved_cutoff = None if completed else report_run_cutoff_timestamp
+
+    if (
+        unresolved_cutoff is not None
+        and latest_timestamp is not None
+        and unresolved_cutoff < latest_timestamp
+    ):
+        raise ExplorationValidationError(
+            "report-run cutoff must not precede the latest observed attempt"
+        )
+
+    latest_to_cutoff_minutes = (
+        None
+        if unresolved_cutoff is None or latest_timestamp is None
+        else (unresolved_cutoff - latest_timestamp).total_seconds() / 60.0
+    )
+    first_to_cutoff_minutes = (
+        None
+        if unresolved_cutoff is None or first_timestamp is None
+        else (unresolved_cutoff - first_timestamp).total_seconds() / 60.0
+    )
 
     ai_count = int(sum(mode == AI for mode in modes))
     manual_count = int(sum(mode == MANUAL for mode in modes))
@@ -434,8 +459,11 @@ def _study_row(
         "first_attempt_timestamp": first_timestamp,
         "latest_observed_attempt_timestamp": latest_timestamp,
         "completed_timestamp": completed_timestamp,
+        "report_run_cutoff_timestamp": unresolved_cutoff,
         "minutes_first_attempt_to_completion": completion_minutes,
         "minutes_first_attempt_to_last_observed_attempt": observed_minutes,
+        "minutes_latest_attempt_to_report_run_cutoff": (latest_to_cutoff_minutes),
+        "minutes_first_attempt_to_report_run_cutoff": (first_to_cutoff_minutes),
     }
 
 
@@ -446,6 +474,7 @@ def derive_study_retry_tables(
     successful_ai_generations: pd.DataFrame,
     successful_ai_transitions: pd.DataFrame,
     ai_feedback_records: pd.DataFrame | None = None,
+    report_run_cutoff_timestamp: pd.Timestamp | None = None,
 ) -> StudyRetryTables:
     """Return deterministic one-row-per-study retry contexts."""
     attempt_columns = (
@@ -572,6 +601,7 @@ def derive_study_retry_tables(
             successful_ai_generations=successful_ai_generations,
             successful_ai_transitions=successful_ai_transitions,
             feedback_count=feedback_counts.get(str(study_num), 0),
+            report_run_cutoff_timestamp=report_run_cutoff_timestamp,
         )
         for study_num, group in study_attempt_author_history.groupby(
             "study_num",

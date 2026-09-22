@@ -438,3 +438,5 @@ is implemented by this metadata-loading milestone.
 The retry completion timestamp uses the completed attempt's authoritative `END_TIME`. Completed timing is measured from the first recorded attempt start to that completion end. Missing `END_TIME` on a completed attempt is invalid. This timestamp does not define the observation-window end for studies with no completion observed.
 
 New normalized reports use `REPORT_RUN_CUTOFF`: the report process captures one UTC instant and writes it as both report generation and source snapshot time. Exploration requires those instants to be equal. Legacy `UNAVAILABLE` metadata remains loadable, but it cannot support follow-up durations.
+
+Internal unresolved-study timing now preserves three grains: observed activity span (first to latest attempt), follow-up after the latest attempt (latest attempt to report-run cutoff), and total observation window (first attempt to report-run cutoff). These fields are populated only from validated `REPORT_RUN_CUTOFF` metadata and are not yet published as threshold-qualified rates.

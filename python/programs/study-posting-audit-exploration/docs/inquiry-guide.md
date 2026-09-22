@@ -280,3 +280,5 @@ Observed patterns can motivate qualitative follow-up. They do not establish why
 authors changed modes, whether AI output was liked or rejected, whether source
 changes were intentional experiments, why an author handoff occurred, or
 whether a study was abandoned.
+
+When `REPORT_RUN_CUTOFF` is available, distinguish observed activity span from follow-up after the latest attempt and from the total observation window. These durations remain descriptive. No study is follow-up eligible until a minimum threshold is explicitly selected.

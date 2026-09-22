@@ -109,6 +109,7 @@ def _derive(
     generations: pd.DataFrame | None = None,
     transitions: pd.DataFrame | None = None,
     feedback: pd.DataFrame | None = None,
+    cutoff: pd.Timestamp | None = None,
 ) -> pd.DataFrame:
     """Build study history and derive retry context from synthetic attempts."""
     study_rows = []
@@ -149,6 +150,7 @@ def _derive(
             else transitions
         ),
         ai_feedback_records=feedback,
+        report_run_cutoff_timestamp=cutoff,
     ).study_retry_context
 
 
@@ -494,6 +496,7 @@ def _derive_validation_inputs(
     generations: pd.DataFrame,
     transitions: pd.DataFrame,
     feedback: pd.DataFrame | None = None,
+    cutoff: pd.Timestamp | None = None,
 ) -> pd.DataFrame:
     """Run retry derivation from one explicit validation fixture."""
     return derive_study_retry_tables(
@@ -502,6 +505,7 @@ def _derive_validation_inputs(
         successful_ai_generations=generations,
         successful_ai_transitions=transitions,
         ai_feedback_records=feedback,
+        report_run_cutoff_timestamp=cutoff,
     ).study_retry_context
 
 
@@ -722,3 +726,119 @@ def test_retry_context_handles_missing_attempt_timestamps() -> None:
 
     assert pd.isna(row["first_attempt_timestamp"])
     assert pd.isna(row["minutes_first_attempt_to_last_observed_attempt"])
+
+
+def test_unresolved_retry_context_derives_report_run_follow_up() -> None:
+    """Keep observed activity, follow-up, and total window distinct."""
+    attempts = _attempt_frame(
+        [
+            {
+                "study_num": "SYNTHETIC-FOLLOW-UP",
+                "audit_record_id": 1,
+                "attempt_start_timestamp": "2026-06-01T09:00:00",
+                "attempt_authoring_mode": "AI",
+                "attempt_result": "USER_DROPPED",
+                "attempt_author_user_name": "synthetic-author",
+            },
+            {
+                "study_num": "SYNTHETIC-FOLLOW-UP",
+                "audit_record_id": 2,
+                "attempt_start_timestamp": "2026-06-03T09:00:00",
+                "attempt_authoring_mode": "MANUAL",
+                "attempt_result": "USER_DROPPED",
+                "attempt_author_user_name": "synthetic-author",
+            },
+        ]
+    )
+
+    row = _derive(
+        attempts,
+        cutoff=pd.Timestamp("2026-06-10T09:00:00"),
+    ).iloc[0]
+
+    assert row["minutes_first_attempt_to_last_observed_attempt"] == (
+        pytest.approx(2 * 24 * 60)
+    )
+    assert row["minutes_latest_attempt_to_report_run_cutoff"] == (
+        pytest.approx(7 * 24 * 60)
+    )
+    assert row["minutes_first_attempt_to_report_run_cutoff"] == (
+        pytest.approx(9 * 24 * 60)
+    )
+    assert row["report_run_cutoff_timestamp"] == pd.Timestamp("2026-06-10T09:00:00")
+
+
+def test_unresolved_retry_context_allows_zero_follow_up() -> None:
+    """Allow the cutoff to equal the latest observed attempt."""
+    attempts, studies, generations, transitions = _minimal_retry_inputs()
+    cutoff = attempts.iloc[0]["attempt_start_timestamp"]
+
+    row = _derive_validation_inputs(
+        attempts=attempts,
+        studies=studies,
+        generations=generations,
+        transitions=transitions,
+        cutoff=pd.Timestamp(cutoff),
+    ).iloc[0]
+
+    assert row["minutes_latest_attempt_to_report_run_cutoff"] == 0.0
+    assert row["minutes_first_attempt_to_report_run_cutoff"] == 0.0
+
+
+def test_retry_context_rejects_cutoff_before_latest_attempt() -> None:
+    """Fail fast when metadata contradicts observed attempts."""
+    attempts, studies, generations, transitions = _minimal_retry_inputs()
+
+    with pytest.raises(
+        ExplorationValidationError,
+        match="must not precede the latest observed attempt",
+    ):
+        _derive_validation_inputs(
+            attempts=attempts,
+            studies=studies,
+            generations=generations,
+            transitions=transitions,
+            cutoff=pd.Timestamp("2026-05-01T08:59:00"),
+        )
+
+
+def test_completed_retry_context_has_no_unresolved_follow_up() -> None:
+    """Do not populate unresolved observation fields for completed studies."""
+    attempts = _attempt_frame(
+        [
+            {
+                "study_num": "SYNTHETIC-COMPLETE-CUTOFF",
+                "audit_record_id": 1,
+                "attempt_start_timestamp": "2026-06-01T09:00:00",
+                "attempt_authoring_mode": "AI",
+                "attempt_result": "COMPLETE",
+                "attempt_author_user_name": "synthetic-author",
+            }
+        ]
+    )
+
+    row = _derive(
+        attempts,
+        cutoff=pd.Timestamp("2026-06-10T09:00:00"),
+    ).iloc[0]
+
+    assert pd.isna(row["report_run_cutoff_timestamp"])
+    assert pd.isna(row["minutes_latest_attempt_to_report_run_cutoff"])
+    assert pd.isna(row["minutes_first_attempt_to_report_run_cutoff"])
+
+
+def test_legacy_unavailable_cutoff_keeps_follow_up_missing() -> None:
+    """Keep duration fields unavailable for legacy metadata."""
+    attempts, studies, generations, transitions = _minimal_retry_inputs()
+
+    row = _derive_validation_inputs(
+        attempts=attempts,
+        studies=studies,
+        generations=generations,
+        transitions=transitions,
+        cutoff=None,
+    ).iloc[0]
+
+    assert pd.isna(row["report_run_cutoff_timestamp"])
+    assert pd.isna(row["minutes_latest_attempt_to_report_run_cutoff"])
+    assert pd.isna(row["minutes_first_attempt_to_report_run_cutoff"])
