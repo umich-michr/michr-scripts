@@ -1262,8 +1262,15 @@ def test_html_report_explains_author_handoff_categories() -> None:
     )
     normalized = " ".join(html.split())
 
-    panel_start = html.index('<details class="explanation-panel">')
-    panel_end = html.index("</details>", panel_start)
+    panel_summary = html.index(
+        "<summary>How to read the author-handoff categories</summary>"
+    )
+    panel_start = html.rfind(
+        '<details class="explanation-panel">',
+        0,
+        panel_summary,
+    )
+    panel_end = html.index("</details>", panel_summary)
     panel = html[panel_start:panel_end]
 
     assert "<details" in panel
@@ -1280,7 +1287,10 @@ def test_html_report_explains_author_handoff_categories() -> None:
     assert (
         html.index("Completed-study pathways by final authoring mode")
         < panel_start
-        < html.index("Author handoffs before study completion")
+        < html.index(
+            "Author handoffs before study completion",
+            panel_end,
+        )
     )
     assert "details.explanation-panel:not([open])" in html
     assert "display: block" in html
@@ -1541,6 +1551,51 @@ def test_html_report_loads_plotly_before_first_chart() -> None:
     assert plotly_library_position < first_chart_position
     assert first_chart_position < study_pathways_position
     assert html.lower().count("plotly.js v") == 1
+
+
+def test_html_report_explains_overview_charts_in_plain_language() -> None:
+    """Provide a collapsed worked example for the overview charts."""
+    html = render_html_report(
+        records=feedback_records(),
+        overview_summary=overview_rows(),
+        author_handoff_summary=author_handoff_rows(),
+        retry_card_summary=retry_card_rows(),
+        retry_characteristics_summary=retry_characteristic_rows(),
+        data_quality_summary=quality_rows(),
+        repeated_attempt_source_consistency_summary=repeated_source_rows(),
+        charts=charts(),
+    )
+    normalized = " ".join(html.split())
+
+    summary = "How to read the overview charts"
+    panel_summary = html.index(f"<summary>{summary}</summary>")
+    panel_start = html.rfind(
+        '<details class="explanation-panel">',
+        0,
+        panel_summary,
+    )
+    panel_end = html.index("</details>", panel_summary)
+    panel = html[panel_start:panel_end]
+
+    assert panel_start >= 0
+    assert '<details class="explanation-panel" open' not in panel
+    assert "This chart counts audit attempts, not studies." in normalized
+    assert "one study can have several attempts" in normalized
+    assert "Each completed study contributes once." in normalized
+    assert "5 of 20 completed studies" in normalized
+    assert "the middle half of recorded values" in normalized
+    assert "a median of 8 minutes" in normalized
+    assert "does not show that the mode caused" in normalized
+    assert (
+        html.index("Completed-attempt timing by authoring mode")
+        < panel_start
+        < html.index(
+            '<summary id="data-quality-heading">',
+            panel_end,
+        )
+    )
+    assert "details.explanation-panel:not([open])" in html
+    assert "display: block" in html
 
 
 def test_html_report_explains_workflow_timing() -> None:

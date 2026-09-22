@@ -421,6 +421,15 @@ _TEMPLATE = """<!doctype html>
       authoring mode is taken from each study's unique completed attempt.
     </p>
 
+    <p>
+      This chart counts audit attempts, not studies. A study can contribute
+      more than one attempt. Each colored segment shows how many attempts used
+      AI or manual authoring and whether that attempt completed the posting.
+    </p>
+    <p class="caution">
+      A completed attempt created the posting. An incomplete attempt did not
+      create it during that recorded attempt; the chart does not explain why.
+    </p>
     <div class="chart">{{ attempt_outcomes_html | safe }}</div>
 
     <h3>Completion pathways</h3>
@@ -450,6 +459,61 @@ _TEMPLATE = """<!doctype html>
       or a causal effect of authoring mode.
     </p>
     <div class="chart">{{ attempt_timing_html | safe }}</div>
+
+    <details class="explanation-panel">
+      <summary>How to read the overview charts</summary>
+      <div class="explanation-panel-content">
+        <h4>Attempt outcomes</h4>
+        <p>
+          Read the stacked bar from left to right. Its full length is all
+          recorded attempts. Each colored segment is one outcome and authoring
+          mode, such as completed AI attempts or incomplete manual attempts.
+          The segment count is an attempt count, so several segments can come
+          from attempts for the same study.
+        </p>
+        <p>
+          <strong>Synthetic example:</strong> if a report contains 40 attempts
+          and the completed-AI segment contains 10, then 10 of the 40 attempts
+          were completed AI attempts. This does not mean 10 different studies
+          used AI, because one study can have several attempts.
+        </p>
+
+        <h4>Completion-pathway cards</h4>
+        <p>
+          These cards switch to a study-level view. Each completed study
+          contributes once. A card showing preceding incomplete attempts means
+          that the same study had at least one earlier recorded attempt before
+          its unique completed attempt.
+        </p>
+        <p>
+          <strong>Synthetic example:</strong> if 5 of 20 completed studies had
+          a preceding incomplete attempt, the card reports 25%. It does not
+          explain why those earlier attempts ended.
+        </p>
+
+        <h4>Completed-attempt timing</h4>
+        <p>
+          Each bar is the median recorded time among completed attempts in one
+          authoring mode. The thin error line spans the 25th to 75th
+          percentiles: the middle half of recorded values. Hover text provides
+          the number of attempts with a timing value, missing counts, and the
+          90th percentile.
+        </p>
+        <p>
+          <strong>Synthetic example:</strong> a median of 8 minutes with an
+          error line from 4 to 12 minutes means half of the recorded values
+          were at or below 8 minutes, and the middle half fell between 4 and
+          12 minutes. It does not show that the mode caused faster or slower
+          work.
+        </p>
+
+        <p class="caution">
+          Attempts, completed studies, and authors are different counting
+          units. Compare values only when the chart or card uses the same unit
+          and denominator.
+        </p>
+      </div>
+    </details>
 
     <p class="caution">
       These figures describe the audit records captured in this report. They
