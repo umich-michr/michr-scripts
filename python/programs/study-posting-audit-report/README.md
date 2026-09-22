@@ -61,7 +61,7 @@ study-posting-ai-analysis
             ↓
  text-post-edit-metrics
             ↓
- records.csv + ai_assistance_metrics.csv + readability_metrics.csv
+ records.csv + ai_assistance_metrics.csv + readability_metrics.csv + report_metadata.json
 ```
 
 | Component | Responsibility |
@@ -86,6 +86,25 @@ report/
 ├── ai_assistance_metrics.csv
 └── readability_metrics.csv
 ```
+
+
+
+### `report_metadata.json`
+
+The normalized report atomically includes a small metadata document:
+
+- `schema_version`: metadata schema version, currently `1`;
+- `report_generated_at_utc`: timezone-aware UTC instant captured once for the
+  normalized report run;
+- `source_snapshot_as_of_utc`: authoritative source-snapshot instant when
+  available, otherwise `null`;
+- `source_snapshot_provenance`: `UNAVAILABLE` until an authoritative source
+  snapshot is supplied.
+
+`report_generated_at_utc` records report generation, not necessarily the source
+query or observation-window end. It must not be used as a follow-up endpoint or
+relabeled as a source snapshot. No snapshot time is inferred from attempt,
+creation, login, filesystem, or downstream publication timestamps.
 
 ### `records.csv`
 

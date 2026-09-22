@@ -82,6 +82,8 @@ class AuditCsvReport:
         Long-format AI-assistance metrics CSV.
     readability_metrics_path
         Long-format readability metrics CSV.
+    metadata_path
+        Normalized report metadata JSON.
     summary
         Counts produced by the completed run.
     """
@@ -90,4 +92,5 @@ class AuditCsvReport:
     records_path: Path
     ai_assistance_metrics_path: Path
     readability_metrics_path: Path
+    metadata_path: Path
     summary: AuditReportSummary

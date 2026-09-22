@@ -6,6 +6,7 @@ import csv
 from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
+import json
 from pathlib import Path
 from typing import cast
 
@@ -17,6 +18,9 @@ from study_posting_audit_report import (
     READABILITY_COLUMNS,
     READABILITY_METRICS_FILENAME,
     RECORDS_FILENAME,
+    REPORT_METADATA_FILENAME,
+    REPORT_METADATA_SCHEMA_VERSION,
+    SOURCE_SNAPSHOT_PROVENANCE_UNAVAILABLE,
     AuditOutputError,
     AuditReportConfig,
     AuditReportConfigurationError,
@@ -419,7 +423,7 @@ def completed_manual_readability_row(
 # ---------------------------------------------------------------------------
 
 
-def test_generate_report_writes_three_files_and_summary(
+def test_generate_report_writes_four_files_and_summary(
     tmp_path: Path,
 ) -> None:
     source = InMemoryRowSource(
@@ -450,6 +454,24 @@ def test_generate_report_writes_three_files_and_summary(
     assert report.records_path.is_file()
     assert report.ai_assistance_metrics_path.is_file()
     assert report.readability_metrics_path.is_file()
+    assert report.metadata_path == output_directory / REPORT_METADATA_FILENAME
+    assert report.metadata_path.is_file()
+
+    metadata = json.loads(report.metadata_path.read_text(encoding="utf-8"))
+    assert metadata["schema_version"] == REPORT_METADATA_SCHEMA_VERSION
+    assert metadata["source_snapshot_as_of_utc"] is None
+    assert (
+        metadata["source_snapshot_provenance"] == SOURCE_SNAPSHOT_PROVENANCE_UNAVAILABLE
+    )
+    generated = datetime.fromisoformat(metadata["report_generated_at_utc"])
+    assert generated.tzinfo is not None
+
+    assert {path.name for path in output_directory.iterdir() if path.is_file()} == {
+        RECORDS_FILENAME,
+        AI_ASSISTANCE_METRICS_FILENAME,
+        READABILITY_METRICS_FILENAME,
+        REPORT_METADATA_FILENAME,
+    }
 
     assert report.summary.source_rows == 3
     assert report.summary.analyzable_rows == 1
@@ -1293,3 +1315,6 @@ def test_output_filenames_are_stable() -> None:
     assert RECORDS_FILENAME == "records.csv"
     assert AI_ASSISTANCE_METRICS_FILENAME == "ai_assistance_metrics.csv"
     assert READABILITY_METRICS_FILENAME == "readability_metrics.csv"
+    assert REPORT_METADATA_FILENAME == "report_metadata.json"
+    assert REPORT_METADATA_SCHEMA_VERSION == 1
+    assert SOURCE_SNAPSHOT_PROVENANCE_UNAVAILABLE == "UNAVAILABLE"

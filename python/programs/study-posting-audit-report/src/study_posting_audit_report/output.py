@@ -13,7 +13,7 @@ write failure removes the temporary directory and publishes no report.
 
 import csv
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 import json
 import math
@@ -51,6 +51,9 @@ from tabular_row_sources import (
 RECORDS_FILENAME = "records.csv"
 AI_ASSISTANCE_METRICS_FILENAME = "ai_assistance_metrics.csv"
 READABILITY_METRICS_FILENAME = "readability_metrics.csv"
+REPORT_METADATA_FILENAME = "report_metadata.json"
+REPORT_METADATA_SCHEMA_VERSION = 1
+SOURCE_SNAPSHOT_PROVENANCE_UNAVAILABLE = "UNAVAILABLE"
 
 
 def _require_nonblank_string(
@@ -353,6 +356,43 @@ def _flush_and_sync(handle: TextIO) -> None:
     os.fsync(handle.fileno())
 
 
+def _write_report_metadata(
+    path: Path,
+    *,
+    report_generated_at_utc: datetime,
+) -> None:
+    """Write and synchronize normalized report metadata."""
+    if report_generated_at_utc.tzinfo is None:
+        raise AuditOutputError("report_generated_at_utc must be timezone-aware")
+
+    content = {
+        "report_generated_at_utc": (
+            report_generated_at_utc.astimezone(UTC).isoformat()
+        ),
+        "schema_version": REPORT_METADATA_SCHEMA_VERSION,
+        "source_snapshot_as_of_utc": None,
+        "source_snapshot_provenance": (SOURCE_SNAPSHOT_PROVENANCE_UNAVAILABLE),
+    }
+
+    try:
+        with path.open(
+            mode="w",
+            encoding="utf-8",
+            newline="",
+        ) as handle:
+            json.dump(
+                content,
+                handle,
+                ensure_ascii=False,
+                indent=2,
+                sort_keys=True,
+            )
+            handle.write("\n")
+            _flush_and_sync(handle)
+    except (OSError, TypeError, ValueError) as error:
+        raise AuditOutputError(f"Could not write report metadata: {error}") from error
+
+
 def _write_staged_report(
     *,
     source: RowSource,
@@ -480,7 +520,7 @@ def generate_csv_report(
     output_options: CsvOutputOptions | None = None,
     readability_analyzer: ReadabilityAnalyzer | None = None,
 ) -> AuditCsvReport:
-    """Generate and atomically publish a three-file CSV report.
+    """Generate and atomically publish a four-file normalized report.
 
     Parameters
     ----------
@@ -488,8 +528,8 @@ def generate_csv_report(
         Schema-aware canonical row source.
     output_directory
         New directory that will contain ``records.csv``,
-        ``ai_assistance_metrics.csv``, and ``readability_metrics.csv``. It must not
-        already exist.
+        ``ai_assistance_metrics.csv``, ``readability_metrics.csv``, and
+        ``report_metadata.json``. It must not already exist.
     config
         Audit-report configuration. Defaults to ``AuditReportConfig()``.
     output_options
@@ -555,6 +595,8 @@ def generate_csv_report(
             f"Could not create staging directory in {parent}: {error}"
         ) from error
 
+    report_generated_at_utc = datetime.now(UTC)
+
     try:
         try:
             summary = _write_staged_report(
@@ -563,6 +605,10 @@ def generate_csv_report(
                 config=report_config,
                 options=options,
                 readability_analyzer=readability_analyzer,
+            )
+            _write_report_metadata(
+                staging_path / REPORT_METADATA_FILENAME,
+                report_generated_at_utc=report_generated_at_utc,
             )
         except RowSourceError as error:
             raise AuditSourceError(f"Could not read audit source: {error}") from error
@@ -589,5 +635,6 @@ def generate_csv_report(
         records_path=destination / RECORDS_FILENAME,
         ai_assistance_metrics_path=(destination / AI_ASSISTANCE_METRICS_FILENAME),
         readability_metrics_path=(destination / READABILITY_METRICS_FILENAME),
+        metadata_path=destination / REPORT_METADATA_FILENAME,
         summary=summary,
     )

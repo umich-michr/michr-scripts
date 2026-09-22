@@ -345,3 +345,4 @@ def test_readability_output_vocabulary_is_public_contract() -> None:
 
     assert "readability_rows" in AuditReportSummary.__annotations__
     assert "readability_metrics_path" in AuditCsvReport.__annotations__
+    assert "metadata_path" in AuditCsvReport.__annotations__
