@@ -108,6 +108,8 @@ For no-completion-observed studies, the internal retry context now keeps three d
 
 The two published retry summaries include the count of unresolved studies with a validated report-run cutoff and median minutes from the latest attempt to cutoff and from the first attempt to cutoff. Completed rows keep these cutoff medians missing. The publication inventory remains exactly 36 files.
 
+The faculty retry table labels completed timing, unresolved observed activity span, follow-up after the latest attempt, and total observation window separately. Cutoff medians display their contributing-study count. These are descriptive durations, not threshold-qualified outcomes.
+
 ## Validation
 
 The current validation contract checks:

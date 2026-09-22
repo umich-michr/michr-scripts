@@ -1485,6 +1485,12 @@ def test_html_report_explains_observed_retry_patterns() -> None:
     assert 'scope="row"' in html
     assert "Source change among eligible" in html
     assert "Feedback among AI-exposed" in html
+    assert "First attempt to completion end" in html
+    assert "First to latest observed attempt" in html
+    assert "Latest attempt to report-run cutoff" in html
+    assert "First attempt to report-run cutoff" in html
+    assert "1,440 minutes (n=2)" in normalized
+    assert "1,485 minutes (n=2)" in normalized
     assert "How to interpret observed retry patterns" in html
     assert "patterns support targeted qualitative follow-up" in normalized.lower()
     assert "That the study was abandoned" in html
@@ -2111,3 +2117,48 @@ def test_html_report_requires_quality_columns() -> None:
             repeated_attempt_source_consistency_summary=(repeated_source_rows()),
             charts=charts(),
         )
+
+
+def test_html_report_requires_retry_cutoff_columns() -> None:
+    """Reject retry characteristics without cutoff timing columns."""
+    rows = retry_characteristic_rows().drop(
+        columns=["study_count_with_report_run_cutoff"]
+    )
+
+    with pytest.raises(
+        ExplorationValidationError,
+        match="retry_characteristics_summary lacks required HTML columns",
+    ):
+        render_html_report(
+            records=feedback_records(),
+            overview_summary=overview_rows(),
+            author_handoff_summary=author_handoff_rows(),
+            retry_card_summary=retry_card_rows(),
+            retry_characteristics_summary=rows,
+            data_quality_summary=quality_rows(),
+            repeated_attempt_source_consistency_summary=repeated_source_rows(),
+            charts=charts(),
+        )
+
+
+def test_html_retry_timing_keeps_completed_and_unresolved_measures_distinct() -> None:
+    """Show completed timing separately from unresolved cutoff durations."""
+    html = render_html_report(
+        records=feedback_records(),
+        overview_summary=overview_rows(),
+        author_handoff_summary=author_handoff_rows(),
+        retry_card_summary=retry_card_rows(),
+        retry_characteristics_summary=retry_characteristic_rows(),
+        data_quality_summary=quality_rows(),
+        repeated_attempt_source_consistency_summary=repeated_source_rows(),
+        charts=charts(),
+    )
+    normalized = " ".join(html.split())
+
+    assert "First attempt to completion end" in normalized
+    assert "First to latest observed attempt" in normalized
+    assert "Latest attempt to report-run cutoff" in normalized
+    assert "First attempt to report-run cutoff" in normalized
+    assert "1,440 minutes (n=2)" in normalized
+    assert "1,485 minutes (n=2)" in normalized
+    assert "\\N" in normalized

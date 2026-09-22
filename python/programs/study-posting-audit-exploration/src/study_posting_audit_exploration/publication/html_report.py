@@ -665,7 +665,10 @@ _TEMPLATE = """<!doctype html>
               <th scope="col">Returned-result AI</th>
               <th scope="col">Source change among eligible</th>
               <th scope="col">Feedback among AI-exposed</th>
-              <th scope="col">Relevant timing</th>
+              <th scope="col">First attempt to completion end</th>
+              <th scope="col">First to latest observed attempt</th>
+              <th scope="col">Latest attempt to report-run cutoff</th>
+              <th scope="col">First attempt to report-run cutoff</th>
             </tr>
           </thead>
           <tbody>
@@ -680,7 +683,10 @@ _TEMPLATE = """<!doctype html>
               <td>{{ row.returned_result_ai_text }}</td>
               <td>{{ row.source_change_text }}</td>
               <td>{{ row.feedback_text }}</td>
-              <td>{{ row.timing_text }}</td>
+              <td>{{ row.completion_timing_text }}</td>
+              <td>{{ row.observed_activity_span_text }}</td>
+              <td>{{ row.latest_attempt_to_cutoff_text }}</td>
+              <td>{{ row.first_attempt_to_cutoff_text }}</td>
             </tr>
             {% endfor %}
           </tbody>
@@ -1472,7 +1478,10 @@ class RetryCharacteristicView:
     returned_result_ai_text: str
     source_change_text: str
     feedback_text: str
-    timing_text: str
+    completion_timing_text: str
+    observed_activity_span_text: str
+    latest_attempt_to_cutoff_text: str
+    first_attempt_to_cutoff_text: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -1941,6 +1950,9 @@ def _retry_characteristic_views(
         "percentage_with_feedback_recorded_among_ai_exposed",
         "median_minutes_first_to_completion",
         "median_minutes_first_to_last_observed_attempt",
+        "study_count_with_report_run_cutoff",
+        "median_minutes_latest_attempt_to_report_run_cutoff",
+        "median_minutes_first_attempt_to_report_run_cutoff",
     )
     missing = tuple(column for column in required if column not in summary.columns)
 
@@ -1959,16 +1971,26 @@ def _retry_characteristic_views(
     for row in summary.to_dict(orient="records"):
         group = str(row["study_outcome_group"])
         study_count = int(_finite_number(row["study_count"], value_name="study_count"))
-        completed_timing = row["median_minutes_first_to_completion"]
-        unresolved_timing = row["median_minutes_first_to_last_observed_attempt"]
-        timing = (
-            unresolved_timing if group == "NO_COMPLETION_OBSERVED" else completed_timing
+        is_unresolved = group == "NO_COMPLETION_OBSERVED"
+        completion_timing = (
+            None if is_unresolved else row["median_minutes_first_to_completion"]
         )
-        timing_label = (
-            "First to latest observed: "
-            if group == "NO_COMPLETION_OBSERVED"
-            else "First to completion: "
+        observed_activity_span = (
+            row["median_minutes_first_to_last_observed_attempt"]
+            if is_unresolved
+            else None
         )
+        latest_to_cutoff = (
+            row["median_minutes_latest_attempt_to_report_run_cutoff"]
+            if is_unresolved
+            else None
+        )
+        first_to_cutoff = (
+            row["median_minutes_first_attempt_to_report_run_cutoff"]
+            if is_unresolved
+            else None
+        )
+        cutoff_count = row["study_count_with_report_run_cutoff"]
 
         views.append(
             RetryCharacteristicView(
@@ -1999,8 +2021,31 @@ def _retry_characteristic_views(
                     row["percentage_with_feedback_recorded_among_ai_exposed"],
                     row["ai_exposed_study_count"],
                 ),
-                timing_text=(
-                    timing_label + _nullable_number_text(timing, suffix=" minutes")
+                completion_timing_text=_nullable_number_text(
+                    completion_timing,
+                    suffix=" minutes",
+                ),
+                observed_activity_span_text=_nullable_number_text(
+                    observed_activity_span,
+                    suffix=" minutes",
+                ),
+                latest_attempt_to_cutoff_text=(
+                    _nullable_number_text(
+                        latest_to_cutoff,
+                        suffix=" minutes",
+                    )
+                    + " (n="
+                    + _nullable_number_text(cutoff_count)
+                    + ")"
+                ),
+                first_attempt_to_cutoff_text=(
+                    _nullable_number_text(
+                        first_to_cutoff,
+                        suffix=" minutes",
+                    )
+                    + " (n="
+                    + _nullable_number_text(cutoff_count)
+                    + ")"
                 ),
             )
         )
