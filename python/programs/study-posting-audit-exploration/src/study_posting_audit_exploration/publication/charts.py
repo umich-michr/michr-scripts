@@ -106,6 +106,18 @@ _REQUIRED_AUTHOR_HANDOFF_COLUMNS: tuple[str, ...] = (
     "distinct_completed_study_count",
 )
 
+_REQUIRED_RETRY_PATHWAY_COLUMNS: tuple[str, ...] = (
+    "pathway_category",
+    "pathway_sequence",
+    "study_count",
+    "population_study_count",
+    "study_percentage",
+    "median_attempt_count",
+    "study_count_with_author_change",
+    "median_minutes_first_to_completion",
+    "median_minutes_first_to_last_observed_attempt",
+)
+
 _REQUIRED_ATTEMPT_START_EXPERIENCE_COLUMNS: tuple[str, ...] = (
     "author_adoption_group",
     "attempt_completion_group",
@@ -528,6 +540,7 @@ class ExplorationChartInputs:
     grouped_attempt_summary: pd.DataFrame
     study_attempt_history_summary: pd.DataFrame
     author_handoff_summary: pd.DataFrame
+    study_retry_pathway_summary: pd.DataFrame
     attempt_start_experience_summary: pd.DataFrame
     current_author_experience_summary: pd.DataFrame
     grouped_study_summary: pd.DataFrame
@@ -553,6 +566,7 @@ class ExplorationCharts:
     attempt_timing_distribution_by_mode: go.Figure
     study_completion_pathways: go.Figure
     author_handoff_categories: go.Figure
+    retry_pathways: go.Figure
     author_attempt_start_experience: go.Figure
     author_experience_studies: go.Figure
     author_experience_days: go.Figure
@@ -1110,6 +1124,119 @@ def build_author_handoff_chart(
         xaxis_title="Final completion authoring mode",
         yaxis_title="Completed study count",
         legend_title_text="Author pathway",
+    )
+
+    return figure
+
+
+def _retry_pathway_label(category: object) -> str:
+    """Return a compact faculty-facing retry-pathway label."""
+    labels = {
+        "SINGLE_ATTEMPT_AI_COMPLETION": "One AI attempt → AI completion",
+        "SINGLE_ATTEMPT_MANUAL_COMPLETION": ("One manual attempt → manual completion"),
+        "REPEATED_AI_ONLY_TO_AI_COMPLETION": ("Repeated AI only → AI completion"),
+        "REPEATED_MANUAL_ONLY_TO_MANUAL_COMPLETION": (
+            "Repeated manual only → manual completion"
+        ),
+        "AI_TO_MANUAL_COMPLETION": "AI to manual → manual completion",
+        "MANUAL_TO_AI_COMPLETION": "Manual to AI → AI completion",
+        "MIXED_OR_ALTERNATING_TO_AI_COMPLETION": (
+            "Mixed or alternating → AI completion"
+        ),
+        "MIXED_OR_ALTERNATING_TO_MANUAL_COMPLETION": (
+            "Mixed or alternating → manual completion"
+        ),
+        "SINGLE_ATTEMPT_AI_NO_COMPLETION_OBSERVED": (
+            "One AI attempt → no completion observed"
+        ),
+        "SINGLE_ATTEMPT_MANUAL_NO_COMPLETION_OBSERVED": (
+            "One manual attempt → no completion observed"
+        ),
+        "REPEATED_AI_ONLY_NO_COMPLETION_OBSERVED": (
+            "Repeated AI only → no completion observed"
+        ),
+        "REPEATED_MANUAL_ONLY_NO_COMPLETION_OBSERVED": (
+            "Repeated manual only → no completion observed"
+        ),
+        "MIXED_MODES_NO_COMPLETION_OBSERVED": ("Mixed modes → no completion observed"),
+    }
+
+    return labels.get(str(category), str(category).replace("_", " ").title())
+
+
+def build_retry_pathways_chart(
+    study_retry_pathway_summary: pd.DataFrame,
+) -> go.Figure:
+    """Return one horizontal bar per mutually exclusive retry pathway."""
+    _require_columns(
+        study_retry_pathway_summary,
+        required=_REQUIRED_RETRY_PATHWAY_COLUMNS,
+        frame_name="study_retry_pathway_summary",
+    )
+
+    if study_retry_pathway_summary.empty:
+        return _empty_figure(
+            title="Observed retry pathways",
+            message="No study retry pathway aggregates are available.",
+        )
+
+    rows = study_retry_pathway_summary.sort_values(
+        by=["pathway_sequence"],
+        kind="stable",
+    )
+    labels = [
+        _retry_pathway_label(value) for value in rows["pathway_category"].tolist()
+    ]
+    timing_values = (
+        rows[
+            [
+                "median_minutes_first_to_completion",
+                "median_minutes_first_to_last_observed_attempt",
+            ]
+        ]
+        .bfill(axis=1)
+        .iloc[:, 0]
+    )
+    customdata = list(
+        zip(
+            rows["population_study_count"],
+            rows["study_percentage"],
+            rows["median_attempt_count"],
+            rows["study_count_with_author_change"],
+            timing_values,
+            strict=True,
+        )
+    )
+    figure = go.Figure(
+        data=[
+            go.Bar(
+                x=rows["study_count"].tolist(),
+                y=labels,
+                orientation="h",
+                customdata=customdata,
+                hovertemplate=(
+                    "Pathway: %{y}<br>"
+                    "Studies: %{x} of %{customdata[0]} "
+                    "(%{customdata[1]:.1f}%)<br>"
+                    "Median attempts: %{customdata[2]}<br>"
+                    "Studies with author change: %{customdata[3]}<br>"
+                    "Relevant median minutes: %{customdata[4]}"
+                    "<extra></extra>"
+                ),
+            )
+        ]
+    )
+    figure.update_layout(
+        title="Observed retry pathways",
+        template="plotly_white",
+        xaxis_title="Study count",
+        yaxis_title="",
+        height=max(560, 38 * len(rows) + 150),
+        margin={"l": 320},
+    )
+    figure.update_yaxes(
+        autorange="reversed",
+        automargin=True,
     )
 
     return figure
@@ -2992,6 +3119,7 @@ def build_exploration_charts(
         author_handoff_categories=build_author_handoff_chart(
             inputs.author_handoff_summary
         ),
+        retry_pathways=build_retry_pathways_chart(inputs.study_retry_pathway_summary),
         author_attempt_start_experience=(
             build_author_attempt_start_experience_chart(
                 inputs.attempt_start_experience_summary

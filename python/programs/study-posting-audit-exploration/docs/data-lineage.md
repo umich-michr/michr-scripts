@@ -381,3 +381,38 @@ python/programs/study-posting-audit-exploration/src/
 
 Do not paste operational rows or payload text into external tools while
 performing verification.
+
+## Retry-pathway lineage
+
+The retry analysis preserves separate grains and privacy boundaries:
+
+1. Validated records become ordered attempt and one-row-per-study histories.
+2. Source-context derivation identifies AI generations that returned a result
+   and adjacent within-study comparisons.
+3. The internal retry derivation combines attempt history, study history,
+   returned-result AI transitions, and count-only feedback presence.
+4. The internal study retry context retains study and audit identifiers only
+   for derivation and validation; it is not published.
+5. `study_retry_pathway_summary.csv` and
+   `retry_characteristics_summary.csv` aggregate the internal rows without
+   identifiers or free text.
+6. The faculty HTML consumes only those identifier-free aggregates for retry
+   cards, the pathway chart, and the characteristics table.
+7. The manifest records 13 pathway rows and three characteristics rows as part
+   of the atomic 36-file publication contract.
+
+Completed pathways stop at the unique completed attempt. No-completion-observed
+pathways use all captured attempts. Returned-result AI attempts exclude both
+AI-error result categories. Adjacent source comparisons classify values as
+`SAME`, `CHANGED`, or `MISSING`; missing comparisons are never treated as
+unchanged.
+
+Feedback comments are used only to derive count or Boolean presence for retry
+analysis. Feedback text is not carried into retry derivation, aggregate files,
+or retry charts. The separately authorized final feedback table retains its
+existing restricted display contract.
+
+The extract currently has no formal observation-window end available to
+exploration. No-completion-observed timing therefore ends at the latest captured
+attempt and must not be interpreted as follow-up time, drop-off, abandonment, or
+a final outcome.

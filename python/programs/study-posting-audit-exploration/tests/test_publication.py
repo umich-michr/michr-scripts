@@ -20,17 +20,24 @@ from study_posting_audit_exploration import (
     build_overview_tables,
     build_quality_analysis_tables,
     build_readability_analysis_tables,
+    build_retry_card_summary,
+    build_retry_characteristics_summary,
     build_source_context_analysis_tables,
     build_study_analysis_tables,
+    build_study_retry_pathway_summary,
     derive_appointments,
     derive_attempt_histories,
     derive_completed_ai_field_analysis,
     derive_completed_ai_readability_pairs,
     derive_source_context_tables,
+    derive_study_retry_tables,
     load_audit_report,
     publish_exploration,
 )
-from study_posting_audit_exploration.models import ExplorationAnalysisTables
+from study_posting_audit_exploration.models import (
+    ExplorationAnalysisTables,
+    RetryAnalysisTables,
+)
 from study_posting_audit_exploration.publication import manifest_filename
 
 
@@ -142,6 +149,36 @@ def _study_analysis_inputs(
     return studies, appointments, findings
 
 
+def _ai_feedback_records(records: pd.DataFrame) -> pd.DataFrame:
+    """Return count-only synthetic AI feedback presence."""
+    feedback = records.loc[
+        records["ATTEMPT_TYPE"].eq("AI"),
+        [
+            "ID",
+            "STUDY_NUM",
+            "USER_FEEDBACK_COMMENTS",
+        ],
+    ].copy()
+    comments = feedback["USER_FEEDBACK_COMMENTS"].astype("string").str.strip()
+    feedback["feedback_recorded"] = (
+        feedback["USER_FEEDBACK_COMMENTS"].notna() & comments.notna() & comments.ne("")
+    )
+
+    return feedback.rename(
+        columns={
+            "ID": "audit_record_id",
+            "STUDY_NUM": "study_num",
+        }
+    ).loc[
+        :,
+        [
+            "study_num",
+            "audit_record_id",
+            "feedback_recorded",
+        ],
+    ]
+
+
 def _analysis_tables(
     report: LoadedAuditReport,
 ) -> ExplorationAnalysisTables:
@@ -165,9 +202,27 @@ def _analysis_tables(
         completed_ai_fields,
     )
     source_context = derive_source_context_tables(report.records)
+    retry = derive_study_retry_tables(
+        study_attempt_author_history=(histories.study_attempt_author_history),
+        study_attempt_history=histories.study_attempt_history,
+        successful_ai_generations=(source_context.successful_ai_generations),
+        successful_ai_transitions=(source_context.successful_ai_transitions),
+        ai_feedback_records=_ai_feedback_records(report.records),
+    )
+    retry_context = retry.study_retry_context
 
     return ExplorationAnalysisTables(
         histories=histories,
+        retry=RetryAnalysisTables(
+            study_retry_context=retry_context,
+            retry_card_summary=build_retry_card_summary(retry_context),
+            study_retry_pathway_summary=(
+                build_study_retry_pathway_summary(retry_context)
+            ),
+            retry_characteristics_summary=(
+                build_retry_characteristics_summary(retry_context)
+            ),
+        ),
         source_context=build_source_context_analysis_tables(source_context),
         quality=build_quality_analysis_tables(
             report=report,
@@ -241,6 +296,8 @@ def _publication_paths(
         publication.overview_summary_path,
         publication.study_attempt_history_summary_path,
         publication.author_handoff_summary_path,
+        publication.study_retry_pathway_summary_path,
+        publication.retry_characteristics_summary_path,
         publication.repeated_attempt_source_consistency_summary_path,
         publication.grouped_attempt_summary_path,
         publication.source_context_distribution_summary_path,
@@ -295,6 +352,10 @@ def _assert_derived_outputs(
     repeated_source_consistency = read_published_csv(
         publication.repeated_attempt_source_consistency_summary_path
     )
+    retry_pathways = read_published_csv(publication.study_retry_pathway_summary_path)
+    retry_characteristics = read_published_csv(
+        publication.retry_characteristics_summary_path
+    )
 
     for frame in (
         quality_summary,
@@ -308,6 +369,8 @@ def _assert_derived_outputs(
         source_context_distribution,
         source_size_latency,
         repeated_source_consistency,
+        retry_pathways,
+        retry_characteristics,
     ):
         assert not frame.empty
 
@@ -365,6 +428,8 @@ def _assert_derived_outputs(
         source_context_distribution,
         source_size_latency,
         repeated_source_consistency,
+        retry_pathways,
+        retry_characteristics,
     ):
         assert "audit_record_id" not in source_frame.columns
         assert "study_num" not in source_frame.columns
@@ -403,7 +468,7 @@ def test_publish_exploration_writes_atomic_html_output(
     )
 
     assert publication.output_directory == output_directory
-    assert publication.output_file_count == 34
+    assert publication.output_file_count == 36
 
     for path in _publication_paths(publication):
         assert path.is_file()
@@ -419,7 +484,7 @@ def test_publish_exploration_writes_atomic_html_output(
     }
 
     assert published_inventory == expected_inventory
-    assert len(published_inventory) == 34
+    assert len(published_inventory) == 36
 
     assert list(tmp_path.glob(".exploration.*")) == []
 
@@ -441,7 +506,7 @@ def test_publish_exploration_writes_atomic_html_output(
         "priority_tier",
         "analysis_status",
     )
-    assert len(research_questions) == 14
+    assert len(research_questions) == 16
     assert len(metric_definitions) == sum(
         len(columns) for columns in AGGREGATE_OUTPUT_COLUMNS.values()
     )
@@ -483,9 +548,11 @@ def test_manifest_contains_readability_analysis_counts(
         > 0
     )
     assert manifest["readability_analysis_row_counts"]["final_text_metric_summary"] > 0
+    assert manifest["overview_row_counts"]["study_retry_pathway_summary"] == 13
+    assert manifest["overview_row_counts"]["retry_characteristics_summary"] == 3
     assert manifest["definition_row_counts"]["metric_definitions"] > 0
-    assert manifest["research_row_counts"]["candidate_research_questions"] == 14
-    assert manifest["output_file_count"] == 34
+    assert manifest["research_row_counts"]["candidate_research_questions"] == 16
+    assert manifest["output_file_count"] == 36
     assert manifest["warning_count"] == 0
     assert manifest_filename() == "analysis_manifest.json"
 

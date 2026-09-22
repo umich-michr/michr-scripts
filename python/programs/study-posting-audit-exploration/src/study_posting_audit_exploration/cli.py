@@ -14,8 +14,11 @@ from study_posting_audit_exploration.aggregation import (
     build_overview_tables,
     build_quality_analysis_tables,
     build_readability_analysis_tables,
+    build_retry_card_summary,
+    build_retry_characteristics_summary,
     build_source_context_analysis_tables,
     build_study_analysis_tables,
+    build_study_retry_pathway_summary,
 )
 from study_posting_audit_exploration.config import (
     ExplorationInputConfig,
@@ -27,6 +30,7 @@ from study_posting_audit_exploration.derivation import (
     derive_completed_ai_field_analysis,
     derive_completed_ai_readability_pairs,
     derive_source_context_tables,
+    derive_study_retry_tables,
 )
 from study_posting_audit_exploration.errors import AuditExplorationError
 from study_posting_audit_exploration.loading import load_audit_report
@@ -36,6 +40,7 @@ from study_posting_audit_exploration.models import (
     ExplorationAnalysisTables,
     ExplorationPublication,
     LoadedAuditReport,
+    RetryAnalysisTables,
     ValidationSummary,
 )
 from study_posting_audit_exploration.publication import publish_exploration
@@ -236,6 +241,49 @@ def _studies_with_grouping_columns(
     return studies, appointments, findings
 
 
+def _ai_feedback_records(
+    records: pd.DataFrame,
+) -> pd.DataFrame:
+    """Return count-only AI feedback presence without retaining feedback text."""
+    required_columns = (
+        "ID",
+        "STUDY_NUM",
+        "ATTEMPT_TYPE",
+        "USER_FEEDBACK_COMMENTS",
+    )
+    missing = tuple(
+        column for column in required_columns if column not in records.columns
+    )
+
+    if missing:
+        raise AuditExplorationError(
+            f"records lacks required retry feedback columns: {missing!r}"
+        )
+
+    feedback = records.loc[
+        records["ATTEMPT_TYPE"].eq("AI"),
+        list(required_columns),
+    ].copy()
+    comments = feedback["USER_FEEDBACK_COMMENTS"].astype("string").str.strip()
+    feedback["feedback_recorded"] = (
+        feedback["USER_FEEDBACK_COMMENTS"].notna() & comments.notna() & comments.ne("")
+    )
+
+    return feedback.rename(
+        columns={
+            "ID": "audit_record_id",
+            "STUDY_NUM": "study_num",
+        }
+    ).loc[
+        :,
+        [
+            "study_num",
+            "audit_record_id",
+            "feedback_recorded",
+        ],
+    ]
+
+
 def _analysis_tables(
     report: LoadedAuditReport,
 ) -> ExplorationAnalysisTables:
@@ -261,9 +309,27 @@ def _analysis_tables(
         completed_ai_fields,
     )
     source_context = derive_source_context_tables(report.records)
+    retry = derive_study_retry_tables(
+        study_attempt_author_history=(histories.study_attempt_author_history),
+        study_attempt_history=histories.study_attempt_history,
+        successful_ai_generations=(source_context.successful_ai_generations),
+        successful_ai_transitions=(source_context.successful_ai_transitions),
+        ai_feedback_records=_ai_feedback_records(report.records),
+    )
+    retry_context = retry.study_retry_context
 
     return ExplorationAnalysisTables(
         histories=histories,
+        retry=RetryAnalysisTables(
+            study_retry_context=retry_context,
+            retry_card_summary=build_retry_card_summary(retry_context),
+            study_retry_pathway_summary=(
+                build_study_retry_pathway_summary(retry_context)
+            ),
+            retry_characteristics_summary=(
+                build_retry_characteristics_summary(retry_context)
+            ),
+        ),
         source_context=build_source_context_analysis_tables(source_context),
         quality=build_quality_analysis_tables(
             report=report,
@@ -342,6 +408,14 @@ def _print_publication(
         (
             "Data quality findings CSV",
             published.data_quality_findings_path,
+        ),
+        (
+            "Study retry pathway summary CSV",
+            published.study_retry_pathway_summary_path,
+        ),
+        (
+            "Retry characteristics summary CSV",
+            published.retry_characteristics_summary_path,
         ),
         (
             "Repeated-attempt source consistency summary CSV",

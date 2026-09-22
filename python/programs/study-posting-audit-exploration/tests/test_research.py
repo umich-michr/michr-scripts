@@ -30,7 +30,7 @@ def test_candidate_research_questions_are_stable_and_identifier_free() -> None:
     assert isinstance(questions, pd.DataFrame)
     assert tuple(questions.columns) == CANDIDATE_RESEARCH_QUESTION_COLUMNS
     assert questions["research_question_id"].tolist() == [
-        f"RQ-{index:03d}" for index in range(1, 15)
+        f"RQ-{index:03d}" for index in range(1, 17)
     ]
     assert questions["research_question_id"].is_unique
     assert questions["analysis_status"].eq("DESCRIPTIVE_READY").all()

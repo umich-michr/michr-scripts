@@ -39,6 +39,7 @@ def write_manifest(
     """Write the minimal deterministic-shape analysis manifest."""
     histories = tables.histories
     quality_tables = tables.quality
+    retry_tables = tables.retry
     overview_tables = tables.overview
     attempt_tables = tables.attempts
     source_context_tables = tables.source_context
@@ -90,6 +91,12 @@ def write_manifest(
                 overview_tables.study_attempt_history_summary
             ),
             "author_handoff_summary": len(overview_tables.author_handoff_summary),
+            "study_retry_pathway_summary": len(
+                retry_tables.study_retry_pathway_summary
+            ),
+            "retry_characteristics_summary": len(
+                retry_tables.retry_characteristics_summary
+            ),
             "repeated_attempt_source_consistency_summary": len(
                 source_context_tables.repeated_attempt_source_consistency_summary
             ),

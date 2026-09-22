@@ -63,6 +63,16 @@ class AttemptHistoryTables:
 
 
 @dataclass(frozen=True, slots=True)
+class RetryAnalysisTables:
+    """Internal retry context and identifier-free faculty aggregates."""
+
+    study_retry_context: pd.DataFrame
+    retry_card_summary: pd.DataFrame
+    study_retry_pathway_summary: pd.DataFrame
+    retry_characteristics_summary: pd.DataFrame
+
+
+@dataclass(frozen=True, slots=True)
 class QualityAnalysisTables:
     """Aggregate quality summary and restricted internal findings."""
 
@@ -143,6 +153,7 @@ class ExplorationAnalysisTables:
     """All derived and aggregate tables published by one analysis run."""
 
     histories: AttemptHistoryTables
+    retry: RetryAnalysisTables
     source_context: SourceContextAnalysisTables
     quality: QualityAnalysisTables
     overview: OverviewTables
@@ -171,6 +182,8 @@ class ExplorationPublication:
     overview_summary_path: Path
     study_attempt_history_summary_path: Path
     author_handoff_summary_path: Path
+    study_retry_pathway_summary_path: Path
+    retry_characteristics_summary_path: Path
     repeated_attempt_source_consistency_summary_path: Path
     grouped_attempt_summary_path: Path
     source_context_distribution_summary_path: Path

@@ -197,9 +197,39 @@ _TEMPLATE = """<!doctype html>
     .quality-warning-list li {
       margin-bottom: 1rem;
     }
+    .retry-table-wrapper,
     .feedback-table-wrapper {
       margin-top: 1rem;
       overflow-x: auto;
+    }
+    .retry-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--surface);
+    }
+    .retry-table caption {
+      padding-bottom: 0.75rem;
+      color: var(--muted);
+      text-align: left;
+      font-weight: 700;
+    }
+    .retry-table th,
+    .retry-table td {
+      padding: 0.65rem;
+      border: 1px solid var(--border);
+      text-align: left;
+      vertical-align: top;
+    }
+    .retry-table th {
+      background: var(--panel);
+    }
+    .retry-table th:not(:first-child),
+    .retry-table td:not(:first-child) {
+      text-align: right;
+    }
+    .interpretation-table th:not(:first-child),
+    .interpretation-table td:not(:first-child) {
+      text-align: left;
     }
     .feedback-table {
       width: 100%;
@@ -312,6 +342,11 @@ _TEMPLATE = """<!doctype html>
       <li><a href="#executive-overview-heading">Captured data at a glance</a></li>
       <li><a href="#data-quality-heading">Data quality</a></li>
       <li><a href="#study-pathways-heading">Study pathways and author handoffs</a></li>
+      <li>
+        <a href="#retry-pathways-heading">
+          Retry pathways and observed workflow patterns
+        </a>
+      </li>
       <li><a href="#author-experience-heading">Author experience and activity</a></li>
       <li>
         <a href="#completed-study-author-context-heading">
@@ -572,6 +607,146 @@ _TEMPLATE = """<!doctype html>
     <div class="chart">{{ author_handoffs_html | safe }}</div>
   </section>
   </details>
+
+
+    <details class="report-section">
+    <summary id="retry-pathways-heading">
+      Retry pathways and observed workflow patterns
+    </summary>
+    <section aria-labelledby="retry-pathways-heading">
+      <p>
+        Each study appears once in the cards and pathway chart. The patterns
+        summarize recorded completion state, authoring modes, author changes,
+        AI errors, returned-result AI attempts, source comparisons, feedback
+        presence, and timing.
+      </p>
+      <p class="caution">
+        “No completion observed” means no completed attempt appears in the
+        captured report. Completion may occur outside the observation window.
+        These results do not measure drop-off or a final unresolved outcome.
+      </p>
+
+      <div class="pathway-grid">
+        {% for card in retry_cards %}
+        <article class="pathway-card">
+          <h3>{{ card.label }}</h3>
+          <p class="pathway-value">
+            {{ card.study_count }} studies ({{ card.percentage_text }})
+          </p>
+          <p>Median attempts: {{ card.median_attempts_text }}</p>
+          <p>{{ card.mode_mix_text }}</p>
+        </article>
+        {% endfor %}
+      </div>
+
+      <div class="chart">{{ retry_pathways_html | safe }}</div>
+      <p>
+        <strong>Synthetic example:</strong> AI → AI → manual completion belongs
+        to <strong>AI to manual → manual completion</strong>. This records the
+        observed sequence and does not explain why the team changed modes.
+      </p>
+
+      <div class="retry-table-wrapper" role="region"
+           aria-label="Observed retry characteristics table" tabindex="0">
+        <table class="retry-table">
+          <caption>
+            Observed retry characteristics. General percentages use all studies
+            in the row; source-change percentages use source-comparison-eligible
+            studies; feedback percentages use AI-exposed studies.
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Study group</th>
+              <th scope="col">Studies</th>
+              <th scope="col">Median attempts</th>
+              <th scope="col">Both modes</th>
+              <th scope="col">Author change</th>
+              <th scope="col">AI error</th>
+              <th scope="col">Returned-result AI</th>
+              <th scope="col">Source change among eligible</th>
+              <th scope="col">Feedback among AI-exposed</th>
+              <th scope="col">Relevant timing</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in retry_characteristics %}
+            <tr>
+              <th scope="row">{{ row.label }}</th>
+              <td>{{ row.study_count }}</td>
+              <td>{{ row.median_attempts_text }}</td>
+              <td>{{ row.both_modes_text }}</td>
+              <td>{{ row.author_change_text }}</td>
+              <td>{{ row.ai_error_text }}</td>
+              <td>{{ row.returned_result_ai_text }}</td>
+              <td>{{ row.source_change_text }}</td>
+              <td>{{ row.feedback_text }}</td>
+              <td>{{ row.timing_text }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <details class="explanation-panel">
+        <summary>How to interpret observed retry patterns</summary>
+        <div class="explanation-panel-content">
+          <div class="retry-table-wrapper" role="region"
+               aria-label="Observed retry pattern interpretation table"
+               tabindex="0">
+            <table class="retry-table interpretation-table">
+              <thead>
+                <tr>
+                  <th scope="col">Observed pattern</th>
+                  <th scope="col">May motivate investigating</th>
+                  <th scope="col">Does not prove</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <th scope="row">AI attempts followed by manual completion</th>
+                  <td>Whether AI output fit the team's needs</td>
+                  <td>That the team disliked or rejected AI</td>
+                </tr>
+                <tr>
+                  <th scope="row">
+                    Source size, type, or category changed across AI retries
+                  </th>
+                  <td>Whether teams explored different source inputs</td>
+                  <td>That changes were intentional tests</td>
+                </tr>
+                <tr>
+                  <th scope="row">Same author retried several times</th>
+                  <td>Whether one person iterated through the workflow</td>
+                  <td>What they thought about suggestion quality</td>
+                </tr>
+                <tr>
+                  <th scope="row">Multiple authors participated</th>
+                  <td>
+                    Whether responsibility shifted or collaboration occurred
+                  </td>
+                  <td>Why a handoff occurred</td>
+                </tr>
+                <tr>
+                  <th scope="row">No completion observed</th>
+                  <td>Whether completion occurred after the extract</td>
+                  <td>That the study was abandoned</td>
+                </tr>
+                <tr>
+                  <th scope="row">Feedback not recorded</th>
+                  <td>Whether feedback capture was optional or skipped</td>
+                  <td>Satisfaction or dissatisfaction</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="caution">
+            Patterns support targeted qualitative follow-up, not causal or
+            motivational conclusions.
+          </p>
+        </div>
+      </details>
+    </section>
+    </details>
 
     <details class="report-section">
     <summary id="author-experience-heading">
@@ -1274,6 +1449,33 @@ class CompletionPathwayCallout:
 
 
 @dataclass(frozen=True, slots=True)
+class RetryCardView:
+    """One faculty-facing study retry card."""
+
+    label: str
+    study_count: int
+    percentage_text: str
+    median_attempts_text: str
+    mode_mix_text: str
+
+
+@dataclass(frozen=True, slots=True)
+class RetryCharacteristicView:
+    """One accessible retry-characteristics table row."""
+
+    label: str
+    study_count: int
+    median_attempts_text: str
+    both_modes_text: str
+    author_change_text: str
+    ai_error_text: str
+    returned_result_ai_text: str
+    source_change_text: str
+    feedback_text: str
+    timing_text: str
+
+
+@dataclass(frozen=True, slots=True)
 class UserFeedbackView:
     """One authorized faculty-facing feedback response."""
 
@@ -1629,6 +1831,183 @@ _ZERO_WARNING_MESSAGES: dict[str, str] = {
 }
 
 
+def _nullable_number_text(
+    value: object,
+    *,
+    suffix: str = "",
+) -> str:
+    """Return one faculty-facing number or unavailable marker."""
+    if value is None or value is pd.NA or value is pd.NaT:
+        return "\\N"
+
+    if isinstance(value, float) and math.isnan(value):
+        return "\\N"
+
+    number = _finite_number(value, value_name="retry aggregate")
+    rendered = f"{number:,.1f}" if not number.is_integer() else f"{int(number):,}"
+
+    return f"{rendered}{suffix}"
+
+
+def _retry_cards(
+    summary: pd.DataFrame,
+) -> tuple[RetryCardView, ...]:
+    """Return four cards from identifier-free study-level aggregates."""
+    required = (
+        "retry_card_group",
+        "study_count",
+        "population_study_count",
+        "study_percentage",
+        "median_attempt_count",
+        "ai_only_study_count",
+        "manual_only_study_count",
+        "both_modes_study_count",
+    )
+    missing = tuple(column for column in required if column not in summary.columns)
+
+    if missing:
+        raise ExplorationValidationError(
+            f"retry_card_summary lacks required HTML columns: {missing!r}"
+        )
+
+    labels = {
+        "SINGLE_ATTEMPT_COMPLETED": "One recorded attempt, completed",
+        "MULTIPLE_ATTEMPTS_COMPLETED": ("Multiple recorded attempts, completed"),
+        "SINGLE_ATTEMPT_NO_COMPLETION_OBSERVED": (
+            "One recorded attempt, no completion observed"
+        ),
+        "MULTIPLE_ATTEMPTS_NO_COMPLETION_OBSERVED": (
+            "Multiple recorded attempts, no completion observed"
+        ),
+    }
+    cards: list[RetryCardView] = []
+
+    for row in summary.to_dict(orient="records"):
+        group_name = str(row["retry_card_group"])
+        mode_mix = (
+            f"AI-only: {_nullable_number_text(row['ai_only_study_count'])}; "
+            f"manual-only: "
+            f"{_nullable_number_text(row['manual_only_study_count'])}; "
+            f"both modes: "
+            f"{_nullable_number_text(row['both_modes_study_count'])}."
+        )
+        cards.append(
+            RetryCardView(
+                label=labels.get(group_name, group_name),
+                study_count=int(
+                    _finite_number(
+                        row["study_count"],
+                        value_name="study_count",
+                    )
+                ),
+                percentage_text=_nullable_number_text(
+                    row["study_percentage"],
+                    suffix="%",
+                ),
+                median_attempts_text=_nullable_number_text(row["median_attempt_count"]),
+                mode_mix_text=mode_mix,
+            )
+        )
+
+    return tuple(cards)
+
+
+def _percentage_with_denominator(
+    percentage: object,
+    denominator: object,
+) -> str:
+    """Return percentage plus its explicit denominator."""
+    return (
+        f"{_nullable_number_text(percentage, suffix='%')} "
+        f"(n={_nullable_number_text(denominator)})"
+    )
+
+
+def _retry_characteristic_views(
+    summary: pd.DataFrame,
+) -> tuple[RetryCharacteristicView, ...]:
+    """Return validated rows for the accessible retry table."""
+    required = (
+        "study_outcome_group",
+        "study_count",
+        "median_attempt_count",
+        "percentage_with_both_modes",
+        "percentage_with_author_change",
+        "percentage_with_ai_error",
+        "percentage_with_returned_result_ai",
+        "source_comparison_eligible_study_count",
+        "percentage_with_source_signature_change_among_eligible",
+        "ai_exposed_study_count",
+        "percentage_with_feedback_recorded_among_ai_exposed",
+        "median_minutes_first_to_completion",
+        "median_minutes_first_to_last_observed_attempt",
+    )
+    missing = tuple(column for column in required if column not in summary.columns)
+
+    if missing:
+        raise ExplorationValidationError(
+            f"retry_characteristics_summary lacks required HTML columns: {missing!r}"
+        )
+
+    labels = {
+        "COMPLETED_AI": "Completed with AI",
+        "COMPLETED_MANUAL": "Completed manually",
+        "NO_COMPLETION_OBSERVED": "No completion observed",
+    }
+    views: list[RetryCharacteristicView] = []
+
+    for row in summary.to_dict(orient="records"):
+        group = str(row["study_outcome_group"])
+        study_count = int(_finite_number(row["study_count"], value_name="study_count"))
+        completed_timing = row["median_minutes_first_to_completion"]
+        unresolved_timing = row["median_minutes_first_to_last_observed_attempt"]
+        timing = (
+            unresolved_timing if group == "NO_COMPLETION_OBSERVED" else completed_timing
+        )
+        timing_label = (
+            "First to latest observed: "
+            if group == "NO_COMPLETION_OBSERVED"
+            else "First to completion: "
+        )
+
+        views.append(
+            RetryCharacteristicView(
+                label=labels.get(group, group),
+                study_count=study_count,
+                median_attempts_text=_nullable_number_text(row["median_attempt_count"]),
+                both_modes_text=_percentage_with_denominator(
+                    row["percentage_with_both_modes"],
+                    study_count,
+                ),
+                author_change_text=_percentage_with_denominator(
+                    row["percentage_with_author_change"],
+                    study_count,
+                ),
+                ai_error_text=_percentage_with_denominator(
+                    row["percentage_with_ai_error"],
+                    study_count,
+                ),
+                returned_result_ai_text=_percentage_with_denominator(
+                    row["percentage_with_returned_result_ai"],
+                    study_count,
+                ),
+                source_change_text=_percentage_with_denominator(
+                    row["percentage_with_source_signature_change_among_eligible"],
+                    row["source_comparison_eligible_study_count"],
+                ),
+                feedback_text=_percentage_with_denominator(
+                    row["percentage_with_feedback_recorded_among_ai_exposed"],
+                    row["ai_exposed_study_count"],
+                ),
+                timing_text=(
+                    timing_label + _nullable_number_text(timing, suffix=" minutes")
+                ),
+            )
+        )
+
+    return tuple(views)
+
+
 def _quality_html_context(
     data_quality_summary: pd.DataFrame,
 ) -> QualityHtmlContext:
@@ -1764,6 +2143,8 @@ def render_html_report(
     records: pd.DataFrame,
     overview_summary: pd.DataFrame,
     author_handoff_summary: pd.DataFrame,
+    retry_card_summary: pd.DataFrame,
+    retry_characteristics_summary: pd.DataFrame,
     data_quality_summary: pd.DataFrame,
     repeated_attempt_source_consistency_summary: pd.DataFrame,
     charts: ExplorationCharts,
@@ -1794,6 +2175,14 @@ def render_html_report(
         pathway_callouts=_completion_pathway_callouts(
             overview_summary,
             author_handoff_summary,
+        ),
+        retry_cards=_retry_cards(retry_card_summary),
+        retry_characteristics=_retry_characteristic_views(
+            retry_characteristics_summary
+        ),
+        retry_pathways_html=_figure_html(
+            charts.retry_pathways,
+            include_plotlyjs=False,
         ),
         quality_fatal_passed=quality.fatal_passed,
         quality_fatal_total=quality.fatal_total,
@@ -1929,12 +2318,14 @@ def render_html_report(
     )
 
 
-def write_html_report(
+def write_html_report(  # noqa: PLR0913
     path: Path,
     *,
     records: pd.DataFrame,
     overview_summary: pd.DataFrame,
     author_handoff_summary: pd.DataFrame,
+    retry_card_summary: pd.DataFrame,
+    retry_characteristics_summary: pd.DataFrame,
     data_quality_summary: pd.DataFrame,
     repeated_attempt_source_consistency_summary: pd.DataFrame,
     charts: ExplorationCharts,
@@ -1946,6 +2337,8 @@ def write_html_report(
                 records=records,
                 overview_summary=overview_summary,
                 author_handoff_summary=author_handoff_summary,
+                retry_card_summary=retry_card_summary,
+                retry_characteristics_summary=(retry_characteristics_summary),
                 data_quality_summary=data_quality_summary,
                 repeated_attempt_source_consistency_summary=(
                     repeated_attempt_source_consistency_summary

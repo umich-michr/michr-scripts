@@ -901,6 +901,196 @@ def grouped_author_rows() -> pd.DataFrame:
     return pd.DataFrame.from_records(rows)
 
 
+def retry_card_rows() -> pd.DataFrame:
+    """Return four identifier-free retry card aggregates."""
+    return pd.DataFrame.from_records(
+        [
+            {
+                "retry_card_group": group,
+                "study_count": count,
+                "population_study_count": 10,
+                "study_percentage": 10.0 * count,
+                "median_attempt_count": median_attempts,
+                "ai_only_study_count": ai_only,
+                "manual_only_study_count": manual_only,
+                "both_modes_study_count": both,
+            }
+            for group, count, median_attempts, ai_only, manual_only, both in (
+                ("SINGLE_ATTEMPT_COMPLETED", 5, 1.0, 3, 2, 0),
+                ("MULTIPLE_ATTEMPTS_COMPLETED", 3, 3.0, 1, 0, 2),
+                (
+                    "SINGLE_ATTEMPT_NO_COMPLETION_OBSERVED",
+                    1,
+                    1.0,
+                    1,
+                    0,
+                    0,
+                ),
+                (
+                    "MULTIPLE_ATTEMPTS_NO_COMPLETION_OBSERVED",
+                    1,
+                    2.0,
+                    0,
+                    1,
+                    0,
+                ),
+            )
+        ]
+    )
+
+
+def study_retry_pathway_rows() -> pd.DataFrame:
+    """Return stable aggregate-only retry pathway rows."""
+    categories = (
+        ("SINGLE_ATTEMPT_AI_COMPLETION", "COMPLETED", "AI", 3, 1.0),
+        ("SINGLE_ATTEMPT_MANUAL_COMPLETION", "COMPLETED", "MANUAL", 2, 1.0),
+        ("REPEATED_AI_ONLY_TO_AI_COMPLETION", "COMPLETED", "AI", 1, 3.0),
+        ("REPEATED_MANUAL_ONLY_TO_MANUAL_COMPLETION", "COMPLETED", "MANUAL", 0, None),
+        ("AI_TO_MANUAL_COMPLETION", "COMPLETED", "MANUAL", 1, 2.0),
+        ("MANUAL_TO_AI_COMPLETION", "COMPLETED", "AI", 0, None),
+        ("MIXED_OR_ALTERNATING_TO_AI_COMPLETION", "COMPLETED", "AI", 1, 4.0),
+        ("MIXED_OR_ALTERNATING_TO_MANUAL_COMPLETION", "COMPLETED", "MANUAL", 0, None),
+        (
+            "SINGLE_ATTEMPT_AI_NO_COMPLETION_OBSERVED",
+            "NO_COMPLETION_OBSERVED",
+            "AI",
+            1,
+            1.0,
+        ),
+        (
+            "SINGLE_ATTEMPT_MANUAL_NO_COMPLETION_OBSERVED",
+            "NO_COMPLETION_OBSERVED",
+            "MANUAL",
+            0,
+            None,
+        ),
+        (
+            "REPEATED_AI_ONLY_NO_COMPLETION_OBSERVED",
+            "NO_COMPLETION_OBSERVED",
+            "AI",
+            0,
+            None,
+        ),
+        (
+            "REPEATED_MANUAL_ONLY_NO_COMPLETION_OBSERVED",
+            "NO_COMPLETION_OBSERVED",
+            "MANUAL",
+            1,
+            2.0,
+        ),
+        (
+            "MIXED_MODES_NO_COMPLETION_OBSERVED",
+            "NO_COMPLETION_OBSERVED",
+            "MIXED",
+            0,
+            None,
+        ),
+    )
+    rows = []
+
+    for sequence, (category, state, mode, count, median_attempts) in enumerate(
+        categories,
+        start=1,
+    ):
+        rows.append(
+            {
+                "pathway_category": category,
+                "pathway_sequence": sequence,
+                "completion_state": state,
+                "final_or_latest_mode": mode,
+                "study_count": count,
+                "population_study_count": 10,
+                "study_percentage": 10.0 * count,
+                "median_attempt_count": median_attempts,
+                "percentile_75_attempt_count": median_attempts,
+                "study_count_with_mode_change": int(
+                    count > 0 and ("TO_" in category or "MIXED" in category)
+                ),
+                "study_count_with_author_change": int(count > 0 and sequence == 5),
+                "study_count_with_ai_error": 0,
+                "study_count_with_user_dropped_attempt": 0,
+                "study_count_with_returned_result_ai": count if "AI" in category else 0,
+                "source_comparison_eligible_study_count": 0,
+                "study_count_with_source_size_change": 0,
+                "study_count_with_reported_source_change": 0,
+                "study_count_with_input_method_change": 0,
+                "study_count_with_source_signature_change": 0,
+                "ai_exposed_study_count": count if "AI" in category else 0,
+                "study_count_with_feedback_recorded": 0,
+                "study_count_with_completed_timing": count
+                if state == "COMPLETED"
+                else 0,
+                "median_minutes_first_to_completion": 20.0
+                if state == "COMPLETED" and count
+                else None,
+                "study_count_with_unresolved_observed_span": count
+                if state == "NO_COMPLETION_OBSERVED"
+                else 0,
+                "median_minutes_first_to_last_observed_attempt": 45.0
+                if state == "NO_COMPLETION_OBSERVED" and count
+                else None,
+                "timing_definition": "Synthetic timing definition.",
+                "interpretation_note": "Synthetic descriptive caution.",
+            }
+        )
+
+    return pd.DataFrame.from_records(rows)
+
+
+def retry_characteristic_rows() -> pd.DataFrame:
+    """Return aggregate-only retry characteristic rows."""
+    return pd.DataFrame.from_records(
+        [
+            {
+                "study_outcome_group": group,
+                "study_count": count,
+                "median_attempt_count": median_attempts,
+                "multiple_attempt_study_count": 1,
+                "percentage_with_multiple_attempts": 25.0,
+                "both_modes_study_count": 1,
+                "percentage_with_both_modes": 25.0,
+                "author_change_study_count": 1,
+                "percentage_with_author_change": 25.0,
+                "ai_error_study_count": 1,
+                "percentage_with_ai_error": 25.0,
+                "user_dropped_study_count": 1,
+                "percentage_with_user_dropped_attempt": 25.0,
+                "returned_result_ai_study_count": count if ai_exposed else 0,
+                "percentage_with_returned_result_ai": 100.0 if ai_exposed else 0.0,
+                "source_comparison_eligible_study_count": 1 if ai_exposed else 0,
+                "source_signature_change_study_count": 1 if ai_exposed else 0,
+                "percentage_with_source_signature_change_among_eligible": 100.0
+                if ai_exposed
+                else None,
+                "ai_exposed_study_count": count if ai_exposed else 0,
+                "feedback_recorded_study_count": 1 if ai_exposed else 0,
+                "percentage_with_feedback_recorded_among_ai_exposed": 25.0
+                if ai_exposed
+                else None,
+                "study_count_with_completed_timing": count
+                if group != "NO_COMPLETION_OBSERVED"
+                else 0,
+                "median_minutes_first_to_completion": 30.0
+                if group != "NO_COMPLETION_OBSERVED"
+                else None,
+                "study_count_with_unresolved_observed_span": count
+                if group == "NO_COMPLETION_OBSERVED"
+                else 0,
+                "median_minutes_first_to_last_observed_attempt": 45.0
+                if group == "NO_COMPLETION_OBSERVED"
+                else None,
+                "timing_definition": "Synthetic timing definition.",
+                "interpretation_note": "Synthetic descriptive caution.",
+            }
+            for group, count, median_attempts, ai_exposed in (
+                ("COMPLETED_AI", 4, 2.0, True),
+                ("COMPLETED_MANUAL", 4, 1.5, True),
+                ("NO_COMPLETION_OBSERVED", 2, 1.5, False),
+            )
+        ]
+    )
+
+
 def charts() -> ExplorationCharts:
     """Return synthetic aggregate-only chart bundle."""
     return build_exploration_charts(
@@ -909,6 +1099,7 @@ def charts() -> ExplorationCharts:
             grouped_attempt_summary=attempt_rows(),
             study_attempt_history_summary=study_history_rows(),
             author_handoff_summary=author_handoff_rows(),
+            study_retry_pathway_summary=study_retry_pathway_rows(),
             attempt_start_experience_summary=(attempt_start_experience_rows()),
             current_author_experience_summary=(current_author_experience_rows()),
             grouped_study_summary=grouped_study_rows(),
@@ -935,6 +1126,8 @@ def test_html_report_is_self_contained_and_accessible() -> None:
         records=feedback_records(),
         overview_summary=overview_rows(),
         author_handoff_summary=author_handoff_rows(),
+        retry_card_summary=retry_card_rows(),
+        retry_characteristics_summary=retry_characteristic_rows(),
         data_quality_summary=quality_rows(),
         repeated_attempt_source_consistency_summary=(repeated_source_rows()),
         charts=charts(),
@@ -994,6 +1187,8 @@ def test_html_report_explains_source_context_and_latency() -> None:
         records=feedback_records(),
         overview_summary=overview_rows(),
         author_handoff_summary=author_handoff_rows(),
+        retry_card_summary=retry_card_rows(),
+        retry_characteristics_summary=retry_characteristic_rows(),
         data_quality_summary=quality_rows(),
         repeated_attempt_source_consistency_summary=(repeated_source_rows()),
         charts=charts(),
@@ -1041,6 +1236,8 @@ def test_html_report_explains_author_handoff_categories() -> None:
         records=feedback_records(),
         overview_summary=overview_rows(),
         author_handoff_summary=author_handoff_rows(),
+        retry_card_summary=retry_card_rows(),
+        retry_characteristics_summary=retry_characteristic_rows(),
         data_quality_summary=quality_rows(),
         repeated_attempt_source_consistency_summary=(repeated_source_rows()),
         charts=charts(),
@@ -1077,6 +1274,8 @@ def test_html_report_explains_appointment_context() -> None:
         records=feedback_records(),
         overview_summary=overview_rows(),
         author_handoff_summary=author_handoff_rows(),
+        retry_card_summary=retry_card_rows(),
+        retry_characteristics_summary=retry_characteristic_rows(),
         data_quality_summary=quality_rows(),
         repeated_attempt_source_consistency_summary=(repeated_source_rows()),
         charts=charts(),
@@ -1104,6 +1303,8 @@ def test_html_report_explains_completed_study_author_context() -> None:
         records=feedback_records(),
         overview_summary=overview_rows(),
         author_handoff_summary=author_handoff_rows(),
+        retry_card_summary=retry_card_rows(),
+        retry_characteristics_summary=retry_characteristic_rows(),
         data_quality_summary=quality_rows(),
         repeated_attempt_source_consistency_summary=(repeated_source_rows()),
         charts=charts(),
@@ -1133,6 +1334,8 @@ def test_html_report_has_navigation_and_faculty_summary() -> None:
         records=feedback_records(),
         overview_summary=overview_rows(),
         author_handoff_summary=author_handoff_rows(),
+        retry_card_summary=retry_card_rows(),
+        retry_characteristics_summary=retry_characteristic_rows(),
         data_quality_summary=quality_rows(),
         repeated_attempt_source_consistency_summary=(repeated_source_rows()),
         charts=charts(),
@@ -1162,6 +1365,8 @@ def test_html_report_toc_targets_unique_sections_in_report_order() -> None:
         records=feedback_records(),
         overview_summary=overview_rows(),
         author_handoff_summary=author_handoff_rows(),
+        retry_card_summary=retry_card_rows(),
+        retry_characteristics_summary=retry_characteristic_rows(),
         data_quality_summary=quality_rows(),
         repeated_attempt_source_consistency_summary=(repeated_source_rows()),
         charts=charts(),
@@ -1171,6 +1376,7 @@ def test_html_report_toc_targets_unique_sections_in_report_order() -> None:
         "executive-overview-heading",
         "data-quality-heading",
         "study-pathways-heading",
+        "retry-pathways-heading",
         "author-experience-heading",
         "completed-study-author-context-heading",
         "author-context-heading",
@@ -1200,6 +1406,8 @@ def test_html_report_uses_progressive_disclosure_defaults() -> None:
         records=feedback_records(),
         overview_summary=overview_rows(),
         author_handoff_summary=author_handoff_rows(),
+        retry_card_summary=retry_card_rows(),
+        retry_characteristics_summary=retry_characteristic_rows(),
         data_quality_summary=quality_rows(),
         repeated_attempt_source_consistency_summary=(repeated_source_rows()),
         charts=charts(),
@@ -1216,6 +1424,7 @@ def test_html_report_uses_progressive_disclosure_defaults() -> None:
         ) in html
 
     for section_id in (
+        "retry-pathways-heading",
         "author-experience-heading",
         "completed-study-author-context-heading",
         "author-context-heading",
@@ -1229,9 +1438,58 @@ def test_html_report_uses_progressive_disclosure_defaults() -> None:
             f'<details class="report-section">\n    <summary id="{section_id}"'
         ) in html
 
-    assert html.count('<details class="report-section"') == 12
+    assert html.count('<details class="report-section"') == 13
     assert "details.report-section:not([open]) > section" in html
     assert "display: block" in html
+
+
+def test_html_report_explains_observed_retry_patterns() -> None:
+    """Render cards, chart, semantic table, and collapsed interpretation."""
+    html = render_html_report(
+        records=feedback_records(),
+        overview_summary=overview_rows(),
+        author_handoff_summary=author_handoff_rows(),
+        retry_card_summary=retry_card_rows(),
+        retry_characteristics_summary=retry_characteristic_rows(),
+        data_quality_summary=quality_rows(),
+        repeated_attempt_source_consistency_summary=repeated_source_rows(),
+        charts=charts(),
+    )
+    normalized = " ".join(html.split())
+
+    assert "Retry pathways and observed workflow patterns" in html
+    assert "One recorded attempt, completed" in html
+    assert "Multiple recorded attempts, no completion observed" in html
+    assert "Observed retry pathways" in html
+    assert "AI → AI → manual completion" in html
+    assert '<table class="retry-table">' in html
+    assert 'scope="col"' in html
+    assert 'scope="row"' in html
+    assert "Source change among eligible" in html
+    assert "Feedback among AI-exposed" in html
+    assert "How to interpret observed retry patterns" in html
+    assert "patterns support targeted qualitative follow-up" in normalized.lower()
+    assert "That the study was abandoned" in html
+
+    section_start = html.index('<summary id="retry-pathways-heading">')
+    details_start = html.rfind(
+        '<details class="report-section">',
+        0,
+        section_start,
+    )
+    assert details_start >= 0
+    assert (
+        '<details class="report-section" open>' not in html[details_start:section_start]
+    )
+
+    panel_start = html.index(
+        '<details class="explanation-panel">',
+        section_start,
+    )
+    panel_end = html.index("</details>", panel_start)
+    panel = html[panel_start:panel_end]
+    assert '<details class="explanation-panel" open' not in panel
+    assert "details.explanation-panel:not([open])" in html
 
 
 def test_html_report_loads_plotly_before_first_chart() -> None:
@@ -1240,6 +1498,8 @@ def test_html_report_loads_plotly_before_first_chart() -> None:
         records=feedback_records(),
         overview_summary=overview_rows(),
         author_handoff_summary=author_handoff_rows(),
+        retry_card_summary=retry_card_rows(),
+        retry_characteristics_summary=retry_characteristic_rows(),
         data_quality_summary=quality_rows(),
         repeated_attempt_source_consistency_summary=(repeated_source_rows()),
         charts=charts(),
@@ -1265,6 +1525,8 @@ def test_html_report_explains_workflow_timing() -> None:
         records=feedback_records(),
         overview_summary=overview_rows(),
         author_handoff_summary=author_handoff_rows(),
+        retry_card_summary=retry_card_rows(),
+        retry_characteristics_summary=retry_characteristic_rows(),
         data_quality_summary=quality_rows(),
         repeated_attempt_source_consistency_summary=(repeated_source_rows()),
         charts=charts(),
@@ -1287,6 +1549,8 @@ def test_html_report_explains_suggestion_choice_denominators() -> None:
         records=feedback_records(),
         overview_summary=overview_rows(),
         author_handoff_summary=author_handoff_rows(),
+        retry_card_summary=retry_card_rows(),
+        retry_characteristics_summary=retry_characteristic_rows(),
         data_quality_summary=quality_rows(),
         repeated_attempt_source_consistency_summary=(repeated_source_rows()),
         charts=charts(),
@@ -1308,6 +1572,8 @@ def test_html_report_explains_readability_indicators() -> None:
         records=feedback_records(),
         overview_summary=overview_rows(),
         author_handoff_summary=author_handoff_rows(),
+        retry_card_summary=retry_card_rows(),
+        retry_characteristics_summary=retry_characteristic_rows(),
         data_quality_summary=quality_rows(),
         repeated_attempt_source_consistency_summary=(repeated_source_rows()),
         charts=charts(),
@@ -1354,6 +1620,8 @@ def test_html_report_displays_authorized_user_feedback_table() -> None:
         records=feedback_records(),
         overview_summary=overview_rows(),
         author_handoff_summary=author_handoff_rows(),
+        retry_card_summary=retry_card_rows(),
+        retry_characteristics_summary=retry_characteristic_rows(),
         data_quality_summary=quality_rows(),
         repeated_attempt_source_consistency_summary=(repeated_source_rows()),
         charts=charts(),
@@ -1395,6 +1663,8 @@ def test_html_report_displays_feedback_empty_state() -> None:
         ),
         overview_summary=overview_rows(),
         author_handoff_summary=author_handoff_rows(),
+        retry_card_summary=retry_card_rows(),
+        retry_characteristics_summary=retry_characteristic_rows(),
         data_quality_summary=quality_rows(),
         repeated_attempt_source_consistency_summary=(repeated_source_rows()),
         charts=charts(),
@@ -1456,6 +1726,8 @@ def test_html_report_validates_feedback_records(
             records=records,
             overview_summary=overview_rows(),
             author_handoff_summary=author_handoff_rows(),
+            retry_card_summary=retry_card_rows(),
+            retry_characteristics_summary=retry_characteristic_rows(),
             data_quality_summary=quality_rows(),
             repeated_attempt_source_consistency_summary=(repeated_source_rows()),
             charts=charts(),
@@ -1467,6 +1739,8 @@ def test_html_report_excludes_identifier_and_payload_values() -> None:
         records=feedback_records(),
         overview_summary=overview_rows(),
         author_handoff_summary=author_handoff_rows(),
+        retry_card_summary=retry_card_rows(),
+        retry_characteristics_summary=retry_characteristic_rows(),
         data_quality_summary=quality_rows(),
         repeated_attempt_source_consistency_summary=(repeated_source_rows()),
         charts=charts(),
@@ -1503,6 +1777,8 @@ def test_write_html_report_creates_utf8_file(
         records=feedback_records(),
         overview_summary=overview_rows(),
         author_handoff_summary=author_handoff_rows(),
+        retry_card_summary=retry_card_rows(),
+        retry_characteristics_summary=retry_characteristic_rows(),
         data_quality_summary=quality_rows(),
         repeated_attempt_source_consistency_summary=(repeated_source_rows()),
         charts=charts(),
@@ -1536,6 +1812,8 @@ def test_write_html_report_wraps_io_failure(
             records=feedback_records(),
             overview_summary=overview_rows(),
             author_handoff_summary=author_handoff_rows(),
+            retry_card_summary=retry_card_rows(),
+            retry_characteristics_summary=retry_characteristic_rows(),
             data_quality_summary=quality_rows(),
             repeated_attempt_source_consistency_summary=(repeated_source_rows()),
             charts=charts(),
@@ -1555,6 +1833,8 @@ def test_html_report_rejects_missing_overview_columns() -> None:
                 }
             ),
             author_handoff_summary=author_handoff_rows(),
+            retry_card_summary=retry_card_rows(),
+            retry_characteristics_summary=retry_characteristic_rows(),
             data_quality_summary=quality_rows(),
             repeated_attempt_source_consistency_summary=(repeated_source_rows()),
             charts=charts(),
@@ -1576,6 +1856,8 @@ def test_html_report_rejects_missing_required_kpi_metric() -> None:
             records=feedback_records(),
             overview_summary=rows,
             author_handoff_summary=author_handoff_rows(),
+            retry_card_summary=retry_card_rows(),
+            retry_characteristics_summary=retry_characteristic_rows(),
             data_quality_summary=quality_rows(),
             repeated_attempt_source_consistency_summary=(repeated_source_rows()),
             charts=charts(),
@@ -1599,6 +1881,8 @@ def test_html_report_rejects_pathway_count_above_completed_population() -> None:
             records=feedback_records(),
             overview_summary=rows,
             author_handoff_summary=author_handoff_rows(),
+            retry_card_summary=retry_card_rows(),
+            retry_characteristics_summary=retry_characteristic_rows(),
             data_quality_summary=quality_rows(),
             repeated_attempt_source_consistency_summary=(repeated_source_rows()),
             charts=charts(),
@@ -1618,6 +1902,8 @@ def test_html_report_requires_author_handoff_columns() -> None:
                     "author_handoff_category": ["NO_PRECEDING_ATTEMPT"],
                 }
             ),
+            retry_card_summary=retry_card_rows(),
+            retry_characteristics_summary=retry_characteristic_rows(),
             data_quality_summary=quality_rows(),
             repeated_attempt_source_consistency_summary=(repeated_source_rows()),
             charts=charts(),
@@ -1634,6 +1920,8 @@ def test_html_report_requires_repeated_source_columns() -> None:
             records=feedback_records(),
             overview_summary=overview_rows(),
             author_handoff_summary=author_handoff_rows(),
+            retry_card_summary=retry_card_rows(),
+            retry_characteristics_summary=retry_characteristic_rows(),
             data_quality_summary=quality_rows(),
             repeated_attempt_source_consistency_summary=pd.DataFrame(
                 {
@@ -1700,6 +1988,8 @@ def test_html_report_validates_repeated_source_context(
             records=feedback_records(),
             overview_summary=overview_rows(),
             author_handoff_summary=author_handoff_rows(),
+            retry_card_summary=retry_card_rows(),
+            retry_characteristics_summary=retry_characteristic_rows(),
             data_quality_summary=quality_rows(),
             repeated_attempt_source_consistency_summary=mutator(repeated_source_rows()),
             charts=charts(),
@@ -1713,6 +2003,8 @@ def test_html_report_explains_empty_repeated_source_pathways() -> None:
         records=feedback_records(),
         overview_summary=overview_rows(),
         author_handoff_summary=author_handoff_rows(),
+        retry_card_summary=retry_card_rows(),
+        retry_characteristics_summary=retry_characteristic_rows(),
         data_quality_summary=quality_rows(),
         repeated_attempt_source_consistency_summary=empty,
         charts=charts(),
@@ -1732,6 +2024,8 @@ def test_html_report_displays_aggregate_data_quality() -> None:
         records=feedback_records(),
         overview_summary=overview_rows(),
         author_handoff_summary=author_handoff_rows(),
+        retry_card_summary=retry_card_rows(),
+        retry_characteristics_summary=retry_characteristic_rows(),
         data_quality_summary=quality_rows(),
         repeated_attempt_source_consistency_summary=(repeated_source_rows()),
         charts=charts(),
@@ -1765,6 +2059,8 @@ def test_html_report_displays_no_warning_state() -> None:
         records=feedback_records(),
         overview_summary=overview_rows(),
         author_handoff_summary=author_handoff_rows(),
+        retry_card_summary=retry_card_rows(),
+        retry_characteristics_summary=retry_characteristic_rows(),
         data_quality_summary=quality_rows(malformed_appointment_count=0),
         repeated_attempt_source_consistency_summary=(repeated_source_rows()),
         charts=charts(),
@@ -1787,6 +2083,8 @@ def test_html_report_requires_quality_columns() -> None:
             records=feedback_records(),
             overview_summary=overview_rows(),
             author_handoff_summary=author_handoff_rows(),
+            retry_card_summary=retry_card_rows(),
+            retry_characteristics_summary=retry_characteristic_rows(),
             data_quality_summary=pd.DataFrame(
                 {
                     "severity_level": ["WARNING"],

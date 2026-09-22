@@ -23,6 +23,7 @@ from study_posting_audit_exploration.publication import (
     build_edit_readability_relationship_chart,
     build_exploration_charts,
     build_repeated_source_consistency_chart,
+    build_retry_pathways_chart,
     build_source_input_method_chart,
     build_source_size_latency_chart,
     build_study_completion_pathways_chart,
@@ -1724,6 +1725,60 @@ def test_repeated_source_chart_suppresses_zero_unavailable_labels() -> None:
     assert figure.layout.margin.r == 70
 
 
+def study_retry_pathway_rows() -> pd.DataFrame:
+    """Return aggregate-only retry pathway rows."""
+    return pd.DataFrame.from_records(
+        [
+            {
+                "pathway_category": "SINGLE_ATTEMPT_AI_COMPLETION",
+                "pathway_sequence": 1,
+                "study_count": 4,
+                "population_study_count": 10,
+                "study_percentage": 40.0,
+                "median_attempt_count": 1.0,
+                "study_count_with_author_change": 0,
+                "median_minutes_first_to_completion": 0.0,
+                "median_minutes_first_to_last_observed_attempt": None,
+            },
+            {
+                "pathway_category": "AI_TO_MANUAL_COMPLETION",
+                "pathway_sequence": 5,
+                "study_count": 2,
+                "population_study_count": 10,
+                "study_percentage": 20.0,
+                "median_attempt_count": 3.0,
+                "study_count_with_author_change": 1,
+                "median_minutes_first_to_completion": 45.0,
+                "median_minutes_first_to_last_observed_attempt": None,
+            },
+            {
+                "pathway_category": "MIXED_MODES_NO_COMPLETION_OBSERVED",
+                "pathway_sequence": 13,
+                "study_count": 1,
+                "population_study_count": 10,
+                "study_percentage": 10.0,
+                "median_attempt_count": 2.0,
+                "study_count_with_author_change": 0,
+                "median_minutes_first_to_completion": None,
+                "median_minutes_first_to_last_observed_attempt": 30.0,
+            },
+        ]
+    )
+
+
+def test_retry_pathways_chart_is_horizontal_and_mutually_exclusive() -> None:
+    """Render one horizontal bar per stable study pathway."""
+    figure = build_retry_pathways_chart(study_retry_pathway_rows())
+    bar = figure.data[0]
+
+    assert figure.layout.title.text == "Observed retry pathways"
+    assert bar.orientation == "h"
+    assert list(bar.x) == [4, 2, 1]
+    assert len(bar.y) == 3
+    assert "AI to manual" in str(bar.y[1])
+    assert "no completion observed" in str(bar.y[2]).lower()
+
+
 def test_content_source_chart_uses_all_attempt_population() -> None:
     figure = build_content_source_concordance_chart(content_source_rows())
     heatmap = figure.data[0]
@@ -1741,6 +1796,7 @@ def test_chart_bundle_contains_all_figures() -> None:
             grouped_attempt_summary=grouped_attempt_rows(),
             study_attempt_history_summary=study_history_rows(),
             author_handoff_summary=author_handoff_rows(),
+            study_retry_pathway_summary=study_retry_pathway_rows(),
             attempt_start_experience_summary=(attempt_start_experience_rows()),
             current_author_experience_summary=(current_author_experience_rows()),
             grouped_study_summary=grouped_study_rows(),
@@ -1766,6 +1822,7 @@ def test_chart_bundle_contains_all_figures() -> None:
     assert charts.attempt_timing_distribution_by_mode.data
     assert charts.study_completion_pathways.data
     assert charts.author_handoff_categories.data
+    assert charts.retry_pathways.data
     assert charts.author_attempt_start_experience.data
     assert charts.author_experience_studies.data
     assert charts.author_experience_days.data

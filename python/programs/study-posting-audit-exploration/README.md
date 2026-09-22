@@ -138,53 +138,109 @@ days, and login-history span as of the report query.
 
 ## Current output
 
-A successful `analyze` run publishes 34 files: `report.html`, one JSON
-manifest, and 29 CSV files.
+A successful `analyze` run atomically publishes exactly 36 files:
+`report.html`, one JSON manifest, and 31 CSV files.
 
-~~~~text
-exploration/
-├── report.html
-├── analysis_manifest.json
-├── definitions/
-│   └── metric_definitions.csv
-├── quality/
-│   └── data_quality_summary.csv
-├── analysis-audit-records/
-│   ├── data_quality_findings.csv
-│   ├── study_attempt_author_history.csv
-│   ├── study_attempt_history.csv
-│   ├── author_history.csv
-│   ├── completed_ai_field_analysis.csv
-│   └── completed_ai_readability_pairs.csv
-├── overview/
-│   ├── overview_summary.csv
-│   ├── study_attempt_history_summary.csv
-│   └── author_handoff_summary.csv
-├── attempts/
-│   ├── grouped_attempt_summary.csv
-│   ├── content_source_concordance_summary.csv
-│   └── content_source_concordance_matrix.csv
-├── studies/
-│   ├── completed_study_author_context_summary.csv
-│   └── grouped_study_summary.csv
-├── authors/
-│   ├── grouped_author_summary.csv
-│   ├── attempt_start_experience_summary.csv
-│   └── current_author_experience_summary.csv
-├── fields/
-│   ├── field_adoption_editing_summary.csv
-│   ├── nontext_field_adoption_summary.csv
-│   ├── suggestion_selection_summary.csv
-│   └── compensation_analysis_summary.csv
-├── readability/
-│   ├── selected_vs_unselected_readability_summary.csv
-│   ├── field_readability_change_summary.csv
-│   ├── field_readability_target_summary.csv
-│   ├── field_edit_readability_cross_summary.csv
-│   └── final_text_metric_summary.csv
-└── research/
-    └── candidate_research_questions.csv
-~~~~
+Output inventory:
+
+    exploration/
+    |-- report.html
+    |-- analysis_manifest.json
+    |-- definitions/
+    |   `-- metric_definitions.csv
+    |-- quality/
+    |   `-- data_quality_summary.csv
+    |-- analysis-audit-records/
+    |   |-- data_quality_findings.csv
+    |   |-- study_attempt_author_history.csv
+    |   |-- study_attempt_history.csv
+    |   |-- author_history.csv
+    |   |-- completed_ai_field_analysis.csv
+    |   `-- completed_ai_readability_pairs.csv
+    |-- overview/
+    |   |-- overview_summary.csv
+    |   |-- study_attempt_history_summary.csv
+    |   |-- author_handoff_summary.csv
+    |   |-- study_retry_pathway_summary.csv
+    |   |-- retry_characteristics_summary.csv
+    |   `-- repeated_attempt_source_consistency_summary.csv
+    |-- attempts/
+    |   |-- grouped_attempt_summary.csv
+    |   |-- source_context_distribution_summary.csv
+    |   |-- source_size_latency_summary.csv
+    |   |-- content_source_concordance_summary.csv
+    |   `-- content_source_concordance_matrix.csv
+    |-- studies/
+    |   |-- completed_study_author_context_summary.csv
+    |   `-- grouped_study_summary.csv
+    |-- authors/
+    |   |-- grouped_author_summary.csv
+    |   |-- attempt_start_experience_summary.csv
+    |   `-- current_author_experience_summary.csv
+    |-- fields/
+    |   |-- field_adoption_editing_summary.csv
+    |   |-- nontext_field_adoption_summary.csv
+    |   |-- suggestion_selection_summary.csv
+    |   `-- compensation_analysis_summary.csv
+    |-- readability/
+    |   |-- selected_vs_unselected_readability_summary.csv
+    |   |-- field_readability_change_summary.csv
+    |   |-- field_readability_target_summary.csv
+    |   |-- field_edit_readability_cross_summary.csv
+    |   `-- final_text_metric_summary.csv
+    `-- research/
+        `-- candidate_research_questions.csv
+
+### Retry pathways and observed workflow patterns
+
+The internal retry derivation has one row per study. Attempts are ordered by
+`START_TIME`, followed by audit ID. Completed-study pathways stop at the unique
+completed attempt; attempts after completion remain visible through the
+existing quality warning but do not redefine the completion pathway. Studies
+without a completed attempt use every captured attempt.
+
+The 13 stable pathway categories are exhaustive and mutually exclusive:
+
+- single-attempt AI or manual completion;
+- repeated AI-only or manual-only completion;
+- one-direction AI-to-manual or manual-to-AI completion;
+- mixed or alternating completion in AI or manual mode;
+- single-attempt AI or manual no completion observed;
+- repeated AI-only or manual-only no completion observed;
+- mixed-mode no completion observed.
+
+A one-direction pathway contains exactly one adjacent mode transition. For
+example, AI then AI then manual completion belongs to the AI-to-manual
+category. Sequences with at least two mode transitions are mixed or
+alternating.
+
+`overview/study_retry_pathway_summary.csv` always has one row for each of the
+13 categories, including zero-count categories. Its percentage denominator is
+all studies with captured attempts.
+
+`overview/retry_characteristics_summary.csv` has exactly three rows: completed
+with AI, completed manually, and no completion observed. General percentages
+use all studies in the row; source-signature change percentages use
+source-comparison-eligible studies; feedback percentages use AI-exposed
+studies. A missing percentage means its denominator is zero.
+
+A returned-result AI attempt excludes both recorded AI-error result categories;
+eligible user-dropped AI attempts remain included. Source-signature equality is
+an unchanged-source proxy based on source size and reported source, not proof
+of identical text.
+
+Faculty outputs contain aggregates only. Feedback contributes only count or
+Boolean presence to retry analysis; feedback text does not enter retry tables
+or charts.
+
+Completed timing means first recorded attempt start to completed-attempt start.
+Timing for no-completion-observed studies means first recorded attempt start to
+latest observed attempt start. It is not follow-up time.
+
+“No completion observed” means no `COMPLETE` attempt appears in the captured
+report; completion may occur outside the observation window. These measures
+must not be described as drop-off, abandonment, final outcomes, motivation,
+satisfaction, or causal effects.
 
 ### Data quality
 

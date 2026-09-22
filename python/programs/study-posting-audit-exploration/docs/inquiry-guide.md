@@ -244,3 +244,39 @@ For a reproducible answer, record:
 - any filters or grouping dimensions.
 
 The generated manifest and metric definitions contain much of this information.
+
+## Retry pathways and observed workflow patterns
+
+Use these outputs together:
+
+- `overview/study_retry_pathway_summary.csv` for the exhaustive,
+  mutually exclusive one-row-per-pathway distribution;
+- `overview/retry_characteristics_summary.csv` for completed-AI,
+  completed-manual, and no-completion-observed characteristics;
+- `overview/repeated_attempt_source_consistency_summary.csv` for detailed
+  adjacent returned-result AI source comparisons.
+
+Each study contributes to exactly one retry pathway. The pathway sequence uses
+attempts through the unique completion attempt for completed studies and all
+captured attempts otherwise. `USER_DROPPED` is an attempt result, not a study
+outcome.
+
+Interpret percentages with their paired denominators:
+
+- pathway percentages: all studies with captured attempts;
+- general characteristic percentages: studies in the outcome-group row;
+- source-signature change: source-comparison-eligible studies;
+- feedback recorded: AI-exposed studies.
+
+Missing percentages indicate a zero denominator. Do not replace them with zero.
+
+Completed timing is first attempt to completion. No-completion-observed timing
+is first attempt to latest observed attempt. The latter does not measure
+follow-up. Until a report-query timestamp and minimum follow-up threshold are
+defined, do not compare no-completion-observed percentages as drop-off or final
+outcomes.
+
+Observed patterns can motivate qualitative follow-up. They do not establish why
+authors changed modes, whether AI output was liked or rejected, whether source
+changes were intentional experiments, why an author handoff occurred, or
+whether a study was abandoned.

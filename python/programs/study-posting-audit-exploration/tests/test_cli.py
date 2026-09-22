@@ -176,8 +176,8 @@ def _assert_manifest(manifest: dict[str, object]) -> None:
     research_counts = manifest["research_row_counts"]
 
     assert isinstance(research_counts, dict)
-    assert research_counts["candidate_research_questions"] == 14
-    assert manifest["output_file_count"] == 34
+    assert research_counts["candidate_research_questions"] == 16
+    assert manifest["output_file_count"] == 36
     assert manifest["warning_count"] == 0
 
 
@@ -214,7 +214,7 @@ def _assert_cli_paths_printed(
         f"Field edit/readability cross summary CSV: {paths['cross']}",
         f"Final text metric summary CSV: {paths['final_metric']}",
         f"Candidate research questions CSV: {paths['research_questions']}",
-        "Published files: 34",
+        "Published files: 36",
     )
 
     for expected_line in expected_lines:

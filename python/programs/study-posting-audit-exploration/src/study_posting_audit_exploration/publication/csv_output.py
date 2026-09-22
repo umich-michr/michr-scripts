@@ -64,6 +64,8 @@ _COMPLETED_AI_READABILITY_PAIRS_FILENAME = "completed_ai_readability_pairs.csv"
 _OVERVIEW_SUMMARY_FILENAME = "overview_summary.csv"
 _STUDY_ATTEMPT_HISTORY_SUMMARY_FILENAME = "study_attempt_history_summary.csv"
 _AUTHOR_HANDOFF_SUMMARY_FILENAME = "author_handoff_summary.csv"
+_STUDY_RETRY_PATHWAY_SUMMARY_FILENAME = "study_retry_pathway_summary.csv"
+_RETRY_CHARACTERISTICS_SUMMARY_FILENAME = "retry_characteristics_summary.csv"
 _REPEATED_ATTEMPT_SOURCE_CONSISTENCY_SUMMARY_FILENAME = (
     "repeated_attempt_source_consistency_summary.csv"
 )
@@ -102,7 +104,7 @@ _FINAL_TEXT_METRIC_SUMMARY_FILENAME = "final_text_metric_summary.csv"
 
 _CANDIDATE_RESEARCH_QUESTIONS_FILENAME = "candidate_research_questions.csv"
 
-_OUTPUT_FILE_COUNT = 34
+_OUTPUT_FILE_COUNT = 36
 
 
 def _write_frame(
@@ -180,6 +182,14 @@ def _output_frames(
         (
             tables.overview.author_handoff_summary,
             overview_directory / _AUTHOR_HANDOFF_SUMMARY_FILENAME,
+        ),
+        (
+            tables.retry.study_retry_pathway_summary,
+            overview_directory / _STUDY_RETRY_PATHWAY_SUMMARY_FILENAME,
+        ),
+        (
+            tables.retry.retry_characteristics_summary,
+            overview_directory / _RETRY_CHARACTERISTICS_SUMMARY_FILENAME,
         ),
         (
             tables.source_context.repeated_attempt_source_consistency_summary,
@@ -323,6 +333,7 @@ def _write_staging_output(
                 tables.overview.study_attempt_history_summary
             ),
             author_handoff_summary=(tables.overview.author_handoff_summary),
+            study_retry_pathway_summary=(tables.retry.study_retry_pathway_summary),
             attempt_start_experience_summary=(
                 tables.authors.attempt_start_experience_summary
             ),
@@ -368,6 +379,8 @@ def _write_staging_output(
         records=report.records,
         overview_summary=tables.overview.overview_summary,
         author_handoff_summary=tables.overview.author_handoff_summary,
+        retry_card_summary=tables.retry.retry_card_summary,
+        retry_characteristics_summary=(tables.retry.retry_characteristics_summary),
         data_quality_summary=tables.quality.data_quality_summary,
         repeated_attempt_source_consistency_summary=(
             tables.source_context.repeated_attempt_source_consistency_summary
@@ -431,6 +444,12 @@ def _publication_result(
         ),
         author_handoff_summary_path=(
             overview_directory / _AUTHOR_HANDOFF_SUMMARY_FILENAME
+        ),
+        study_retry_pathway_summary_path=(
+            overview_directory / _STUDY_RETRY_PATHWAY_SUMMARY_FILENAME
+        ),
+        retry_characteristics_summary_path=(
+            overview_directory / _RETRY_CHARACTERISTICS_SUMMARY_FILENAME
         ),
         repeated_attempt_source_consistency_summary_path=(
             overview_directory / _REPEATED_ATTEMPT_SOURCE_CONSISTENCY_SUMMARY_FILENAME

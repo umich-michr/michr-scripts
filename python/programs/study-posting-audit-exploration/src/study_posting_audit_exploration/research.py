@@ -302,6 +302,56 @@ _QUESTIONS: tuple[CandidateResearchQuestion, ...] = (
         priority_tier="SECONDARY",
         analysis_status="DESCRIPTIVE_READY",
     ),
+    CandidateResearchQuestion(
+        research_question_id="RQ-015",
+        research_question=(
+            "Among studies with repeated attempts, how often do mode, author, "
+            "and source characteristics change before AI completion, manual "
+            "completion, or no completion observed?"
+        ),
+        primary_analytical_unit="study",
+        comparison_or_grouping=(
+            "mutually exclusive retry pathway and observed completion group"
+        ),
+        outcome_or_measure=(
+            "attempt count, mode change, author change, AI error, "
+            "returned-result AI, source change, feedback presence, and timing"
+        ),
+        supporting_output_files=(
+            "overview/study_retry_pathway_summary.csv; "
+            "overview/retry_characteristics_summary.csv"
+        ),
+        interpretation_cautions=(
+            f"{_COMMON_CAUTION} {_TIMING_CAUTION} No completion observed is "
+            "not a final outcome because formal follow-up time is unavailable."
+        ),
+        priority_tier="CORE",
+        analysis_status="DESCRIPTIVE_READY",
+    ),
+    CandidateResearchQuestion(
+        research_question_id="RQ-016",
+        research_question=(
+            "Among same-author studies with returned-result AI attempts "
+            "followed by manual completion, how often do source "
+            "characteristics change and how often is feedback recorded?"
+        ),
+        primary_analytical_unit="study",
+        comparison_or_grouping=(
+            "AI-to-manual completion pathway, author continuity, and "
+            "source-comparison eligibility"
+        ),
+        outcome_or_measure=("source-signature change and count-only feedback presence"),
+        supporting_output_files=(
+            "overview/study_retry_pathway_summary.csv; "
+            "overview/repeated_attempt_source_consistency_summary.csv"
+        ),
+        interpretation_cautions=(
+            f"{_COMMON_CAUTION} Source-signature equality does not prove "
+            "identical text. Feedback presence does not establish satisfaction."
+        ),
+        priority_tier="SECONDARY",
+        analysis_status="DESCRIPTIVE_READY",
+    ),
 )
 
 
