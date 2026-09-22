@@ -270,19 +270,26 @@ Interpret percentages with their paired denominators:
 
 Missing percentages indicate a zero denominator. Do not replace them with zero.
 
-Completed timing is first attempt start to completed-attempt end. No-completion-observed timing
-is first attempt to latest observed attempt. The latter does not measure
-follow-up. Until a report-query timestamp and minimum follow-up threshold are
-defined, do not compare no-completion-observed percentages as drop-off or final
-outcomes.
+Completed timing is first attempt start to completed-attempt end. For
+no-completion-observed studies, keep three measures distinct: first attempt to
+latest observed attempt, latest attempt to report-run cutoff, and first attempt
+to report-run cutoff. The project intentionally uses descriptive durations only
+and does not define a minimum follow-up threshold or threshold-qualified
+unresolved percentage. Do not describe these measures as drop-off, abandonment,
+or final outcomes.
 
 Observed patterns can motivate qualitative follow-up. They do not establish why
 authors changed modes, whether AI output was liked or rejected, whether source
 changes were intentional experiments, why an author handoff occurred, or
 whether a study was abandoned.
 
-When `REPORT_RUN_CUTOFF` is available, distinguish observed activity span from follow-up after the latest attempt and from the total observation window. These durations remain descriptive. No study is follow-up eligible until a minimum threshold is explicitly selected.
+When `REPORT_RUN_CUTOFF` is available, distinguish observed activity
+span from follow-up after the latest attempt and from the total observation
+window. These durations remain descriptive.
 
-In the retry summaries, use `study_count_with_report_run_cutoff` as the contributing count for cutoff medians. Do not compare those medians as threshold-qualified outcomes; no minimum follow-up threshold is defined.
+In the retry summaries, use `study_count_with_report_run_cutoff` as the
+contributing count for cutoff medians. By explicit project policy, no minimum
+follow-up threshold, follow-up-eligibility classification, or
+threshold-qualified unresolved percentage is planned.
 
 The faculty table uses distinct columns for first-to-completion-end, first-to-latest-observed-attempt, latest-attempt-to-report-run-cutoff, and first-attempt-to-report-run-cutoff. Do not combine or relabel these measures.
