@@ -442,3 +442,5 @@ New normalized reports use `REPORT_RUN_CUTOFF`: the report process captures one 
 Internal unresolved-study timing now preserves three grains: observed activity span (first to latest attempt), follow-up after the latest attempt (latest attempt to report-run cutoff), and total observation window (first attempt to report-run cutoff). These fields are populated only from validated `REPORT_RUN_CUTOFF` metadata. By explicit project policy, they remain descriptive durations and will not be converted into threshold-qualified rates.
 
 Existing retry aggregate files carry identifier-free report-run cutoff counts and medians for no-completion-observed studies. No new file was added, and completed rows do not receive unresolved cutoff medians.
+
+Source attempt timestamps are interpreted as naive `America/Detroit` local time. Cutoff calculations localize those values with strict daylight-saving handling and compare them in UTC. Stored attempt-history timestamps remain in their existing naive source form.

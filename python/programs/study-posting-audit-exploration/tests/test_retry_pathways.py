@@ -753,7 +753,7 @@ def test_unresolved_retry_context_derives_report_run_follow_up() -> None:
 
     row = _derive(
         attempts,
-        cutoff=pd.Timestamp("2026-06-10T09:00:00"),
+        cutoff=pd.Timestamp("2026-06-10T13:00:00+00:00"),
     ).iloc[0]
 
     assert row["minutes_first_attempt_to_last_observed_attempt"] == (
@@ -765,13 +765,15 @@ def test_unresolved_retry_context_derives_report_run_follow_up() -> None:
     assert row["minutes_first_attempt_to_report_run_cutoff"] == (
         pytest.approx(9 * 24 * 60)
     )
-    assert row["report_run_cutoff_timestamp"] == pd.Timestamp("2026-06-10T09:00:00")
+    assert row["report_run_cutoff_timestamp"] == pd.Timestamp(
+        "2026-06-10T13:00:00+00:00"
+    )
 
 
 def test_unresolved_retry_context_allows_zero_follow_up() -> None:
     """Allow the cutoff to equal the latest observed attempt."""
     attempts, studies, generations, transitions = _minimal_retry_inputs()
-    cutoff = attempts.iloc[0]["attempt_start_timestamp"]
+    cutoff = pd.Timestamp("2026-05-01T13:00:00+00:00")
 
     row = _derive_validation_inputs(
         attempts=attempts,
@@ -798,7 +800,7 @@ def test_retry_context_rejects_cutoff_before_latest_attempt() -> None:
             studies=studies,
             generations=generations,
             transitions=transitions,
-            cutoff=pd.Timestamp("2026-05-01T08:59:00"),
+            cutoff=pd.Timestamp("2026-05-01T12:59:00+00:00"),
         )
 
 
@@ -819,7 +821,7 @@ def test_completed_retry_context_has_no_unresolved_follow_up() -> None:
 
     row = _derive(
         attempts,
-        cutoff=pd.Timestamp("2026-06-10T09:00:00"),
+        cutoff=pd.Timestamp("2026-06-10T13:00:00+00:00"),
     ).iloc[0]
 
     assert pd.isna(row["report_run_cutoff_timestamp"])
@@ -842,3 +844,49 @@ def test_legacy_unavailable_cutoff_keeps_follow_up_missing() -> None:
     assert pd.isna(row["report_run_cutoff_timestamp"])
     assert pd.isna(row["minutes_latest_attempt_to_report_run_cutoff"])
     assert pd.isna(row["minutes_first_attempt_to_report_run_cutoff"])
+
+
+@pytest.mark.parametrize(
+    "local_timestamp",
+    [
+        "2026-03-08T02:30:00",
+        "2026-11-01T01:30:00",
+    ],
+)
+def test_retry_context_rejects_invalid_detroit_local_time(
+    local_timestamp: str,
+) -> None:
+    """Reject nonexistent and ambiguous Detroit source timestamps."""
+    attempts, studies, generations, transitions = _minimal_retry_inputs()
+    attempts.loc[:, "attempt_start_timestamp"] = pd.Timestamp(local_timestamp)
+
+    with pytest.raises(
+        ExplorationValidationError,
+        match="ambiguous or nonexistent in America/Detroit",
+    ):
+        _derive_validation_inputs(
+            attempts=attempts,
+            studies=studies,
+            generations=generations,
+            transitions=transitions,
+            cutoff=pd.Timestamp("2026-12-01T00:00:00+00:00"),
+        )
+
+
+def test_retry_context_accepts_timezone_aware_attempt_timestamp() -> None:
+    """Convert an already-aware source timestamp directly to UTC."""
+    attempts, studies, generations, transitions = _minimal_retry_inputs()
+    attempts = attempts.assign(
+        attempt_start_timestamp=pd.DatetimeIndex(["2026-05-01T09:00:00-04:00"])
+    )
+
+    row = _derive_validation_inputs(
+        attempts=attempts,
+        studies=studies,
+        generations=generations,
+        transitions=transitions,
+        cutoff=pd.Timestamp("2026-05-01T14:00:00+00:00"),
+    ).iloc[0]
+
+    assert row["minutes_latest_attempt_to_report_run_cutoff"] == 60.0
+    assert row["minutes_first_attempt_to_report_run_cutoff"] == 60.0

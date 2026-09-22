@@ -10,6 +10,9 @@ from typing import Final, cast
 import pandas as pd
 
 from study_posting_audit_exploration.errors import ExplorationValidationError
+from study_posting_audit_exploration.input_contracts import (
+    SOURCE_TIMESTAMP_TIME_ZONE,
+)
 
 AI: Final = "AI"
 MANUAL: Final = "MANUAL"
@@ -109,6 +112,32 @@ def _timestamp(value: object) -> pd.Timestamp | None:
     return pd.Timestamp(
         cast("str | int | float | date | datetime | pd.Timestamp", value)
     )
+
+
+def _source_timestamp_utc(
+    value: pd.Timestamp | None,
+    *,
+    field_name: str,
+) -> pd.Timestamp | None:
+    """Interpret one source timestamp in Detroit and return UTC."""
+    if value is None:
+        return None
+
+    timestamp = pd.Timestamp(value)
+
+    if timestamp.tzinfo is not None:
+        return timestamp.tz_convert("UTC")
+
+    try:
+        return timestamp.tz_localize(
+            SOURCE_TIMESTAMP_TIME_ZONE,
+            ambiguous="raise",
+            nonexistent="raise",
+        ).tz_convert("UTC")
+    except (TypeError, ValueError) as error:
+        raise ExplorationValidationError(
+            f"{field_name} is ambiguous or nonexistent in {SOURCE_TIMESTAMP_TIME_ZONE}"
+        ) from error
 
 
 def _require_columns(
@@ -384,11 +413,24 @@ def _study_row(
         else (latest_timestamp - first_timestamp).total_seconds() / 60.0
     )
     unresolved_cutoff = None if completed else report_run_cutoff_timestamp
+    first_timestamp_utc = _source_timestamp_utc(
+        first_timestamp,
+        field_name="first attempt timestamp",
+    )
+    latest_timestamp_utc = _source_timestamp_utc(
+        latest_timestamp,
+        field_name="latest observed attempt timestamp",
+    )
+    unresolved_cutoff_utc = (
+        None
+        if unresolved_cutoff is None
+        else pd.Timestamp(unresolved_cutoff).tz_convert("UTC")
+    )
 
     if (
-        unresolved_cutoff is not None
-        and latest_timestamp is not None
-        and unresolved_cutoff < latest_timestamp
+        unresolved_cutoff_utc is not None
+        and latest_timestamp_utc is not None
+        and unresolved_cutoff_utc < latest_timestamp_utc
     ):
         raise ExplorationValidationError(
             "report-run cutoff must not precede the latest observed attempt"
@@ -396,13 +438,13 @@ def _study_row(
 
     latest_to_cutoff_minutes = (
         None
-        if unresolved_cutoff is None or latest_timestamp is None
-        else (unresolved_cutoff - latest_timestamp).total_seconds() / 60.0
+        if unresolved_cutoff_utc is None or latest_timestamp_utc is None
+        else (unresolved_cutoff_utc - latest_timestamp_utc).total_seconds() / 60.0
     )
     first_to_cutoff_minutes = (
         None
-        if unresolved_cutoff is None or first_timestamp is None
-        else (unresolved_cutoff - first_timestamp).total_seconds() / 60.0
+        if unresolved_cutoff_utc is None or first_timestamp_utc is None
+        else (unresolved_cutoff_utc - first_timestamp_utc).total_seconds() / 60.0
     )
 
     ai_count = int(sum(mode == AI for mode in modes))

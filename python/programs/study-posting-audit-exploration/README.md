@@ -110,6 +110,8 @@ The two published retry summaries include the count of unresolved studies with a
 
 The faculty retry table labels completed timing, unresolved observed activity span, follow-up after the latest attempt, and total observation window separately. Cutoff medians display their contributing-study count. These are descriptive durations, not threshold-qualified outcomes.
 
+Normalized `START_TIME` and `END_TIME` values are naive timestamps in `America/Detroit`. Exploration localizes them to that zone and converts them to UTC only for report-run cutoff calculations. Ambiguous or nonexistent daylight-saving transition times fail validation.
+
 ## Validation
 
 The current validation contract checks:
