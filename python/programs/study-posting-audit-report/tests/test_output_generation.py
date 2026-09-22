@@ -20,6 +20,7 @@ from study_posting_audit_report import (
     RECORDS_FILENAME,
     REPORT_METADATA_FILENAME,
     REPORT_METADATA_SCHEMA_VERSION,
+    SOURCE_SNAPSHOT_PROVENANCE_REPORT_RUN_CUTOFF,
     SOURCE_SNAPSHOT_PROVENANCE_UNAVAILABLE,
     AuditOutputError,
     AuditReportConfig,
@@ -459,12 +460,16 @@ def test_generate_report_writes_four_files_and_summary(
 
     metadata = json.loads(report.metadata_path.read_text(encoding="utf-8"))
     assert metadata["schema_version"] == REPORT_METADATA_SCHEMA_VERSION
-    assert metadata["source_snapshot_as_of_utc"] is None
+    assert metadata["source_snapshot_as_of_utc"] == metadata["report_generated_at_utc"]
     assert (
-        metadata["source_snapshot_provenance"] == SOURCE_SNAPSHOT_PROVENANCE_UNAVAILABLE
+        metadata["source_snapshot_provenance"]
+        == SOURCE_SNAPSHOT_PROVENANCE_REPORT_RUN_CUTOFF
     )
     generated = datetime.fromisoformat(metadata["report_generated_at_utc"])
+    snapshot = datetime.fromisoformat(metadata["source_snapshot_as_of_utc"])
     assert generated.tzinfo is not None
+    assert snapshot.tzinfo is not None
+    assert snapshot == generated
 
     assert {path.name for path in output_directory.iterdir() if path.is_file()} == {
         RECORDS_FILENAME,

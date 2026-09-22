@@ -96,15 +96,14 @@ The normalized report atomically includes a small metadata document:
 - `schema_version`: metadata schema version, currently `1`;
 - `report_generated_at_utc`: timezone-aware UTC instant captured once for the
   normalized report run;
-- `source_snapshot_as_of_utc`: authoritative source-snapshot instant when
-  available, otherwise `null`;
-- `source_snapshot_provenance`: `UNAVAILABLE` until an authoritative source
-  snapshot is supplied.
+- `source_snapshot_as_of_utc`: the same report-run cutoff instant for new
+  reports;
+- `source_snapshot_provenance`: `REPORT_RUN_CUTOFF` for new reports.
 
-`report_generated_at_utc` records report generation, not necessarily the source
-query or observation-window end. It must not be used as a follow-up endpoint or
-relabeled as a source snapshot. No snapshot time is inferred from attempt,
-creation, login, filesystem, or downstream publication timestamps.
+The report process includes every attempt available through the instant when the
+report runs. One timestamp is captured once and reused for both timestamp
+fields. No cutoff is inferred from attempt, completion, creation, login,
+filesystem, or downstream publication timestamps.
 
 ### `records.csv`
 
