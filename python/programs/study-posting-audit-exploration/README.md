@@ -90,10 +90,13 @@ Exploration validates its exact version 1 shape:
 
 - `report_generated_at_utc` is a timezone-aware UTC report-generation instant;
 - `source_snapshot_as_of_utc` is nullable;
-- `source_snapshot_provenance` is `UNAVAILABLE` or `SOURCE_PROVIDED`;
+- `source_snapshot_provenance` is `REPORT_RUN_CUTOFF`, `UNAVAILABLE`, or
+  `SOURCE_PROVIDED`;
 - `UNAVAILABLE` requires a null snapshot;
 - `SOURCE_PROVIDED` requires a timezone-aware snapshot no later than report
-  generation.
+  generation;
+- `REPORT_RUN_CUTOFF` requires a nonnull snapshot identical to the report
+  generation timestamp after UTC normalization.
 
 Report generation time is not automatically a source-query or observation-window
 endpoint. Exploration does not infer a source snapshot from attempt, creation,

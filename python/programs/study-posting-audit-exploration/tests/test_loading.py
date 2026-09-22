@@ -16,6 +16,7 @@ from study_posting_audit_exploration.input_contracts import (
     READABILITY_METRICS_FILENAME,
     RECORDS_FILENAME,
     REPORT_METADATA_FILENAME,
+    SOURCE_SNAPSHOT_PROVENANCE_REPORT_RUN_CUTOFF,
     SOURCE_SNAPSHOT_PROVENANCE_SOURCE_PROVIDED,
     SOURCE_SNAPSHOT_PROVENANCE_UNAVAILABLE,
 )
@@ -47,10 +48,17 @@ def test_loads_all_four_files_with_typed_columns(
         0,
         tzinfo=UTC,
     )
-    assert report.metadata.source_snapshot_as_of_utc is None
+    assert report.metadata.source_snapshot_as_of_utc == datetime(
+        2026,
+        6,
+        3,
+        12,
+        0,
+        tzinfo=UTC,
+    )
     assert (
         report.metadata.source_snapshot_provenance
-        == SOURCE_SNAPSHOT_PROVENANCE_UNAVAILABLE
+        == SOURCE_SNAPSHOT_PROVENANCE_REPORT_RUN_CUTOFF
     )
 
 
@@ -371,3 +379,66 @@ def test_source_provided_snapshot_is_loaded_in_utc(
         0,
         tzinfo=UTC,
     )
+
+
+def test_legacy_unavailable_snapshot_is_still_accepted(
+    valid_report_directory: Path,
+) -> None:
+    """Preserve compatibility with pre-cutoff normalized metadata."""
+    _write_metadata(
+        valid_report_directory,
+        {
+            "schema_version": 1,
+            "report_generated_at_utc": "2026-06-03T12:00:00+00:00",
+            "source_snapshot_as_of_utc": None,
+            "source_snapshot_provenance": (SOURCE_SNAPSHOT_PROVENANCE_UNAVAILABLE),
+        },
+    )
+
+    report = load_audit_report(
+        ExplorationInputConfig(
+            report_directory=valid_report_directory,
+        )
+    )
+
+    assert report.metadata.source_snapshot_as_of_utc is None
+    assert (
+        report.metadata.source_snapshot_provenance
+        == SOURCE_SNAPSHOT_PROVENANCE_UNAVAILABLE
+    )
+
+
+@pytest.mark.parametrize(
+    ("snapshot", "message"),
+    [
+        (None, "must be an RFC 3339 string"),
+        (
+            "2026-06-03T11:59:59+00:00",
+            "requires snapshot and generation timestamps to be identical",
+        ),
+    ],
+)
+def test_report_run_cutoff_requires_identical_nonnull_timestamp(
+    valid_report_directory: Path,
+    snapshot: object,
+    message: str,
+) -> None:
+    """Require the one-instant report-run cutoff contract."""
+    _write_metadata(
+        valid_report_directory,
+        {
+            "schema_version": 1,
+            "report_generated_at_utc": "2026-06-03T12:00:00+00:00",
+            "source_snapshot_as_of_utc": snapshot,
+            "source_snapshot_provenance": (
+                SOURCE_SNAPSHOT_PROVENANCE_REPORT_RUN_CUTOFF
+            ),
+        },
+    )
+
+    with pytest.raises(ExplorationInputError, match=message):
+        load_audit_report(
+            ExplorationInputConfig(
+                report_directory=valid_report_directory,
+            )
+        )

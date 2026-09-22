@@ -436,3 +436,5 @@ follow-up eligibility, and no follow-up threshold or adjusted unresolved rate
 is implemented by this metadata-loading milestone.
 
 The retry completion timestamp uses the completed attempt's authoritative `END_TIME`. Completed timing is measured from the first recorded attempt start to that completion end. Missing `END_TIME` on a completed attempt is invalid. This timestamp does not define the observation-window end for studies with no completion observed.
+
+New normalized reports use `REPORT_RUN_CUTOFF`: the report process captures one UTC instant and writes it as both report generation and source snapshot time. Exploration requires those instants to be equal. Legacy `UNAVAILABLE` metadata remains loadable, but it cannot support follow-up durations.

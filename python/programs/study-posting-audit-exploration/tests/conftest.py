@@ -20,7 +20,7 @@ from study_posting_audit_exploration.input_contracts import (
     RECORDS_FILENAME,
     REPORT_METADATA_FILENAME,
     REPORT_METADATA_SCHEMA_VERSION,
-    SOURCE_SNAPSHOT_PROVENANCE_UNAVAILABLE,
+    SOURCE_SNAPSHOT_PROVENANCE_REPORT_RUN_CUTOFF,
 )
 
 
@@ -290,8 +290,10 @@ def valid_report_directory(tmp_path: Path) -> Path:
             {
                 "schema_version": REPORT_METADATA_SCHEMA_VERSION,
                 "report_generated_at_utc": "2026-06-03T12:00:00+00:00",
-                "source_snapshot_as_of_utc": None,
-                "source_snapshot_provenance": (SOURCE_SNAPSHOT_PROVENANCE_UNAVAILABLE),
+                "source_snapshot_as_of_utc": "2026-06-03T12:00:00+00:00",
+                "source_snapshot_provenance": (
+                    SOURCE_SNAPSHOT_PROVENANCE_REPORT_RUN_CUTOFF
+                ),
             },
             indent=2,
             sort_keys=True,

@@ -26,6 +26,7 @@ from study_posting_audit_exploration.input_contracts import (
     REPORT_METADATA_FILENAME,
     REPORT_METADATA_KEYS,
     REPORT_METADATA_SCHEMA_VERSION,
+    SOURCE_SNAPSHOT_PROVENANCE_REPORT_RUN_CUTOFF,
     SOURCE_SNAPSHOT_PROVENANCE_SOURCE_PROVIDED,
     SOURCE_SNAPSHOT_PROVENANCE_UNAVAILABLE,
 )
@@ -220,7 +221,9 @@ def _metadata_datetime(
     return parsed.astimezone(UTC)
 
 
-def _read_report_metadata(path: Path) -> NormalizedReportMetadata:
+def _read_report_metadata(  # noqa: PLR0912
+    path: Path,
+) -> NormalizedReportMetadata:
     """Read and validate normalized report metadata."""
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
@@ -263,6 +266,7 @@ def _read_report_metadata(path: Path) -> NormalizedReportMetadata:
     provenance = raw["source_snapshot_provenance"]
 
     if provenance not in {
+        SOURCE_SNAPSHOT_PROVENANCE_REPORT_RUN_CUTOFF,
         SOURCE_SNAPSHOT_PROVENANCE_UNAVAILABLE,
         SOURCE_SNAPSHOT_PROVENANCE_SOURCE_PROVIDED,
     }:
@@ -288,6 +292,15 @@ def _read_report_metadata(path: Path) -> NormalizedReportMetadata:
         if source_snapshot > generated:
             raise ExplorationInputError(
                 "Source snapshot timestamp must not be after report generation"
+            )
+
+        if (
+            provenance == SOURCE_SNAPSHOT_PROVENANCE_REPORT_RUN_CUTOFF
+            and source_snapshot != generated
+        ):
+            raise ExplorationInputError(
+                "REPORT_RUN_CUTOFF requires snapshot and generation timestamps "
+                "to be identical"
             )
 
     return NormalizedReportMetadata(
