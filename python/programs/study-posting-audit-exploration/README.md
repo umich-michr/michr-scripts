@@ -253,7 +253,7 @@ Faculty outputs contain aggregates only. Feedback contributes only count or
 Boolean presence to retry analysis; feedback text does not enter retry tables
 or charts.
 
-Completed timing means first recorded attempt start to completed-attempt start.
+Completed timing means first recorded attempt start to completed-attempt end.
 Timing for no-completion-observed studies means first recorded attempt start to
 latest observed attempt start. It is not follow-up time.
 

@@ -127,7 +127,7 @@ _PATHWAY_METADATA: dict[str, tuple[str, str]] = {
 }
 
 _COMPLETED_TIMING_DEFINITION = (
-    "First recorded attempt start to completed attempt start, in minutes."
+    "First recorded attempt start to completed attempt end, in minutes."
 )
 _UNRESOLVED_TIMING_DEFINITION = (
     "First recorded attempt start to latest observed attempt start, in minutes; "

@@ -93,6 +93,12 @@ def _attempt_frame(
     """Return a minimal attempt-history-shaped synthetic frame."""
     frame = pd.DataFrame(rows)
     frame["attempt_start_timestamp"] = pd.to_datetime(frame["attempt_start_timestamp"])
+    completed = frame["attempt_result"].eq("COMPLETE")
+    frame["attempt_end_timestamp"] = pd.NaT
+    frame.loc[
+        completed,
+        "attempt_end_timestamp",
+    ] = frame.loc[completed, "attempt_start_timestamp"] + pd.Timedelta(minutes=5)
 
     return frame
 
@@ -257,7 +263,8 @@ def test_retry_context_derives_observed_characteristics_and_timing() -> None:
     assert bool(completed["any_input_method_change"]) is True
     assert bool(completed["any_source_signature_change"]) is True
     assert completed["ai_feedback_record_count"] == 1
-    assert completed["minutes_first_attempt_to_completion"] == pytest.approx(30.0)
+    assert completed["completed_timestamp"] == pd.Timestamp("2026-01-01T09:35:00")
+    assert completed["minutes_first_attempt_to_completion"] == pytest.approx(35.0)
     assert pd.isna(completed["minutes_first_attempt_to_last_observed_attempt"])
 
     assert unresolved["pathway_category"] == "MIXED_MODES_NO_COMPLETION_OBSERVED"
@@ -362,6 +369,7 @@ def test_empty_retry_context_has_stable_schema() -> None:
             "study_num",
             "audit_record_id",
             "attempt_start_timestamp",
+            "attempt_end_timestamp",
             "attempt_authoring_mode",
             "attempt_result",
             "attempt_author_user_name",

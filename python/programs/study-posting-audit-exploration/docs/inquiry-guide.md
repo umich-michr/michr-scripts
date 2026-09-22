@@ -270,7 +270,7 @@ Interpret percentages with their paired denominators:
 
 Missing percentages indicate a zero denominator. Do not replace them with zero.
 
-Completed timing is first attempt to completion. No-completion-observed timing
+Completed timing is first attempt start to completed-attempt end. No-completion-observed timing
 is first attempt to latest observed attempt. The latter does not measure
 follow-up. Until a report-query timestamp and minimum follow-up threshold are
 defined, do not compare no-completion-observed percentages as drop-off or final

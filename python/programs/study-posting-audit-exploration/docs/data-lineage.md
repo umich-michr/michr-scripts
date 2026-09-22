@@ -434,3 +434,5 @@ does not establish when source querying completed or when observation ended.
 Only a source-provided snapshot timestamp can potentially anchor later
 follow-up eligibility, and no follow-up threshold or adjusted unresolved rate
 is implemented by this metadata-loading milestone.
+
+The retry completion timestamp uses the completed attempt's authoritative `END_TIME`. Completed timing is measured from the first recorded attempt start to that completion end. Missing `END_TIME` on a completed attempt is invalid. This timestamp does not define the observation-window end for studies with no completion observed.

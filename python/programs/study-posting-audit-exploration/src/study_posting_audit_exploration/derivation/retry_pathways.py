@@ -346,8 +346,29 @@ def _study_row(
     completed_timestamp = (
         None
         if completed_rows.empty
+        else _timestamp(completed_rows.iloc[0]["attempt_end_timestamp"])
+    )
+
+    if completed and completed_timestamp is None:
+        raise ExplorationValidationError(
+            "retry-pathway completion timing requires completed attempt end time"
+        )
+
+    completed_start = (
+        None
+        if completed_rows.empty
         else _timestamp(completed_rows.iloc[0]["attempt_start_timestamp"])
     )
+
+    if (
+        completed_timestamp is not None
+        and completed_start is not None
+        and completed_timestamp < completed_start
+    ):
+        raise ExplorationValidationError(
+            "retry-pathway completion end time must not precede attempt start"
+        )
+
     completion_minutes = (
         None
         if first_timestamp is None or completed_timestamp is None
@@ -431,6 +452,7 @@ def derive_study_retry_tables(
         "study_num",
         "audit_record_id",
         "attempt_start_timestamp",
+        "attempt_end_timestamp",
         "attempt_authoring_mode",
         "attempt_result",
         "attempt_author_user_name",
