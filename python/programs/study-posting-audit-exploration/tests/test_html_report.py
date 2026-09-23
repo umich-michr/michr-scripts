@@ -438,6 +438,51 @@ def suggestion_selection_rows() -> pd.DataFrame:
     )
 
 
+def nontext_compensation_rows() -> pd.DataFrame:
+    """Return one aggregate-only compensation Boolean row."""
+    return pd.DataFrame.from_records(
+        [
+            {
+                "field_name": "offersCompensation",
+                "analysis_type": "BOOLEAN",
+                "completed_ai_attempt_count": 10,
+                "attempt_count_with_ai_value_selected": 9,
+                "attempt_count_final_equal_to_selected": 7,
+                "attempt_count_final_different_from_selected": 2,
+                "attempt_count_final_missing": 1,
+                "final_equal_to_selected_percentage_among_selected": (
+                    100.0 * 7.0 / 9.0
+                ),
+                "final_different_from_selected_percentage_among_selected": (
+                    100.0 * 2.0 / 9.0
+                ),
+            }
+        ]
+    )
+
+
+def compensation_analysis_rows() -> pd.DataFrame:
+    """Return aggregate-only generic and specific suggestion rows."""
+    return pd.DataFrame.from_records(
+        [
+            {
+                "compensation_suggestion_kind": "genericCompensation",
+                "completed_ai_attempt_count_with_suggestion": 6,
+                "offered_suggestion_count": 18,
+                "selected_suggestion_count": 4,
+                "suggestion_selection_percentage": 100.0 * 4.0 / 18.0,
+            },
+            {
+                "compensation_suggestion_kind": "specificCompensation",
+                "completed_ai_attempt_count_with_suggestion": 5,
+                "offered_suggestion_count": 15,
+                "selected_suggestion_count": 3,
+                "suggestion_selection_percentage": 20.0,
+            },
+        ]
+    )
+
+
 def readability_change_rows() -> pd.DataFrame:
     """Return aggregate-only readability-change rows."""
     return pd.DataFrame.from_records(
@@ -1512,6 +1557,7 @@ def test_html_report_toc_targets_unique_sections_in_report_order() -> None:
         "study-mix-heading",
         "field-adoption-heading",
         "suggestion-choice-heading",
+        "compensation-heading",
         "readability-heading",
         "content-source-heading",
         "user-feedback-heading",
@@ -1560,6 +1606,7 @@ def test_html_report_uses_progressive_disclosure_defaults() -> None:
         "study-mix-heading",
         "field-adoption-heading",
         "suggestion-choice-heading",
+        "compensation-heading",
         "readability-heading",
         "content-source-heading",
     ):
@@ -1567,7 +1614,7 @@ def test_html_report_uses_progressive_disclosure_defaults() -> None:
             f'<details class="report-section">\n    <summary id="{section_id}"'
         ) in html
 
-    assert html.count('<details class="report-section"') == 13
+    assert html.count('<details class="report-section"') == 14
     assert "details.report-section:not([open]) > section" in html
     assert "display: block" in html
 
@@ -1816,6 +1863,179 @@ def test_html_report_explains_field_adoption_and_editing() -> None:
     panel_end = html.index("</details>", summary)
     panel = html[panel_start:panel_end]
     assert '<details class="explanation-panel" open' not in panel
+
+
+def test_html_report_explains_compensation_choices() -> None:
+    """Surface completed-AI Boolean and text-suggestion aggregates."""
+    html = render_html_report(
+        records=feedback_records(),
+        overview_summary=overview_rows(),
+        author_handoff_summary=author_handoff_rows(),
+        retry_card_summary=retry_card_rows(),
+        retry_characteristics_summary=retry_characteristic_rows(),
+        data_quality_summary=quality_rows(),
+        repeated_attempt_source_consistency_summary=repeated_source_rows(),
+        charts=charts(),
+        nontext_field_adoption_summary=nontext_compensation_rows(),
+        compensation_analysis_summary=compensation_analysis_rows(),
+    )
+    normalized = " ".join(html.split())
+
+    assert 'id="compensation-heading"' in html
+    assert "Compensation choices and text suggestions" in html
+    assert "completed AI attempts only" in normalized
+    assert "do not show whether the user actively clicked" in normalized
+    assert "Compensation Yes/No comparison among completed AI attempts" in normalized
+    assert "77.8% had a matching final value" in normalized
+    assert "22.2% had a different final value" in normalized
+    assert "Generic compensation" in normalized
+    assert "Specific compensation" in normalized
+    assert ">18<" in normalized
+    assert ">15<" in normalized
+    assert "22.2%" in normalized
+    assert "20.0%" in normalized
+    assert "At most one compensation text suggestion" in normalized
+    assert "exactly three generic and three specific suggestions" in normalized
+
+    summary = html.index("<summary>How to interpret compensation choices</summary>")
+    panel_start = html.rfind('<details class="explanation-panel">', 0, summary)
+    panel_end = html.index("</details>", summary)
+    panel = html[panel_start:panel_end]
+    assert '<details class="explanation-panel" open' not in panel
+
+
+def test_html_report_displays_compensation_empty_states() -> None:
+    """Render clear states when compensation aggregates are unavailable."""
+    html = render_html_report(
+        records=feedback_records(),
+        overview_summary=overview_rows(),
+        author_handoff_summary=author_handoff_rows(),
+        retry_card_summary=retry_card_rows(),
+        retry_characteristics_summary=retry_characteristic_rows(),
+        data_quality_summary=quality_rows(),
+        repeated_attempt_source_consistency_summary=repeated_source_rows(),
+        charts=charts(),
+    )
+
+    assert "No compensation Yes/No aggregate was available." in html
+    assert "No compensation text-suggestion aggregate was available." in html
+
+
+def test_html_report_rejects_duplicate_compensation_boolean_rows() -> None:
+    """Reject an ambiguous aggregate with duplicate Boolean rows."""
+    duplicated = pd.concat(
+        [nontext_compensation_rows(), nontext_compensation_rows()],
+        ignore_index=True,
+    )
+
+    with pytest.raises(
+        ExplorationValidationError,
+        match="must contain at most one offersCompensation BOOLEAN row",
+    ):
+        render_html_report(
+            records=feedback_records(),
+            overview_summary=overview_rows(),
+            author_handoff_summary=author_handoff_rows(),
+            retry_card_summary=retry_card_rows(),
+            retry_characteristics_summary=retry_characteristic_rows(),
+            data_quality_summary=quality_rows(),
+            repeated_attempt_source_consistency_summary=repeated_source_rows(),
+            charts=charts(),
+            nontext_field_adoption_summary=duplicated,
+        )
+
+
+def test_html_report_rejects_incomplete_compensation_text_summary() -> None:
+    """Require every aggregate column consumed by the HTML table."""
+    incomplete = compensation_analysis_rows().drop(
+        columns=["selected_suggestion_count"]
+    )
+
+    with pytest.raises(
+        ExplorationValidationError,
+        match="compensation_analysis_summary lacks required HTML columns",
+    ):
+        render_html_report(
+            records=feedback_records(),
+            overview_summary=overview_rows(),
+            author_handoff_summary=author_handoff_rows(),
+            retry_card_summary=retry_card_rows(),
+            retry_characteristics_summary=retry_characteristic_rows(),
+            data_quality_summary=quality_rows(),
+            repeated_attempt_source_consistency_summary=repeated_source_rows(),
+            charts=charts(),
+            compensation_analysis_summary=incomplete,
+        )
+
+
+def test_html_report_marks_empty_compensation_offer_denominator_unavailable() -> None:
+    """Do not render a zero-denominator selection rate as zero percent."""
+    summary = compensation_analysis_rows()
+    summary.loc[
+        summary["compensation_suggestion_kind"].eq("genericCompensation"),
+        [
+            "completed_ai_attempt_count_with_suggestion",
+            "offered_suggestion_count",
+            "selected_suggestion_count",
+            "suggestion_selection_percentage",
+        ],
+    ] = [0, 0, 0, None]
+
+    html = render_html_report(
+        records=feedback_records(),
+        overview_summary=overview_rows(),
+        author_handoff_summary=author_handoff_rows(),
+        retry_card_summary=retry_card_rows(),
+        retry_characteristics_summary=retry_characteristic_rows(),
+        data_quality_summary=quality_rows(),
+        repeated_attempt_source_consistency_summary=repeated_source_rows(),
+        charts=charts(),
+        compensation_analysis_summary=summary,
+    )
+
+    generic_start = html.index(">Generic compensation<")
+    generic_end = html.index("</tr>", generic_start)
+    assert "\\N" in html[generic_start:generic_end]
+
+
+@pytest.mark.parametrize(
+    ("mutate", "message"),
+    [
+        (
+            lambda frame: frame.assign(
+                compensation_suggestion_kind="SYNTHETIC_UNKNOWN"
+            ),
+            "contains unsupported suggestion kinds",
+        ),
+        (
+            lambda frame: pd.concat([frame, frame.iloc[[0]]], ignore_index=True),
+            "must contain at most one row per suggestion kind",
+        ),
+        (
+            lambda frame: frame.assign(offered_suggestion_count=4.5),
+            "must be a nonnegative integer",
+        ),
+    ],
+)
+def test_html_report_rejects_invalid_compensation_text_aggregates(
+    mutate: Callable[[pd.DataFrame], pd.DataFrame],
+    message: str,
+) -> None:
+    """Reject unsupported kinds, duplicates, and fractional counts."""
+    invalid = mutate(compensation_analysis_rows())
+
+    with pytest.raises(ExplorationValidationError, match=message):
+        render_html_report(
+            records=feedback_records(),
+            overview_summary=overview_rows(),
+            author_handoff_summary=author_handoff_rows(),
+            retry_card_summary=retry_card_rows(),
+            retry_characteristics_summary=retry_characteristic_rows(),
+            data_quality_summary=quality_rows(),
+            repeated_attempt_source_consistency_summary=repeated_source_rows(),
+            charts=charts(),
+            compensation_analysis_summary=invalid,
+        )
 
 
 def test_html_report_explains_readability_indicators() -> None:

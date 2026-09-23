@@ -357,6 +357,11 @@ _TEMPLATE = """<!doctype html>
       <li><a href="#study-mix-heading">Participant and department mix</a></li>
       <li><a href="#field-adoption-heading">AI field adoption and editing</a></li>
       <li><a href="#suggestion-choice-heading">Suggestion choice</a></li>
+      <li>
+        <a href="#compensation-heading">
+          Compensation choices and text suggestions
+        </a>
+      </li>
       <li><a href="#readability-heading">Readability indicators</a></li>
       <li>
         <a href="#content-source-heading">
@@ -1246,6 +1251,126 @@ _TEMPLATE = """<!doctype html>
   </details>
 
   <details class="report-section">
+    <summary id="compensation-heading">
+      Compensation choices and text suggestions
+    </summary>
+    <section aria-labelledby="compensation-heading">
+      <p>
+        This section includes completed AI attempts only. It first compares
+        the compensation Yes/No value supplied by AI with the final saved
+        value. It then summarizes generic and specific compensation text
+        suggestions.
+      </p>
+      <p class="caution">
+        A matching final Yes/No value means the saved value matched the value
+        supplied by AI. The audit data do not show whether the user actively
+        clicked or affirmatively accepted that value.
+      </p>
+
+      <h3>AI-supplied Yes/No value and final saved value</h3>
+      {% if compensation_flag %}
+      <div class="retry-table-wrapper" role="region"
+           aria-label="Compensation Yes or No comparison table" tabindex="0">
+        <table class="retry-table">
+          <caption>
+            Compensation Yes/No comparison among completed AI attempts
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Completed AI attempts</th>
+              <th scope="col">With AI-supplied value</th>
+              <th scope="col">Final matched AI value</th>
+              <th scope="col">Final differed from AI value</th>
+              <th scope="col">Final value unavailable</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>{{ compensation_flag.completed_attempt_count }}</td>
+              <td>{{ compensation_flag.ai_value_count }}</td>
+              <td>{{ compensation_flag.matched_count }}</td>
+              <td>{{ compensation_flag.differed_count }}</td>
+              <td>{{ compensation_flag.final_unavailable_count }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        Among attempts with an AI-supplied value,
+        {{ compensation_flag.matched_percentage_text }} had a matching final
+        value and {{ compensation_flag.differed_percentage_text }} had a
+        different final value. These percentages can sum to less than 100%
+        when a final value was unavailable.
+      </p>
+      {% else %}
+      <p>No compensation Yes/No aggregate was available.</p>
+      {% endif %}
+
+      <h3>Generic and specific compensation text suggestions</h3>
+      {% if compensation_text_rows %}
+      <div class="retry-table-wrapper" role="region"
+           aria-label="Compensation text suggestion table" tabindex="0">
+        <table class="retry-table">
+          <caption>
+            Compensation text offers and selections among completed AI attempts
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Suggestion kind</th>
+              <th scope="col">Attempts with one or more offers</th>
+              <th scope="col">Text suggestions offered</th>
+              <th scope="col">Text suggestions selected</th>
+              <th scope="col">Selected among offered text suggestions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in compensation_text_rows %}
+            <tr>
+              <th scope="row">{{ row.label }}</th>
+              <td>{{ row.attempt_count_with_suggestion }}</td>
+              <td>{{ row.offered_count }}</td>
+              <td>{{ row.selected_count }}</td>
+              <td>{{ row.selection_percentage_text }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p>No compensation text-suggestion aggregate was available.</p>
+      {% endif %}
+
+      <details class="explanation-panel">
+        <summary>How to interpret compensation choices</summary>
+        <div class="explanation-panel-content">
+          <p>
+            The Yes/No table counts completed AI attempts. “Matched” means the
+            AI-supplied Boolean and final saved Boolean were equal; “differed”
+            means they were unequal. It does not identify an active click.
+          </p>
+          <p>
+            The text table uses two different units. “Attempts with one or more
+            offers” counts completed AI attempts, while “suggestions offered”
+            and “suggestions selected” count individual text suggestions. At
+            most one compensation text suggestion can be selected per attempt.
+          </p>
+          <p>
+            <strong>Synthetic example:</strong> if 10 completed AI attempts
+            received 30 generic suggestions and 4 generic suggestions were
+            selected, the instance-level selection percentage is 13.3%. This
+            does not mean 40% of attempts selected a generic suggestion.
+          </p>
+          <p class="caution">
+            These totals cannot show how many attempts received exactly three
+            generic and three specific suggestions. They also do not establish
+            preference, suggestion quality, or causal benefit.
+          </p>
+        </div>
+      </details>
+    </section>
+  </details>
+
+  <details class="report-section">
     <summary id="readability-heading">
     Readability indicators
   </summary>
@@ -1950,6 +2075,30 @@ class RetryCharacteristicView:
 
 
 @dataclass(frozen=True, slots=True)
+class CompensationFlagView:
+    """One completed-AI compensation Boolean comparison."""
+
+    completed_attempt_count: int
+    ai_value_count: int
+    matched_count: int
+    differed_count: int
+    final_unavailable_count: int
+    matched_percentage_text: str
+    differed_percentage_text: str
+
+
+@dataclass(frozen=True, slots=True)
+class CompensationTextView:
+    """One generic or specific compensation suggestion summary."""
+
+    label: str
+    attempt_count_with_suggestion: int
+    offered_count: int
+    selected_count: int
+    selection_percentage_text: str
+
+
+@dataclass(frozen=True, slots=True)
 class UserFeedbackView:
     """One authorized faculty-facing feedback response."""
 
@@ -2305,6 +2454,183 @@ _ZERO_WARNING_MESSAGES: dict[str, str] = {
 }
 
 
+def _aggregate_count(
+    value: object,
+    *,
+    value_name: str,
+) -> int:
+    """Return one validated nonnegative aggregate count."""
+    number = _finite_number(value, value_name=value_name)
+
+    if number < 0 or not number.is_integer():
+        raise ExplorationValidationError(
+            f"HTML aggregate value {value_name!r} must be a nonnegative integer"
+        )
+
+    return int(number)
+
+
+def _compensation_flag_view(
+    summary: pd.DataFrame,
+) -> CompensationFlagView | None:
+    """Return the completed-AI compensation Boolean comparison."""
+    required = (
+        "field_name",
+        "analysis_type",
+        "completed_ai_attempt_count",
+        "attempt_count_with_ai_value_selected",
+        "attempt_count_final_equal_to_selected",
+        "attempt_count_final_different_from_selected",
+        "attempt_count_final_missing",
+        "final_equal_to_selected_percentage_among_selected",
+        "final_different_from_selected_percentage_among_selected",
+    )
+    missing = [column for column in required if column not in summary.columns]
+    if missing:
+        raise ExplorationValidationError(
+            "nontext_field_adoption_summary lacks required HTML columns: "
+            + ", ".join(missing)
+        )
+
+    rows = summary.loc[
+        summary["field_name"].eq("offersCompensation")
+        & summary["analysis_type"].eq("BOOLEAN")
+    ]
+    if rows.empty:
+        return None
+    if len(rows) != 1:
+        raise ExplorationValidationError(
+            "nontext_field_adoption_summary must contain at most one "
+            "offersCompensation BOOLEAN row"
+        )
+
+    row = rows.iloc[0]
+    count_names = (
+        ("completed_ai_attempt_count", "completed_attempt_count"),
+        ("attempt_count_with_ai_value_selected", "ai_value_count"),
+        ("attempt_count_final_equal_to_selected", "matched_count"),
+        ("attempt_count_final_different_from_selected", "differed_count"),
+        ("attempt_count_final_missing", "final_unavailable_count"),
+    )
+    counts = {
+        output_name: _aggregate_count(row[column], value_name=column)
+        for column, output_name in count_names
+    }
+
+    return CompensationFlagView(
+        **counts,
+        matched_percentage_text=(
+            _percentage_text(row["final_equal_to_selected_percentage_among_selected"])
+            or "\\N"
+        ),
+        differed_percentage_text=(
+            _percentage_text(
+                row["final_different_from_selected_percentage_among_selected"]
+            )
+            or "\\N"
+        ),
+    )
+
+
+def _compensation_text_views(
+    summary: pd.DataFrame,
+) -> tuple[CompensationTextView, ...]:
+    """Return generic and specific completed-AI compensation summaries."""
+    required = (
+        "compensation_suggestion_kind",
+        "completed_ai_attempt_count_with_suggestion",
+        "offered_suggestion_count",
+        "selected_suggestion_count",
+        "suggestion_selection_percentage",
+    )
+    missing = [column for column in required if column not in summary.columns]
+    if missing:
+        raise ExplorationValidationError(
+            "compensation_analysis_summary lacks required HTML columns: "
+            + ", ".join(missing)
+        )
+
+    labels = {
+        "genericCompensation": "Generic compensation",
+        "specificCompensation": "Specific compensation",
+    }
+    kinds = summary["compensation_suggestion_kind"].astype("string")
+    unknown = sorted(set(kinds.dropna().astype(str)) - set(labels))
+
+    if unknown:
+        raise ExplorationValidationError(
+            "compensation_analysis_summary contains unsupported suggestion "
+            "kinds: " + ", ".join(unknown)
+        )
+
+    if kinds.duplicated(keep=False).any():
+        raise ExplorationValidationError(
+            "compensation_analysis_summary must contain at most one row per "
+            "suggestion kind"
+        )
+
+    rows_by_kind = {
+        str(row["compensation_suggestion_kind"]): row
+        for row in summary.to_dict(orient="records")
+    }
+    views: list[CompensationTextView] = []
+    for kind, label in labels.items():
+        row = rows_by_kind.get(kind)
+        if row is None:
+            continue
+        views.append(
+            CompensationTextView(
+                label=label,
+                attempt_count_with_suggestion=_aggregate_count(
+                    row["completed_ai_attempt_count_with_suggestion"],
+                    value_name="completed_ai_attempt_count_with_suggestion",
+                ),
+                offered_count=_aggregate_count(
+                    row["offered_suggestion_count"],
+                    value_name="offered_suggestion_count",
+                ),
+                selected_count=_aggregate_count(
+                    row["selected_suggestion_count"],
+                    value_name="selected_suggestion_count",
+                ),
+                selection_percentage_text=(
+                    _percentage_text(row["suggestion_selection_percentage"]) or "\\N"
+                ),
+            )
+        )
+    return tuple(views)
+
+
+def _empty_nontext_summary() -> pd.DataFrame:
+    """Return canonical columns consumed by compensation HTML."""
+    return pd.DataFrame(
+        columns=[
+            "field_name",
+            "analysis_type",
+            "completed_ai_attempt_count",
+            "attempt_count_with_ai_value_selected",
+            "attempt_count_final_equal_to_selected",
+            "attempt_count_final_different_from_selected",
+            "attempt_count_final_missing",
+            "final_equal_to_selected_percentage_among_selected",
+            "final_different_from_selected_percentage_among_selected",
+        ]
+    )
+
+
+def _empty_compensation_summary() -> pd.DataFrame:
+    """Return canonical compensation text-summary columns."""
+    return pd.DataFrame(
+        columns=[
+            "compensation_suggestion_kind",
+            "completed_ai_attempt_count_with_suggestion",
+            "offered_suggestion_count",
+            "selected_suggestion_count",
+            "suggestion_selection_percentage",
+        ]
+    )
+
+
 def _nullable_number_text(
     value: object,
     *,
@@ -2648,7 +2974,7 @@ def _figure_html(
     )
 
 
-def render_html_report(
+def render_html_report(  # noqa: PLR0913
     *,
     records: pd.DataFrame,
     overview_summary: pd.DataFrame,
@@ -2658,6 +2984,8 @@ def render_html_report(
     data_quality_summary: pd.DataFrame,
     repeated_attempt_source_consistency_summary: pd.DataFrame,
     charts: ExplorationCharts,
+    nontext_field_adoption_summary: pd.DataFrame | None = None,
+    compensation_analysis_summary: pd.DataFrame | None = None,
 ) -> str:
     """Return one self-contained faculty-facing HTML report."""
     environment = Environment(
@@ -2671,9 +2999,21 @@ def render_html_report(
     source_context = _source_context_html_context(
         repeated_attempt_source_consistency_summary
     )
+    compensation_flag = _compensation_flag_view(
+        _empty_nontext_summary()
+        if nontext_field_adoption_summary is None
+        else nontext_field_adoption_summary
+    )
+    compensation_text_rows = _compensation_text_views(
+        _empty_compensation_summary()
+        if compensation_analysis_summary is None
+        else compensation_analysis_summary
+    )
 
     return template.render(
         title=_REPORT_TITLE,
+        compensation_flag=compensation_flag,
+        compensation_text_rows=compensation_text_rows,
         user_feedback_rows=feedback_rows,
         source_context=source_context,
         faculty_summary=_faculty_summary(
@@ -2839,6 +3179,8 @@ def write_html_report(  # noqa: PLR0913
     data_quality_summary: pd.DataFrame,
     repeated_attempt_source_consistency_summary: pd.DataFrame,
     charts: ExplorationCharts,
+    nontext_field_adoption_summary: pd.DataFrame | None = None,
+    compensation_analysis_summary: pd.DataFrame | None = None,
 ) -> None:
     """Write one self-contained HTML report."""
     try:
@@ -2854,6 +3196,8 @@ def write_html_report(  # noqa: PLR0913
                     repeated_attempt_source_consistency_summary
                 ),
                 charts=charts,
+                nontext_field_adoption_summary=nontext_field_adoption_summary,
+                compensation_analysis_summary=compensation_analysis_summary,
             ),
             encoding="utf-8",
         )

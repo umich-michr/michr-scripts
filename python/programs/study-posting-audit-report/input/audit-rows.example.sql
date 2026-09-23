@@ -193,6 +193,8 @@ WITH
      AND spa.start_time BETWEEN
          hj.job_effective_date
          AND hj.job_end_date
+    -- OPTIONAL uncomment below to limit to primary appointments only
+    --WHERE hj.primary_appointment=1
     GROUP BY spa.id
 ),
  attempt_pi_appointments AS (
@@ -219,6 +221,8 @@ WITH
      AND spa.start_time BETWEEN
          hj.job_effective_date
          AND hj.job_end_date
+    -- OPTIONAL uncomment below to limit to primary appointments only
+    --WHERE hj.primary_appointment=1
     GROUP BY spa.id
 ),
  all_logins AS (

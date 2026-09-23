@@ -386,6 +386,8 @@ def _write_staging_output(
             tables.source_context.repeated_attempt_source_consistency_summary
         ),
         charts=charts,
+        nontext_field_adoption_summary=(tables.fields.nontext_field_adoption_summary),
+        compensation_analysis_summary=(tables.fields.compensation_analysis_summary),
     )
     write_manifest(
         manifest_path,
