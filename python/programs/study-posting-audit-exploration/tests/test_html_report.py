@@ -1283,6 +1283,10 @@ def test_html_report_explains_author_handoff_categories() -> None:
     assert "Mixed completion and other authors" in panel
     assert "Suppose Alex made the completed attempt" in normalized
     assert "Each completed study appears in exactly one category." in normalized
+    assert "Each full bar is all completed studies" in normalized
+    assert "Segment heights are completed-study counts" in normalized
+    assert "if an AI bar contains 20 completed studies" in normalized
+    assert "does not show why responsibility changed" in normalized
     assert "do not explain why an author changed" in normalized
     assert (
         html.index("Completed-study pathways by final authoring mode")
@@ -1501,6 +1505,14 @@ def test_html_report_explains_observed_retry_patterns() -> None:
     assert "First attempt to report-run cutoff" in html
     assert "1,440 minutes (n=2)" in normalized
     assert "1,485 minutes (n=2)" in normalized
+    assert "How to read the retry summary" in html
+    assert "Each study appears in exactly one card." in normalized
+    assert "12 of 50 studies" in normalized
+    assert "A study appears in only one bar" in normalized
+    assert "does not mean zero percent" in normalized
+    assert "observed activity span is 2 days" in normalized
+    assert "follow-up after the latest attempt is 7 days" in normalized
+    assert "total observation window is 9 days" in normalized
     assert "How to interpret observed retry patterns" in html
     assert "patterns support targeted qualitative follow-up" in normalized.lower()
     assert "That the study was abandoned" in html
@@ -1516,13 +1528,33 @@ def test_html_report_explains_observed_retry_patterns() -> None:
         '<details class="report-section" open>' not in html[details_start:section_start]
     )
 
-    panel_start = html.index(
-        '<details class="explanation-panel">',
+    reading_summary = html.index(
+        "<summary>How to read the retry summary</summary>",
         section_start,
     )
-    panel_end = html.index("</details>", panel_start)
-    panel = html[panel_start:panel_end]
-    assert '<details class="explanation-panel" open' not in panel
+    reading_start = html.rfind(
+        '<details class="explanation-panel">',
+        section_start,
+        reading_summary,
+    )
+    reading_end = html.index("</details>", reading_summary)
+    reading_panel = html[reading_start:reading_end]
+
+    interpretation_summary = html.index(
+        "<summary>How to interpret observed retry patterns</summary>",
+        reading_end,
+    )
+    interpretation_start = html.rfind(
+        '<details class="explanation-panel">',
+        reading_end,
+        interpretation_summary,
+    )
+    interpretation_end = html.index("</details>", interpretation_summary)
+    interpretation_panel = html[interpretation_start:interpretation_end]
+
+    assert '<details class="explanation-panel" open' not in reading_panel
+    assert '<details class="explanation-panel" open' not in interpretation_panel
+    assert reading_start < interpretation_start
     assert "details.explanation-panel:not([open])" in html
 
 

@@ -596,10 +596,17 @@ _TEMPLATE = """<!doctype html>
       Study pathways and author handoffs
     </summary>
     <section aria-labelledby="study-pathways-heading">
+    <p>
+      These charts count completed studies. Each completed study contributes
+      once, using the AI or manual mode recorded on its unique completed
+      attempt. The first chart separates studies completed on their first
+      recorded attempt from studies with one or more earlier incomplete
+      attempts.
+    </p>
     <p class="caution">
       A preceding attempt is an incomplete attempt ordered before the unique
-      completed attempt for the same study. Author comparisons are made only
-      within a study.
+      completed attempt for the same study. The chart describes the recorded
+      sequence; it does not explain why an earlier attempt ended.
     </p>
     <div class="chart">{{ study_pathways_html | safe }}</div>
 
@@ -638,7 +645,21 @@ _TEMPLATE = """<!doctype html>
           </dd>
         </dl>
 
-        <h4>Brief example</h4>
+        <h4>How to read the stacked bars</h4>
+        <p>
+          Each full bar is all completed studies for one final authoring mode.
+          The colored segments divide that bar into author-handoff categories.
+          Segment heights are completed-study counts, not author counts.
+        </p>
+        <p>
+          <strong>Synthetic chart example:</strong> if an AI bar contains 20
+          completed studies and 4 are in an “all preceding attempts by other
+          authors” segment, then 4 of those 20 completed AI studies had earlier
+          attempts made only by people other than the completion author. It
+          does not show why responsibility changed.
+        </p>
+
+        <h4>Brief category example</h4>
         <p>
           Suppose Alex made the completed attempt:
         </p>
@@ -756,6 +777,87 @@ _TEMPLATE = """<!doctype html>
           </tbody>
         </table>
       </div>
+
+      <details class="explanation-panel">
+        <summary>How to read the retry summary</summary>
+        <div class="explanation-panel-content">
+          <h4>Cards</h4>
+          <p>
+            The four cards divide all studies into completed versus no
+            completion observed and one versus multiple recorded attempts.
+            Each study appears in exactly one card. The percentage uses all
+            studies with at least one captured attempt as its denominator.
+          </p>
+          <p>
+            <strong>Synthetic example:</strong> if 12 of 50 studies had
+            multiple attempts and then completed, that card reports 24%.
+            This identifies a repeated-attempt pattern but does not explain
+            why another attempt was needed.
+          </p>
+
+          <h4>Horizontal pathway chart</h4>
+          <p>
+            Each horizontal bar is one mutually exclusive sequence category.
+            Bar length is the number of studies in that category. A study
+            appears in only one bar, based on its complete recorded mode
+            sequence and whether completion was observed.
+          </p>
+          <p>
+            <strong>Synthetic example:</strong> AI → AI → manual completion is
+            counted once in <strong>AI to manual → manual completion</strong>,
+            not once for every arrow or attempt.
+          </p>
+
+          <h4>Characteristics table</h4>
+          <p>
+            Each row groups studies by observed result: completed with AI,
+            completed manually, or no completion observed. General
+            percentages use all studies in that row. Source-change
+            percentages use only studies with comparable returned-result AI
+            attempts. Feedback percentages use only studies with at least one
+            AI attempt.
+          </p>
+          <p>
+            A value shown as <code>\\N</code> means the measure was
+            unavailable, usually because its denominator was zero. It does
+            not mean zero percent.
+          </p>
+
+          <h4>Timing columns</h4>
+          <ul>
+            <li>
+              <strong>First attempt to completion end</strong> applies to
+              completed studies.
+            </li>
+            <li>
+              <strong>First to latest observed attempt</strong> describes the
+              period containing recorded activity for studies with no
+              completion observed.
+            </li>
+            <li>
+              <strong>Latest attempt to report-run cutoff</strong> describes
+              how long the report continued observing after the latest
+              attempt.
+            </li>
+            <li>
+              <strong>First attempt to report-run cutoff</strong> is the total
+              captured observation window.
+            </li>
+          </ul>
+          <p>
+            <strong>Synthetic timing example:</strong> if a study's first
+            attempt was on day 1, its latest attempt was on day 3, and the
+            report ran on day 10, then its observed activity span is 2 days,
+            follow-up after the latest attempt is 7 days, and total
+            observation window is 9 days.
+          </p>
+          <p class="caution">
+            These durations are descriptive. They do not classify studies as
+            abandoned, measure satisfaction, or establish a causal effect of
+            AI or manual authoring.
+          </p>
+        </div>
+      </details>
 
       <details class="explanation-panel">
         <summary>How to interpret observed retry patterns</summary>
