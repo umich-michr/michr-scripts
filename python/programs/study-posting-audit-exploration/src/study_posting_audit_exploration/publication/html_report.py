@@ -1479,6 +1479,46 @@ _TEMPLATE = """<!doctype html>
       source category, or input method caused a latency difference.
     </p>
 
+    <details class="explanation-panel">
+      <summary>How to read input method and latency</summary>
+      <div class="explanation-panel-content">
+        <h4>Input-method charts</h4>
+        <p>
+          Each horizontal bar is one captured way of supplying source
+          material. Bar length is the number of generation attempts in the
+          population named by the chart. One study can contribute several bars'
+          worth of activity across separate generations, but only once per
+          generation.
+        </p>
+        <p>
+          <strong>Synthetic example:</strong> if 30 returned-result generations
+          used file upload and 20 used pasted text, their bars are 30 and 20.
+          This counts generations, not necessarily 50 different studies or
+          authors.
+        </p>
+
+        <h4>Latency charts</h4>
+        <p>
+          Each source-size band is defined by ranked quartile boundaries from
+          all generations that returned a result. Bar height is median
+          generation latency in seconds. The error line spans the 25th to 75th
+          percentile, so a longer line means the middle half of observed
+          latencies was more spread out.
+        </p>
+        <p>
+          <strong>Synthetic example:</strong> a 6-second bar with an error line
+          from 4 to 9 seconds means the median was 6 seconds and the middle half
+          of captured latencies ranged from 4 through 9 seconds. It does not
+          mean every generation took between 4 and 9 seconds.
+        </p>
+        <p class="caution">
+          Compare the all-returned-result and completed-AI charts as different
+          populations. A latency difference does not establish that source
+          size or input method caused it.
+        </p>
+      </div>
+    </details>
+
     <h3>Reported versus inferred content source</h3>
     <p>
       This heatmap compares the author-reported semantic source category with
@@ -1487,6 +1527,31 @@ _TEMPLATE = """<!doctype html>
       labels.
     </p>
     <div class="chart">{{ content_source_html | safe }}</div>
+
+    <details class="explanation-panel">
+      <summary>How to read the reported-versus-inferred heatmap</summary>
+      <div class="explanation-panel-content">
+        <p>
+          Each cell combines one author-reported category on the vertical axis
+          with one model-inferred category on the horizontal axis. The cell
+          value and color intensity show the number of comparable AI
+          generations in that combination.
+        </p>
+        <p>
+          <strong>Synthetic example:</strong> if the “Category A” row and
+          “Category A” column cell contains 18, then 18 comparable generations
+          were reported and inferred as Category A. If the same row's
+          “Category B” column contains 5, then 5 were reported as A and inferred
+          as B.
+        </p>
+        <p class="caution">
+          Diagonal cells show matching normalized labels; off-diagonal cells
+          show different labels. Neither pattern proves which label is correct
+          or why the labels differ.
+        </p>
+      </div>
+    </details>
+
     <p class="caution">
       Agreement is descriptive. It does not establish that either category is
       objectively correct, and a missing reported category is not silently

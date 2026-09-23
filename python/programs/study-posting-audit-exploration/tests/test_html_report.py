@@ -1227,6 +1227,36 @@ def test_html_report_explains_source_context_and_latency() -> None:
         "Each completed study contributes its unique completed "
         "AI-assisted attempt once." in normalized
     )
+    assert "How to read input method and latency" in rendered
+    assert "This counts generations, not necessarily 50 different studies" in (
+        normalized
+    )
+    assert "Bar height is median generation latency in seconds" in normalized
+    assert "error line spans the 25th to 75th percentile" in normalized
+    assert "a 6-second bar with an error line from 4 to 9 seconds" in normalized
+    assert "different populations" in normalized
+    assert "How to read the reported-versus-inferred heatmap" in rendered
+    assert "vertical axis" in normalized
+    assert "horizontal axis" in normalized
+    assert "cell contains 18" in normalized
+    assert "5 were reported as A and inferred as B" in normalized
+    assert "Diagonal cells show matching normalized labels" in normalized
+    assert "Neither pattern proves which label is correct" in normalized
+
+    for panel_title in (
+        "How to read input method and latency",
+        "How to read the reported-versus-inferred heatmap",
+    ):
+        summary = rendered.index(f"<summary>{panel_title}</summary>")
+        panel_start = rendered.rfind(
+            '<details class="explanation-panel">',
+            0,
+            summary,
+        )
+        panel_end = rendered.index("</details>", summary)
+        panel = rendered[panel_start:panel_end]
+        assert '<details class="explanation-panel" open' not in panel
+
     assert "<strong>7</strong>" in rendered
     assert "<strong>3</strong>" in rendered
     assert "consecutive-generation transitions from" in normalized
