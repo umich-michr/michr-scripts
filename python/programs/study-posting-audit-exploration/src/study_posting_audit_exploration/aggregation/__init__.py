@@ -22,7 +22,9 @@ from study_posting_audit_exploration.aggregation.authors import (
 )
 from study_posting_audit_exploration.aggregation.compensation import (
     COMPENSATION_ANALYSIS_COLUMNS,
+    COMPENSATION_OFFER_COMPOSITION_COLUMNS,
     build_compensation_analysis_summary,
+    build_compensation_offer_composition_summary,
 )
 from study_posting_audit_exploration.aggregation.completed_study_context import (
     COMPLETED_STUDY_AUTHOR_CONTEXT_COLUMNS,
@@ -327,6 +329,7 @@ def build_readability_analysis_tables(
 
 __all__ = [
     "AGGREGATE_OUTPUT_COLUMNS",
+    "COMPENSATION_OFFER_COMPOSITION_COLUMNS",
     "COMPLETED_STUDY_AUTHOR_CONTEXT_COLUMNS",
     "DATA_QUALITY_SUMMARY_COLUMNS",
     "REPEATED_ATTEMPT_SOURCE_CONSISTENCY_COLUMNS",
@@ -348,6 +351,7 @@ __all__ = [
     "build_author_analysis_tables",
     "build_author_handoff_summary",
     "build_compensation_analysis_summary",
+    "build_compensation_offer_composition_summary",
     "build_completed_study_author_context_summary",
     "build_content_source_concordance_matrix",
     "build_content_source_concordance_summary",
