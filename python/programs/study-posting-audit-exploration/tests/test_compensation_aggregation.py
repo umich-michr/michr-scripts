@@ -1,4 +1,5 @@
 from collections.abc import Callable
+import json
 
 import pandas as pd
 import pytest
@@ -30,6 +31,8 @@ def compensation_row(
         "edit_intensity_category": category,
         "character_edit_ratio": ratio,
         "edit_intensity_threshold_scheme_name": ("EXPLORATORY_CHARACTER_RATIO_10_30"),
+        "flag_suggested": "true",
+        "flag_saved": "true",
     }
 
 
@@ -101,6 +104,62 @@ def test_compensation_summary_reports_kind_selection_and_editing() -> None:
     assert specific["selected_suggestion_count_unclassified_edit"] == 1
     assert specific["median_character_edit_ratio"] == pytest.approx(0.20)
     assert specific["average_character_edit_ratio"] == pytest.approx(0.20)
+
+
+def test_compensation_summary_embeds_deterministic_composition_json() -> None:
+    """Embed identical aggregate-only composition payloads on both kind rows."""
+    fields = pd.DataFrame.from_records(
+        [
+            compensation_row(
+                audit_record_id=1,
+                counts='{"genericCompensation": 3, "specificCompensation": 3}',
+                picked_kind="genericCompensation",
+                picked_index=0,
+                category="EXACT",
+                ratio=0.0,
+            ),
+            compensation_row(
+                audit_record_id=2,
+                counts='{"genericCompensation": 1, "specificCompensation": 0}',
+                picked_kind=None,
+                picked_index=None,
+                category="UNASSISTED",
+                ratio=None,
+            )
+            | {
+                "flag_suggested": "false",
+                "flag_saved": "true",
+            },
+        ]
+    )
+
+    summary = build_compensation_analysis_summary(fields)
+
+    for column in (
+        "offer_composition_summary_json",
+        "offer_count_pair_summary_json",
+        "workflow_consistency_summary_json",
+    ):
+        assert summary[column].nunique() == 1
+        payload = summary[column].iloc[0]
+        assert isinstance(payload, str)
+        decoded = json.loads(payload)
+        assert isinstance(decoded, list)
+        assert decoded
+        assert "NaN" not in payload
+
+    assert (
+        '"summary_grain":"OFFER_COMPOSITION"'
+        in (summary["offer_composition_summary_json"].iloc[0])
+    )
+    assert (
+        '"summary_grain":"OFFER_COUNT_PAIR"'
+        in (summary["offer_count_pair_summary_json"].iloc[0])
+    )
+    assert (
+        '"summary_grain":"WORKFLOW_CONSISTENCY"'
+        in (summary["workflow_consistency_summary_json"].iloc[0])
+    )
 
 
 def test_compensation_summary_excludes_unclassified_edit_from_ratio_statistics() -> (

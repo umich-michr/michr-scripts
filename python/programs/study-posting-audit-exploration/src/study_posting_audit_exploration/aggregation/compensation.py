@@ -40,6 +40,9 @@ COMPENSATION_ANALYSIS_COLUMNS: tuple[str, ...] = (
     "count_consensus_grade_level_increase",
     "count_mixed_formula_direction",
     "edit_intensity_threshold_scheme_name",
+    "offer_composition_summary_json",
+    "offer_count_pair_summary_json",
+    "workflow_consistency_summary_json",
 )
 
 
@@ -622,6 +625,51 @@ def build_compensation_offer_composition_summary(
     )
 
 
+def _json_records(
+    frame: pd.DataFrame,
+    *,
+    grain: str,
+) -> str:
+    """Return deterministic standards-compliant JSON records for one grain."""
+    rows = frame.loc[frame["summary_grain"].eq(grain)]
+    records = [
+        {
+            key: None if _is_missing_scalar(value) else value
+            for key, value in row.items()
+        }
+        for row in rows.to_dict(orient="records")
+    ]
+
+    return json.dumps(
+        records,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    )
+
+
+def _composition_json_columns(
+    completed_ai_fields: pd.DataFrame,
+) -> dict[str, str]:
+    """Return deterministic embedded compensation composition aggregates."""
+    summary = build_compensation_offer_composition_summary(completed_ai_fields)
+
+    return {
+        "offer_composition_summary_json": _json_records(
+            summary,
+            grain="OFFER_COMPOSITION",
+        ),
+        "offer_count_pair_summary_json": _json_records(
+            summary,
+            grain="OFFER_COUNT_PAIR",
+        ),
+        "workflow_consistency_summary_json": _json_records(
+            summary,
+            grain="WORKFLOW_CONSISTENCY",
+        ),
+    }
+
+
 def build_compensation_analysis_summary(
     completed_ai_fields: pd.DataFrame,
     readability_pairs: pd.DataFrame | None = None,
@@ -648,12 +696,16 @@ def build_compensation_analysis_summary(
     if compensation.empty:
         rows: list[dict[str, object]] = []
     else:
+        composition_json = _composition_json_columns(completed_ai_fields)
         rows = [
-            _compensation_summary_row(
-                compensation,
-                resolved_pairs,
-                suggestion_kind=suggestion_kind,
-            )
+            {
+                **_compensation_summary_row(
+                    compensation,
+                    resolved_pairs,
+                    suggestion_kind=suggestion_kind,
+                ),
+                **composition_json,
+            }
             for suggestion_kind in _COMPENSATION_KINDS
         ]
 
