@@ -1246,6 +1246,7 @@ def test_html_report_explains_source_context_and_latency() -> None:
     for panel_title in (
         "How to read input method and latency",
         "How to read the reported-versus-inferred heatmap",
+        "How to read adjacent-generation source changes",
     ):
         summary = rendered.index(f"<summary>{panel_title}</summary>")
         panel_start = rendered.rfind(
@@ -1866,6 +1867,7 @@ def test_html_report_explains_readability_indicators() -> None:
     for panel_title in (
         "How to read direction and final grade bands",
         "How to read selected versus unselected differences",
+        "Definitions and how to read edit-intensity results",
     ):
         summary = html.index(f"<summary>{panel_title}</summary>")
         panel_start = html.rfind('<details class="explanation-panel">', 0, summary)

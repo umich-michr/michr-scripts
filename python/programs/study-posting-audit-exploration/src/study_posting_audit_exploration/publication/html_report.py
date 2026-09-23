@@ -1347,76 +1347,86 @@ _TEMPLATE = """<!doctype html>
     descriptive and does not establish whether an edit improved the text.
   </p>
 
-  <h4>How edit size is classified</h4>
-  <p>
-    The character edit ratio is the character edit distance divided by the
-    longer character count of the selected suggestion or final text. Character
-    edit distance counts the minimum insertions, deletions, and substitutions
-    needed to transform the selected suggestion into the final text.
-  </p>
-  <ul>
-    <li><strong>Exact:</strong> final text exactly matched the selected
-      suggestion.</li>
-    <li><strong>Cosmetic:</strong> only cosmetic normalization changed.</li>
-    <li><strong>Light edit:</strong> character edit ratio at or below 10%.</li>
-    <li><strong>Moderate edit:</strong> ratio above 10% and at or below
-      30%.</li>
-    <li><strong>Heavy edit:</strong> ratio above 30%.</li>
-    <li><strong>Edited, unclassified:</strong> edited, but usable character
-      measurements were unavailable.</li>
-    <li><strong>Replaced:</strong> final text replaced the selected
-      suggestion.</li>
-    <li><strong>Cleared:</strong> selected suggestion was removed and final
-      text was blank.</li>
-    <li><strong>Unassisted:</strong> no AI suggestion was selected.</li>
-  </ul>
-  <p class="caution">
-    These are project-specific exploratory character-edit bands using 10% and
-    30% thresholds. The technical scheme ID is
-    <code>EXPLORATORY_CHARACTER_RATIO_10_30</code>. The bands describe edit
-    size, not writing quality.
-  </p>
+  <details class="explanation-panel">
+    <summary>Definitions and how to read edit-intensity results</summary>
+    <div class="explanation-panel-content">
+      <h4>How edit size is classified</h4>
+      <p>
+        The character edit ratio is the character edit distance divided by the
+        longer character count of the selected suggestion or final text.
+        Character edit distance counts the minimum insertions, deletions, and
+        substitutions needed to transform the selected suggestion into the
+        final text.
+      </p>
+      <ul>
+        <li><strong>Exact:</strong> final text exactly matched the selected
+          suggestion.</li>
+        <li><strong>Cosmetic:</strong> only cosmetic normalization changed.</li>
+        <li><strong>Light edit:</strong> character edit ratio at or below
+          10%.</li>
+        <li><strong>Moderate edit:</strong> ratio above 10% and at or below
+          30%.</li>
+        <li><strong>Heavy edit:</strong> ratio above 30%.</li>
+        <li><strong>Edited, unclassified:</strong> edited, but usable character
+          measurements were unavailable.</li>
+        <li><strong>Replaced:</strong> final text replaced the selected
+          suggestion.</li>
+        <li><strong>Cleared:</strong> selected suggestion was removed and final
+          text was blank.</li>
+        <li><strong>Unassisted:</strong> no AI suggestion was selected.</li>
+      </ul>
+      <p class="caution">
+        These are project-specific exploratory character-edit bands using 10%
+        and 30% thresholds. The technical scheme ID is
+        <code>EXPLORATORY_CHARACTER_RATIO_10_30</code>. The bands describe edit
+        size, not writing quality.
+      </p>
 
-  <h4>How readability direction is classified</h4>
-  <p>
-    Consensus uses Flesch-Kincaid grade, Automated Readability Index,
-    Coleman-Liau Index, and Gunning Fog.
-  </p>
-  <ul>
-    <li><strong>Consensus decrease:</strong> the grade-level formulas agreed on
-      a downward direction for material change.</li>
-    <li><strong>No material change:</strong> formula changes stayed within the
-      configured tolerance.</li>
-    <li><strong>Consensus increase:</strong> the grade-level formulas agreed on
-      an upward direction for material change.</li>
-    <li><strong>Mixed formula direction:</strong> the formulas did not agree on
-      direction. Mixed direction is not the same as no material change.</li>
-  </ul>
+      <h4>How readability direction is classified</h4>
+      <p>
+        Consensus uses Flesch-Kincaid grade, Automated Readability Index,
+        Coleman-Liau Index, and Gunning Fog.
+      </p>
+      <ul>
+        <li><strong>Consensus decrease:</strong> the grade-level formulas agreed
+          on a downward direction for material change.</li>
+        <li><strong>No material change:</strong> formula changes stayed within
+          the configured tolerance.</li>
+        <li><strong>Consensus increase:</strong> the grade-level formulas agreed
+          on an upward direction for material change.</li>
+        <li><strong>Mixed formula direction:</strong> the formulas did not agree
+          on direction. Mixed direction is not the same as no material
+          change.</li>
+      </ul>
 
-  <h4>How to read a bar</h4>
-  <p>
-    Each bar represents one study-posting field and one edit category. The
-    label includes the total group size as <strong>N</strong>. Colored sections
-    show the share assigned to each readability result. Only fields with usable
-    selected-and-final readability pairs receive a direction. If the colored
-    sections total less than 100%, the unfilled remainder represents fields
-    without a usable pair. Always inspect the counts in hover text: a 100%
-    section based on one field is less stable than one based on many fields.
-  </p>
-  <p>
-    <strong>Worked example:</strong> if a group contains five light-edited
-    descriptions and one is classified as consensus decrease, that section is
-    20% (1 of 5). A median Flesch-Kincaid change of -0.59 means the middle
-    final-minus-selected indicator in that result group was 0.59 grade levels
-    lower. It does not show that the final text was better or easier to
-    understand.
-  </p>
-  <p class="caution">
-    Lower is not automatically better, and higher is not automatically worse.
-    Grade-level formulas do not establish comprehension, accuracy,
-    accessibility, usefulness, cultural appropriateness, writing quality, or
-    causal benefit.
-  </p>
+      <h4>How to read a bar</h4>
+      <p>
+        Each bar represents one study-posting field and one edit category. The
+        label includes the total group size as <strong>N</strong>. Colored
+        sections show the share assigned to each readability result. Only
+        fields with usable selected-and-final readability pairs receive a
+        direction. If the colored sections total less than 100%, the unfilled
+        remainder represents fields without a usable pair. Always inspect the
+        counts in hover text: a 100% section based on one field is less stable
+        than one based on many fields.
+      </p>
+      <p>
+        <strong>Worked example:</strong> if a group contains five light-edited
+        descriptions and one is classified as consensus decrease, that section
+        is 20% (1 of 5). A median Flesch-Kincaid change of -0.59 means the
+        middle final-minus-selected indicator in that result group was 0.59
+        grade levels lower. It does not show that the final text was better or
+        easier to understand.
+      </p>
+      <p class="caution">
+        Lower is not automatically better, and higher is not automatically
+        worse. Grade-level formulas do not establish comprehension, accuracy,
+        accessibility, usefulness, cultural appropriateness, writing quality,
+        or causal benefit.
+      </p>
+    </div>
+  </details>
+
   <div class="chart">
     {{ edit_readability_relationship_html | safe }}
   </div>
@@ -1576,55 +1586,64 @@ _TEMPLATE = """<!doctype html>
     </p>
     {% endif %}
 
-    <h4>What is being compared?</h4>
-    <p>
-      Each comparison uses two adjacent AI generations for the same study.
-      Manual attempts and AI-error attempts are not treated as source
-      comparisons. The completed-path analysis stops at the completed
-      AI-assisted attempt.
-    </p>
-    <p>
-      If a study had three qualifying AI generations before completion, it
-      contributes two transitions: generation 1 to generation 2, and
-      generation 2 to the completed generation.
-    </p>
-
     {% if source_context.has_repeated_pathways %}
-    <h4>Available comparisons</h4>
-    <ul>
-      {% for comparison in source_context.comparisons %}
-      <li>
-        <strong>{{ comparison.label }}:</strong>
-        {{ comparison.comparable_transition_count }} comparable and
-        {{ comparison.unavailable_transition_count }} unavailable among
-        {{ comparison.all_transition_count }} total completed-path
-        transitions.
-      </li>
-      {% endfor %}
-    </ul>
     <div class="chart">
       {{ repeated_source_consistency_html | safe }}
     </div>
     {% endif %}
 
-    <h4>Illustrative example</h4>
-    <p>
-      Suppose generation 1 used DOCX, reported informed consent, contained
-      4,200 source characters, and took 12.0 seconds. Generation 2 used DOCX,
-      reported informed consent, contained 5,100 characters, and took 13.5
-      seconds. Source size changed; reported source and input method were
-      unchanged; the source-signature proxy changed because source size
-      changed; and captured latency increased by 1.5 seconds. This example
-      does not show that the source-size change caused the latency increase.
-    </p>
-    <p class="caution">
-      Equal source size and equal reported source category form an
-      unchanged-source proxy, not proof that source text was identical.
-      Different text can have the same character count and category. Positive
-      latency change means the later generation took longer; negative means
-      it took less time; zero means no captured latency change. These
-      associations remain descriptive.
-    </p>
+    <details class="explanation-panel">
+      <summary>How to read adjacent-generation source changes</summary>
+      <div class="explanation-panel-content">
+        <h4>What is being compared?</h4>
+        <p>
+          Each comparison uses two adjacent AI generations for the same study.
+          Manual attempts and AI-error attempts are not treated as source
+          comparisons. The completed-path analysis stops at the completed
+          AI-assisted attempt.
+        </p>
+        <p>
+          If a study had three qualifying AI generations before completion, it
+          contributes two transitions: generation 1 to generation 2, and
+          generation 2 to the completed generation.
+        </p>
+
+        {% if source_context.has_repeated_pathways %}
+        <h4>Available comparisons</h4>
+        <ul>
+          {% for comparison in source_context.comparisons %}
+          <li>
+            <strong>{{ comparison.label }}:</strong>
+            {{ comparison.comparable_transition_count }} comparable and
+            {{ comparison.unavailable_transition_count }} unavailable among
+            {{ comparison.all_transition_count }} total completed-path
+            transitions.
+          </li>
+          {% endfor %}
+        </ul>
+        {% endif %}
+
+        <h4>Illustrative example</h4>
+        <p>
+          Suppose generation 1 used DOCX, reported informed consent, contained
+          4,200 source characters, and took 12.0 seconds. Generation 2 used
+          DOCX, reported informed consent, contained 5,100 characters, and took
+          13.5 seconds. Source size changed; reported source and input method
+          were unchanged; the source-signature proxy changed because source
+          size changed; and captured latency increased by 1.5 seconds. This
+          example does not show that the source-size change caused the latency
+          increase.
+        </p>
+        <p class="caution">
+          Equal source size and equal reported source category form an
+          unchanged-source proxy, not proof that source text was identical.
+          Different text can have the same character count and category.
+          Positive latency change means the later generation took longer;
+          negative means it took less time; zero means no captured latency
+          change. These associations remain descriptive.
+        </p>
+      </div>
+    </details>
   </section>
   </details>
 
