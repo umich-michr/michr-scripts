@@ -348,6 +348,7 @@ def _write_staging_output(
             field_adoption_editing_summary=(
                 tables.fields.field_adoption_editing_summary
             ),
+            compensation_analysis_summary=(tables.fields.compensation_analysis_summary),
             suggestion_selection_summary=(tables.fields.suggestion_selection_summary),
             field_readability_change_summary=(
                 tables.readability.field_readability_change_summary

@@ -2,6 +2,7 @@
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from numbers import Integral, Real
 from typing import cast
 
 import pandas as pd
@@ -190,6 +191,13 @@ _REQUIRED_FIELD_ADOPTION_COLUMNS: tuple[str, ...] = (
     "completed_ai_attempt_count_selected_then_cleared",
     "completed_ai_attempt_count_unassisted",
     "suggestion_selection_percentage_among_attempts_with_offer",
+)
+
+_REQUIRED_COMPENSATION_ANALYSIS_COLUMNS: tuple[str, ...] = (
+    "compensation_suggestion_kind",
+    "completed_ai_attempt_count_with_suggestion",
+    "offered_suggestion_count",
+    "selected_suggestion_count",
 )
 
 _REQUIRED_SUGGESTION_SELECTION_COLUMNS: tuple[str, ...] = (
@@ -548,6 +556,7 @@ class ExplorationChartInputs:
     grouped_author_summary: pd.DataFrame
     field_adoption_editing_summary: pd.DataFrame
     suggestion_selection_summary: pd.DataFrame
+    compensation_analysis_summary: pd.DataFrame
     field_readability_change_summary: pd.DataFrame
     field_readability_target_summary: pd.DataFrame
     selected_vs_unselected_readability_summary: pd.DataFrame
@@ -584,6 +593,7 @@ class ExplorationCharts:
     field_selected_outcomes: go.Figure
     suggestion_selection_by_kind: go.Figure
     suggestion_selection_by_index: go.Figure
+    compensation_suggestion_use: go.Figure
     readability_change_direction: go.Figure
     final_grade_bands: go.Figure
     selected_vs_unselected_readability: go.Figure
@@ -2025,6 +2035,175 @@ def _suggestion_kind_rows(
     )
 
 
+def _chart_count(
+    value: object,
+    *,
+    value_name: str,
+) -> int:
+    """Return one validated nonnegative aggregate count for a chart."""
+    if isinstance(value, bool) or not isinstance(value, Real):
+        raise ExplorationValidationError(
+            f"{value_name} must contain a nonnegative integer"
+        )
+
+    if isinstance(value, Integral):
+        converted = int(value)
+    else:
+        converted_float = float(value)
+
+        if not converted_float.is_integer():
+            raise ExplorationValidationError(
+                f"{value_name} must contain a nonnegative integer"
+            )
+
+        converted = int(converted_float)
+
+    if converted < 0:
+        raise ExplorationValidationError(
+            f"{value_name} must contain a nonnegative integer"
+        )
+
+    return converted
+
+
+def build_compensation_suggestion_use_chart(
+    compensation_summary: pd.DataFrame,
+) -> go.Figure:
+    """Return attempt-level compensation offers and selections by kind."""
+    _require_columns(
+        compensation_summary,
+        required=_REQUIRED_COMPENSATION_ANALYSIS_COLUMNS,
+        frame_name="compensation_analysis_summary",
+    )
+    labels = {
+        "genericCompensation": "Generic compensation",
+        "specificCompensation": "Specific compensation",
+    }
+    kinds = compensation_summary["compensation_suggestion_kind"].astype("string")
+    unknown = sorted(set(kinds.dropna().astype(str)) - set(labels))
+    if unknown:
+        raise ExplorationValidationError(
+            "compensation_analysis_summary contains unsupported suggestion "
+            "kinds: " + ", ".join(unknown)
+        )
+
+    rows = compensation_summary.copy()
+    title = "Compensation text offers and selections by kind"
+
+    if rows.empty:
+        return _empty_figure(
+            title=title,
+            message="No compensation suggestion-use aggregates are available.",
+        )
+
+    row_kinds = rows["compensation_suggestion_kind"].astype("string")
+    if row_kinds.duplicated(keep=False).any():
+        raise ExplorationValidationError(
+            "compensation_analysis_summary must contain at most one row per "
+            "suggestion kind"
+        )
+
+    rows_by_kind = {
+        str(row["compensation_suggestion_kind"]): row
+        for row in rows.to_dict(orient="records")
+    }
+    ordered_kinds = [kind for kind in labels if kind in rows_by_kind]
+    offered_attempts = [
+        _chart_count(
+            rows_by_kind[kind]["completed_ai_attempt_count_with_suggestion"],
+            value_name="completed_ai_attempt_count_with_suggestion",
+        )
+        for kind in ordered_kinds
+    ]
+    selected_attempts = [
+        _chart_count(
+            rows_by_kind[kind]["selected_suggestion_count"],
+            value_name="selected_suggestion_count",
+        )
+        for kind in ordered_kinds
+    ]
+    offered_instances = [
+        _chart_count(
+            rows_by_kind[kind]["offered_suggestion_count"],
+            value_name="offered_suggestion_count",
+        )
+        for kind in ordered_kinds
+    ]
+
+    if any(
+        selected > offered
+        for offered, selected in zip(
+            offered_attempts,
+            selected_attempts,
+            strict=True,
+        )
+    ):
+        raise ExplorationValidationError(
+            "compensation selected-attempt count must not exceed offered-attempt count"
+        )
+    attempt_percentages = [
+        (100.0 * selected / offered if offered > 0 else None)
+        for offered, selected in zip(
+            offered_attempts,
+            selected_attempts,
+            strict=True,
+        )
+    ]
+    category_labels = [labels[kind] for kind in ordered_kinds]
+    customdata = [
+        [offered, selected, percentage, instances]
+        for offered, selected, percentage, instances in zip(
+            offered_attempts,
+            selected_attempts,
+            attempt_percentages,
+            offered_instances,
+            strict=True,
+        )
+    ]
+
+    figure = go.Figure()
+    figure.add_bar(
+        name="Attempts offered this kind",
+        orientation="h",
+        y=category_labels,
+        x=offered_attempts,
+        customdata=customdata,
+        hovertemplate=(
+            "Suggestion kind: %{y}<br>"
+            "Completed AI attempts offered this kind: %{customdata[0]}<br>"
+            "Completed AI attempts selecting this kind: %{customdata[1]}<br>"
+            "Attempt-level selection: %{customdata[2]:.1f}%<br>"
+            "Text suggestion instances offered: %{customdata[3]}"
+            "<extra>%{fullData.name}</extra>"
+        ),
+    )
+    figure.add_bar(
+        name="Attempts selecting this kind",
+        orientation="h",
+        y=category_labels,
+        x=selected_attempts,
+        customdata=customdata,
+        hovertemplate=(
+            "Suggestion kind: %{y}<br>"
+            "Completed AI attempts offered this kind: %{customdata[0]}<br>"
+            "Completed AI attempts selecting this kind: %{customdata[1]}<br>"
+            "Attempt-level selection: %{customdata[2]:.1f}%<br>"
+            "Text suggestion instances offered: %{customdata[3]}"
+            "<extra>%{fullData.name}</extra>"
+        ),
+    )
+    figure.update_layout(
+        title=title,
+        template="plotly_white",
+        barmode="group",
+        xaxis_title="Completed AI attempt count",
+        yaxis_title="Compensation suggestion kind",
+        legend_title_text="Suggestion-use stage",
+    )
+
+    return figure
+
+
 def build_suggestion_selection_by_kind_chart(
     suggestion_selection_summary: pd.DataFrame,
 ) -> go.Figure:
@@ -3207,6 +3386,9 @@ def build_exploration_charts(
             build_suggestion_selection_by_index_chart(
                 inputs.suggestion_selection_summary
             )
+        ),
+        compensation_suggestion_use=build_compensation_suggestion_use_chart(
+            inputs.compensation_analysis_summary
         ),
         readability_change_direction=build_readability_change_direction_chart(
             inputs.field_readability_change_summary

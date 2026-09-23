@@ -1307,6 +1307,13 @@ _TEMPLATE = """<!doctype html>
       {% endif %}
 
       <h3>Generic and specific compensation text suggestions</h3>
+      <p>
+        The chart compares completed AI attempts offered each kind with
+        completed AI attempts selecting that kind.
+      </p>
+      <div class="chart">
+        {{ compensation_suggestion_use_html | safe }}
+      </div>
       {% if compensation_text_rows %}
       <div class="retry-table-wrapper" role="region"
            aria-label="Compensation text suggestion table" tabindex="0">
@@ -1319,8 +1326,10 @@ _TEMPLATE = """<!doctype html>
               <th scope="col">Suggestion kind</th>
               <th scope="col">Attempts with one or more offers</th>
               <th scope="col">Text suggestions offered</th>
-              <th scope="col">Text suggestions selected</th>
-              <th scope="col">Selected among offered text suggestions</th>
+              <th scope="col">Attempts selecting this kind</th>
+              <th scope="col">
+                Attempts selecting among attempts offered this kind
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -1330,7 +1339,7 @@ _TEMPLATE = """<!doctype html>
               <td>{{ row.attempt_count_with_suggestion }}</td>
               <td>{{ row.offered_count }}</td>
               <td>{{ row.selected_count }}</td>
-              <td>{{ row.selection_percentage_text }}</td>
+              <td>{{ row.attempt_selection_percentage_text }}</td>
             </tr>
             {% endfor %}
           </tbody>
@@ -1349,16 +1358,18 @@ _TEMPLATE = """<!doctype html>
             means they were unequal. It does not identify an active click.
           </p>
           <p>
-            The text table uses two different units. “Attempts with one or more
-            offers” counts completed AI attempts, while “suggestions offered”
-            and “suggestions selected” count individual text suggestions. At
-            most one compensation text suggestion can be selected per attempt.
+            The text table uses two units. “Attempts with one or more
+            offers” and “attempts selecting” count completed AI attempts.
+            “Text suggestions offered” counts individual suggestion instances.
+            At most one compensation text suggestion can be selected per
+            attempt.
           </p>
           <p>
             <strong>Synthetic example:</strong> if 10 completed AI attempts
-            received 30 generic suggestions and 4 generic suggestions were
-            selected, the instance-level selection percentage is 13.3%. This
-            does not mean 40% of attempts selected a generic suggestion.
+            received generic suggestions and 4 selected a generic suggestion,
+            the attempt-level selection percentage is 40%. If those attempts
+            received 30 individual generic suggestions, 30 remains useful offer
+            context but is not the percentage denominator.
           </p>
           <p class="caution">
             These totals cannot show how many attempts received exactly three
@@ -2095,7 +2106,7 @@ class CompensationTextView:
     attempt_count_with_suggestion: int
     offered_count: int
     selected_count: int
-    selection_percentage_text: str
+    attempt_selection_percentage_text: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -2578,24 +2589,31 @@ def _compensation_text_views(
         row = rows_by_kind.get(kind)
         if row is None:
             continue
+
+        offered_attempt_count = _aggregate_count(
+            row["completed_ai_attempt_count_with_suggestion"],
+            value_name="completed_ai_attempt_count_with_suggestion",
+        )
+        offered_instance_count = _aggregate_count(
+            row["offered_suggestion_count"],
+            value_name="offered_suggestion_count",
+        )
+        selected_attempt_count = _aggregate_count(
+            row["selected_suggestion_count"],
+            value_name="selected_suggestion_count",
+        )
+        attempt_selection_percentage_text = (
+            f"{100.0 * selected_attempt_count / offered_attempt_count:.1f}%"
+            if offered_attempt_count > 0
+            else "\\N"
+        )
         views.append(
             CompensationTextView(
                 label=label,
-                attempt_count_with_suggestion=_aggregate_count(
-                    row["completed_ai_attempt_count_with_suggestion"],
-                    value_name="completed_ai_attempt_count_with_suggestion",
-                ),
-                offered_count=_aggregate_count(
-                    row["offered_suggestion_count"],
-                    value_name="offered_suggestion_count",
-                ),
-                selected_count=_aggregate_count(
-                    row["selected_suggestion_count"],
-                    value_name="selected_suggestion_count",
-                ),
-                selection_percentage_text=(
-                    _percentage_text(row["suggestion_selection_percentage"]) or "\\N"
-                ),
+                attempt_count_with_suggestion=offered_attempt_count,
+                offered_count=offered_instance_count,
+                selected_count=selected_attempt_count,
+                attempt_selection_percentage_text=(attempt_selection_percentage_text),
             )
         )
     return tuple(views)
@@ -3075,6 +3093,10 @@ def render_html_report(  # noqa: PLR0913
         ),
         suggestion_selection_by_index_html=_figure_html(
             charts.suggestion_selection_by_index,
+            include_plotlyjs=False,
+        ),
+        compensation_suggestion_use_html=_figure_html(
+            charts.compensation_suggestion_use,
             include_plotlyjs=False,
         ),
         readability_change_direction_html=_figure_html(

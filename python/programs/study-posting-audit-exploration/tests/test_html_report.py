@@ -1171,6 +1171,7 @@ def charts() -> ExplorationCharts:
             ),
             grouped_author_summary=grouped_author_rows(),
             field_adoption_editing_summary=field_adoption_rows(),
+            compensation_analysis_summary=compensation_analysis_rows(),
             suggestion_selection_summary=suggestion_selection_rows(),
             field_readability_change_summary=readability_change_rows(),
             field_readability_target_summary=readability_target_rows(),
@@ -1888,13 +1889,27 @@ def test_html_report_explains_compensation_choices() -> None:
     assert "Compensation Yes/No comparison among completed AI attempts" in normalized
     assert "77.8% had a matching final value" in normalized
     assert "22.2% had a different final value" in normalized
-    assert "Generic compensation" in normalized
-    assert "Specific compensation" in normalized
-    assert ">18<" in normalized
-    assert ">15<" in normalized
-    assert "22.2%" in normalized
-    assert "20.0%" in normalized
+    assert "Compensation text offers and selections by kind" in html
+
+    generic_start = html.index(">Generic compensation<")
+    generic_end = html.index("</tr>", generic_start)
+    generic_row = " ".join(html[generic_start:generic_end].split())
+    assert ">6<" in generic_row
+    assert ">18<" in generic_row
+    assert ">4<" in generic_row
+    assert ">66.7%<" in generic_row
+
+    specific_start = html.index(">Specific compensation<")
+    specific_end = html.index("</tr>", specific_start)
+    specific_row = " ".join(html[specific_start:specific_end].split())
+    assert ">5<" in specific_row
+    assert ">15<" in specific_row
+    assert ">3<" in specific_row
+    assert ">60.0%<" in specific_row
+
     assert "At most one compensation text suggestion" in normalized
+    assert "the attempt-level selection percentage is 40%" in normalized
+    assert "30 remains useful offer context" in normalized
     assert "exactly three generic and three specific suggestions" in normalized
 
     summary = html.index("<summary>How to interpret compensation choices</summary>")

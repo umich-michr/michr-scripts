@@ -17,6 +17,7 @@ from study_posting_audit_exploration.publication import (
     build_author_attempt_start_experience_chart,
     build_author_experience_chart,
     build_author_handoff_chart,
+    build_compensation_suggestion_use_chart,
     build_completed_study_author_context_chart,
     build_completed_study_mix_chart,
     build_content_source_concordance_chart,
@@ -662,6 +663,26 @@ def field_adoption_rows() -> pd.DataFrame:
                 "completed_ai_attempt_count_selected_then_cleared": 0,
                 "completed_ai_attempt_count_unassisted": 2,
                 "suggestion_selection_percentage_among_attempts_with_offer": 80.0,
+            },
+        ]
+    )
+
+
+def compensation_analysis_rows() -> pd.DataFrame:
+    """Return synthetic generic and specific compensation summaries."""
+    return pd.DataFrame.from_records(
+        [
+            {
+                "compensation_suggestion_kind": "genericCompensation",
+                "completed_ai_attempt_count_with_suggestion": 10,
+                "offered_suggestion_count": 30,
+                "selected_suggestion_count": 4,
+            },
+            {
+                "compensation_suggestion_kind": "specificCompensation",
+                "completed_ai_attempt_count_with_suggestion": 8,
+                "offered_suggestion_count": 24,
+                "selected_suggestion_count": 2,
             },
         ]
     )
@@ -1470,6 +1491,74 @@ def test_field_selected_outcomes_chart_preserves_unclassified() -> None:
     )
 
 
+def test_compensation_suggestion_use_chart_is_attempt_level() -> None:
+    """Compare offered and selected attempts, retaining instance context."""
+    figure = build_compensation_suggestion_use_chart(compensation_analysis_rows())
+    traces = {str(trace.name): trace for trace in figure.data}
+
+    assert figure.layout.title.text == (
+        "Compensation text offers and selections by kind"
+    )
+    assert figure.layout.barmode == "group"
+    assert list(traces["Attempts offered this kind"].y) == [
+        "Generic compensation",
+        "Specific compensation",
+    ]
+    assert list(traces["Attempts offered this kind"].x) == [10, 8]
+    assert list(traces["Attempts selecting this kind"].x) == [4, 2]
+    assert list(traces["Attempts offered this kind"].customdata[0]) == [
+        10,
+        4,
+        40.0,
+        30,
+    ]
+    assert "Attempt-level selection" in str(
+        traces["Attempts offered this kind"].hovertemplate
+    )
+    assert "Text suggestion instances offered" in str(
+        traces["Attempts offered this kind"].hovertemplate
+    )
+
+
+@pytest.mark.parametrize(
+    ("mutate", "message"),
+    [
+        (
+            lambda frame: frame.assign(
+                compensation_suggestion_kind="SYNTHETIC_UNKNOWN"
+            ),
+            "contains unsupported suggestion kinds",
+        ),
+        (
+            lambda frame: frame.assign(offered_suggestion_count=4.5),
+            "must contain a nonnegative integer",
+        ),
+        (
+            lambda frame: frame.assign(offered_suggestion_count=True),
+            "must contain a nonnegative integer",
+        ),
+        (
+            lambda frame: frame.assign(offered_suggestion_count="invalid"),
+            "must contain a nonnegative integer",
+        ),
+        (
+            lambda frame: frame.assign(
+                completed_ai_attempt_count_with_suggestion=1,
+                selected_suggestion_count=2,
+            ),
+            "selected-attempt count must not exceed offered-attempt count",
+        ),
+    ],
+)
+def test_compensation_suggestion_use_chart_rejects_invalid_aggregates(
+    mutate: Callable[[pd.DataFrame], pd.DataFrame],
+    message: str,
+) -> None:
+    """Reject unsupported kinds, fractional counts, and impossible totals."""
+    with pytest.raises(ExplorationValidationError, match=message):
+        build_compensation_suggestion_use_chart(mutate(compensation_analysis_rows()))
+
+
 def test_suggestion_selection_by_kind_chart_distinguishes_denominators() -> None:
     figure = build_suggestion_selection_by_kind_chart(suggestion_selection_rows())
     bar = figure.data[0]
@@ -1805,6 +1894,7 @@ def test_chart_bundle_contains_all_figures() -> None:
             ),
             grouped_author_summary=grouped_author_rows(),
             field_adoption_editing_summary=field_adoption_rows(),
+            compensation_analysis_summary=compensation_analysis_rows(),
             suggestion_selection_summary=suggestion_selection_rows(),
             field_readability_change_summary=readability_change_rows(),
             field_readability_target_summary=readability_target_rows(),
@@ -1846,6 +1936,7 @@ def test_chart_bundle_contains_all_figures() -> None:
     assert charts.field_selected_outcomes.data
     assert charts.suggestion_selection_by_kind.data
     assert charts.suggestion_selection_by_index.data
+    assert charts.compensation_suggestion_use.data
     assert charts.readability_change_direction.data
     assert charts.final_grade_bands.data
     assert charts.selected_vs_unselected_readability.data
