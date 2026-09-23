@@ -1183,13 +1183,11 @@ def test_html_report_is_self_contained_and_accessible() -> None:
     ) in normalized_html
     assert "missing values can further reduce either count" in normalized_html
     assert "not historical snapshots of individual attempts" in normalized_html
-
     assert 'id="study-mix-heading"' in html
     assert "Participant and department mix" in html
     assert "Completed studies by participant type" in html
     assert "Completed studies by department" in html
     assert "Other and missing categories are retained" in normalized_html
-
     assert 'id="field-adoption-heading"' in html
     assert "AI field adoption and editing" in html
     assert "AI suggestion offers and selections by field" in html
@@ -1300,6 +1298,48 @@ def test_html_report_explains_author_handoff_categories() -> None:
     assert "display: block" in html
 
 
+def test_html_report_explains_author_experience_and_study_mix() -> None:
+    """Explain author time points and completed-study category bars."""
+    html = render_html_report(
+        records=feedback_records(),
+        overview_summary=overview_rows(),
+        author_handoff_summary=author_handoff_rows(),
+        retry_card_summary=retry_card_rows(),
+        retry_characteristics_summary=retry_characteristic_rows(),
+        data_quality_summary=quality_rows(),
+        repeated_attempt_source_consistency_summary=(repeated_source_rows()),
+        charts=charts(),
+    )
+    normalized_html = " ".join(html.split())
+
+    assert "How to compare attempt-time and query-time experience" in html
+    assert "five AI attempts have prior-study counts" in normalized_html
+    assert "the AI bar is 2 studies" in normalized_html
+    assert "an author with three attempts contributes three observations" in (
+        normalized_html
+    )
+    assert "the median author in that group had 6 distinct calendar days" in (
+        normalized_html
+    )
+    assert "different observation units and time points" in normalized_html
+
+    experience_summary = html.index(
+        "<summary>How to compare attempt-time and query-time experience</summary>"
+    )
+    experience_panel_start = html.rfind(
+        '<details class="explanation-panel">',
+        0,
+        experience_summary,
+    )
+    experience_panel_end = html.index("</details>", experience_summary)
+    experience_panel = html[experience_panel_start:experience_panel_end]
+    assert '<details class="explanation-panel" open' not in experience_panel
+
+    assert "One bar represents one category" in normalized_html
+    assert "each completed study contributes once per chart" in normalized_html
+    assert "do not compare completion rates between categories" in normalized_html
+
+
 def test_html_report_explains_appointment_context() -> None:
     """Explain parsed appointment facets and overlapping groups."""
     html = render_html_report(
@@ -1327,6 +1367,20 @@ def test_html_report_explains_appointment_context() -> None:
     assert "Title:Department:School" in normalized_html
     assert "not intended to sum to 100 percent" in normalized_html
     assert "counts distinct attempt authors represented" in normalized_html
+    assert "How to interpret overlapping appointment groups" in html
+    assert "count attempt authors according to" in normalized_html
+    assert "their studies' named principal investigators" in normalized_html
+    assert "among 10 distinct attempt authors" in normalized_html
+    assert "the chart does not count 11 different people" in normalized_html
+    assert "not greater feature use per person" in normalized_html
+
+    summary = html.index(
+        "<summary>How to interpret overlapping appointment groups</summary>"
+    )
+    panel_start = html.rfind('<details class="explanation-panel">', 0, summary)
+    panel_end = html.index("</details>", summary)
+    panel = html[panel_start:panel_end]
+    assert '<details class="explanation-panel" open' not in panel
 
 
 def test_html_report_explains_completed_study_author_context() -> None:
@@ -1359,6 +1413,18 @@ def test_html_report_explains_completed_study_author_context() -> None:
         "Distinct completion authors appear only as aggregate hover context"
         in normalized_html
     )
+    assert "How to read completion-author context" in html
+    assert "Each horizontal bar is one final authoring mode" in normalized_html
+    assert "Segment length is a completed-study count" in normalized_html
+    assert "if the manual bar contains 15 completed studies" in normalized_html
+    assert "not six necessarily different people" in normalized_html
+    assert "do not measure effort by other team members" in normalized_html
+
+    summary = html.index("<summary>How to read completion-author context</summary>")
+    panel_start = html.rfind('<details class="explanation-panel">', 0, summary)
+    panel_end = html.index("</details>", summary)
+    panel = html[panel_start:panel_end]
+    assert '<details class="explanation-panel" open' not in panel
 
 
 def test_html_report_has_navigation_and_faculty_summary() -> None:

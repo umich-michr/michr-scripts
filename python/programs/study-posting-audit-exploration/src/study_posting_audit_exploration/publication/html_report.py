@@ -967,6 +967,41 @@ _TEMPLATE = """<!doctype html>
   <div class="chart">{{ author_experience_studies_html | safe }}</div>
   <div class="chart">{{ author_experience_days_html | safe }}</div>
 
+  <details class="explanation-panel">
+    <summary>How to compare attempt-time and query-time experience</summary>
+    <div class="explanation-panel-content">
+      <h4>Attempt-time chart</h4>
+      <p>
+        Each bar shows the median number of prior studies across attempts in
+        one authoring mode. Because attempts are counted, an author with three
+        attempts contributes three observations.
+      </p>
+      <p>
+        <strong>Synthetic example:</strong> if five AI attempts have prior-study
+        counts of 0, 1, 2, 4, and 8, the AI bar is 2 studies, the middle value.
+      </p>
+
+      <h4>Query-time charts</h4>
+      <p>
+        Each cluster is an author adoption group, and each colored bar is one
+        experience or activity metric. Bar height is the median among distinct
+        authors who had a value for that metric when the report query ran.
+      </p>
+      <p>
+        <strong>Synthetic example:</strong> if the “authors with any AI
+        attempt” group has a 6-day bar for distinct login days, the median
+        author in that group had 6 distinct calendar days with a recorded
+        login. It does not mean each author had 6 login days.
+      </p>
+      <p class="caution">
+        Attempt-time and query-time bars use different observation units and
+        time points, so their heights should not be compared as if they
+        measured the same population. Larger medians do not establish that
+        experience caused authoring-mode choice or completion.
+      </p>
+    </div>
+  </details>
+
   <p class="caution">
     These descriptive medians must not be interpreted as causes of
     authoring-mode choice or study outcomes.
@@ -998,6 +1033,30 @@ _TEMPLATE = """<!doctype html>
     <div class="chart">
       {{ completed_studies_by_completion_author_pi_status_html | safe }}
     </div>
+
+    <details class="explanation-panel">
+      <summary>How to read completion-author context</summary>
+      <div class="explanation-panel-content">
+        <p>
+          Each horizontal bar is one final authoring mode. Its stacked
+          segments divide completed studies by the completion author's role or
+          by whether that author was the principal investigator for that
+          specific study. Segment length is a completed-study count.
+        </p>
+        <p>
+          <strong>Synthetic example:</strong> if the manual bar contains 15
+          completed studies and its “PI for this study” segment contains 6,
+          then the completion author was the study's principal investigator
+          for 6 of those 15 studies. This counts studies, not six necessarily
+          different people.
+        </p>
+        <p class="caution">
+          These charts describe who made the recorded completed attempt. They
+          do not measure effort by other team members or explain why AI or
+          manual authoring was used.
+        </p>
+      </div>
+    </details>
   </section>
   </details>
 
@@ -1022,6 +1081,31 @@ _TEMPLATE = """<!doctype html>
     <div class="chart">{{ pi_appointment_departments_html | safe }}</div>
     <div class="chart">{{ author_appointment_titles_html | safe }}</div>
     <div class="chart">{{ pi_appointment_titles_html | safe }}</div>
+
+    <details class="explanation-panel">
+      <summary>How to interpret overlapping appointment groups</summary>
+      <div class="explanation-panel-content">
+        <p>
+          Each horizontal bar counts distinct attempt authors represented in
+          one school, department, or title group. “Author appointment” charts
+          use appointments recorded for attempt authors. “Principal-
+          investigator appointment” charts count attempt authors according to
+          the appointment groups of their studies' named principal
+          investigators.
+        </p>
+        <p>
+          <strong>Synthetic example:</strong> among 10 distinct attempt authors,
+          6 might be represented in one school and 5 in another. The total can
+          exceed 10 because an author or a study's principal investigator may
+          have appointments in both schools; the chart does not count 11
+          different people.
+        </p>
+        <p class="caution">
+          Larger bars show broader representation in the captured attempts,
+          not greater feature use per person, influence, or effectiveness.
+        </p>
+      </div>
+    </details>
   </section>
   </details>
 
@@ -1030,10 +1114,16 @@ _TEMPLATE = """<!doctype html>
       Participant and department mix
     </summary>
     <section aria-labelledby="study-mix-heading">
+    <p>
+      These horizontal bars count completed studies by participant type and
+      study department. One bar represents one category, and its length is the
+      number of completed studies in that category.
+    </p>
     <p class="caution">
-      These charts describe mutually exclusive categories among completed
-      studies. Other and missing categories are retained rather than silently
-      removed.
+      Categories within each chart are mutually exclusive, so each completed
+      study contributes once per chart. Other and missing categories are
+      retained rather than silently removed. The charts describe the completed
+      study mix; they do not compare completion rates between categories.
     </p>
     <div class="chart">{{ participant_mix_html | safe }}</div>
     <div class="chart">{{ department_mix_html | safe }}</div>
