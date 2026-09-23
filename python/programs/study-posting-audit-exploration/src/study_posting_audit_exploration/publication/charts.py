@@ -2,6 +2,7 @@
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+import json
 from numbers import Integral, Real
 from typing import cast
 
@@ -198,6 +199,7 @@ _REQUIRED_COMPENSATION_ANALYSIS_COLUMNS: tuple[str, ...] = (
     "completed_ai_attempt_count_with_suggestion",
     "offered_suggestion_count",
     "selected_suggestion_count",
+    "offer_composition_summary_json",
 )
 
 _REQUIRED_SUGGESTION_SELECTION_COLUMNS: tuple[str, ...] = (
@@ -594,6 +596,8 @@ class ExplorationCharts:
     suggestion_selection_by_kind: go.Figure
     suggestion_selection_by_index: go.Figure
     compensation_suggestion_use: go.Figure
+    compensation_offer_composition_all: go.Figure
+    compensation_offer_composition_final_yes: go.Figure
     readability_change_direction: go.Figure
     final_grade_bands: go.Figure
     selected_vs_unselected_readability: go.Figure
@@ -2066,6 +2070,197 @@ def _chart_count(
     return converted
 
 
+_COMPENSATION_COMPOSITION_LABELS: Mapping[str, str] = {
+    "BOTH_KINDS": "Both generic and specific",
+    "GENERIC_ONLY": "Generic only",
+    "SPECIFIC_ONLY": "Specific only",
+    "NEITHER": "Neither kind",
+}
+_COMPENSATION_COMPOSITION_ORDER: tuple[str, ...] = tuple(
+    _COMPENSATION_COMPOSITION_LABELS
+)
+
+
+def _embedded_compensation_rows(
+    compensation_summary: pd.DataFrame,
+    *,
+    column_name: str,
+) -> pd.DataFrame:
+    """Return one validated embedded aggregate copied across kind rows."""
+    if column_name not in compensation_summary.columns:
+        raise ExplorationValidationError(
+            f"compensation_analysis_summary lacks required chart column: {column_name}"
+        )
+
+    payloads = compensation_summary[column_name].dropna().astype(str).unique()
+
+    if len(payloads) == 0:
+        return pd.DataFrame()
+
+    if len(payloads) != 1:
+        raise ExplorationValidationError(
+            f"compensation_analysis_summary must contain one consistent "
+            f"{column_name} payload"
+        )
+
+    try:
+        decoded = json.loads(str(payloads[0]))
+    except json.JSONDecodeError as error:
+        raise ExplorationValidationError(
+            f"compensation_analysis_summary contains invalid {column_name}"
+        ) from error
+
+    if not isinstance(decoded, list) or any(
+        not isinstance(row, dict) for row in decoded
+    ):
+        raise ExplorationValidationError(
+            f"compensation_analysis_summary {column_name} must contain "
+            "a JSON list of objects"
+        )
+
+    return pd.DataFrame.from_records(decoded)
+
+
+def build_compensation_offer_composition_chart(
+    compensation_summary: pd.DataFrame,
+    *,
+    population_name: str,
+    title: str,
+) -> go.Figure:
+    """Return compensation offer-composition counts for one population."""
+    rows = _embedded_compensation_rows(
+        compensation_summary,
+        column_name="offer_composition_summary_json",
+    )
+    required = (
+        "summary_grain",
+        "population_name",
+        "offer_composition_category",
+        "attempt_count",
+        "population_attempt_count",
+        "attempt_percentage",
+    )
+
+    if rows.empty:
+        return _empty_figure(
+            title=title,
+            message="No compensation offer-composition aggregates are available.",
+        )
+
+    _require_columns(
+        rows,
+        required=required,
+        frame_name="embedded compensation offer composition",
+    )
+    rows = rows.loc[
+        rows["summary_grain"].eq("OFFER_COMPOSITION")
+        & rows["population_name"].eq(population_name)
+    ].copy()
+
+    if rows.empty:
+        return _empty_figure(
+            title=title,
+            message=(
+                "No compensation offer composition is available for this population."
+            ),
+        )
+
+    categories = rows["offer_composition_category"].astype(str)
+    unknown = sorted(set(categories) - set(_COMPENSATION_COMPOSITION_ORDER))
+
+    if unknown:
+        raise ExplorationValidationError(
+            "embedded compensation composition contains unsupported categories: "
+            + ", ".join(unknown)
+        )
+
+    if categories.duplicated(keep=False).any():
+        raise ExplorationValidationError(
+            "embedded compensation composition must contain one row per category"
+        )
+
+    missing_categories = set(_COMPENSATION_COMPOSITION_ORDER) - set(categories)
+    if missing_categories:
+        raise ExplorationValidationError(
+            "embedded compensation composition lacks required categories: "
+            + ", ".join(sorted(missing_categories))
+        )
+
+    rows_by_category = {
+        str(row["offer_composition_category"]): row
+        for row in rows.to_dict(orient="records")
+    }
+    counts = [
+        _chart_count(
+            rows_by_category.get(category, {}).get("attempt_count", 0),
+            value_name="attempt_count",
+        )
+        for category in _COMPENSATION_COMPOSITION_ORDER
+    ]
+    population_counts = [
+        _chart_count(
+            rows_by_category.get(category, {}).get("population_attempt_count", 0),
+            value_name="population_attempt_count",
+        )
+        for category in _COMPENSATION_COMPOSITION_ORDER
+    ]
+    if len(set(population_counts)) != 1:
+        raise ExplorationValidationError(
+            "embedded compensation composition has inconsistent population counts"
+        )
+
+    if sum(counts) != population_counts[0]:
+        raise ExplorationValidationError(
+            "embedded compensation composition counts do not reconcile"
+        )
+
+    percentages = [
+        (100.0 * count / population_count if population_count > 0 else None)
+        for count, population_count in zip(
+            counts,
+            population_counts,
+            strict=True,
+        )
+    ]
+    labels = [
+        _COMPENSATION_COMPOSITION_LABELS[category]
+        for category in _COMPENSATION_COMPOSITION_ORDER
+    ]
+    figure = go.Figure(
+        data=[
+            go.Bar(
+                orientation="h",
+                x=counts,
+                y=labels,
+                customdata=[
+                    [percentage, population_count]
+                    for percentage, population_count in zip(
+                        percentages,
+                        population_counts,
+                        strict=True,
+                    )
+                ],
+                hovertemplate=(
+                    "Offer composition: %{y}<br>"
+                    "Completed AI attempts: %{x}<br>"
+                    "Share of population: %{customdata[0]:.1f}% "
+                    "(%{x} of %{customdata[1]})"
+                    "<extra></extra>"
+                ),
+            )
+        ]
+    )
+    figure.update_layout(
+        title=title,
+        template="plotly_white",
+        xaxis_title="Completed AI attempt count",
+        yaxis_title="Compensation text offer composition",
+        showlegend=False,
+    )
+
+    return figure
+
+
 def build_compensation_suggestion_use_chart(
     compensation_summary: pd.DataFrame,
 ) -> go.Figure:
@@ -3389,6 +3584,25 @@ def build_exploration_charts(
         ),
         compensation_suggestion_use=build_compensation_suggestion_use_chart(
             inputs.compensation_analysis_summary
+        ),
+        compensation_offer_composition_all=(
+            build_compensation_offer_composition_chart(
+                inputs.compensation_analysis_summary,
+                population_name="ALL_COMPLETED_AI_ATTEMPTS",
+                title=(
+                    "Compensation text offer composition among all "
+                    "completed AI attempts"
+                ),
+            )
+        ),
+        compensation_offer_composition_final_yes=(
+            build_compensation_offer_composition_chart(
+                inputs.compensation_analysis_summary,
+                population_name="FINAL_COMPENSATION_YES",
+                title=(
+                    "Compensation text offer composition when final compensation is Yes"
+                ),
+            )
         ),
         readability_change_direction=build_readability_change_direction_chart(
             inputs.field_readability_change_summary

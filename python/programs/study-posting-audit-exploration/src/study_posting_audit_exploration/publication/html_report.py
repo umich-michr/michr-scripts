@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 from html import escape
+import json
 import math
 from numbers import Real
 from pathlib import Path
@@ -1349,6 +1350,111 @@ _TEMPLATE = """<!doctype html>
       <p>No compensation text-suggestion aggregate was available.</p>
       {% endif %}
 
+      <h3>Which kinds and how many suggestions were offered?</h3>
+      <p>
+        The next charts separate all completed AI attempts from the subset
+        whose final saved compensation value was Yes. Each attempt appears in
+        exactly one category per chart: both kinds, generic only, specific
+        only, or neither.
+      </p>
+      <div class="chart">
+        {{ compensation_offer_composition_all_html | safe }}
+      </div>
+      <div class="chart">
+        {{ compensation_offer_composition_final_yes_html | safe }}
+      </div>
+
+      {% if compensation_count_pair_rows %}
+      <div class="retry-table-wrapper" role="region"
+           aria-label="Compensation suggestion count combinations" tabindex="0">
+        <table class="retry-table">
+          <caption>
+            Observed generic and specific suggestion-count combinations
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Population</th>
+              <th scope="col">Offer composition</th>
+              <th scope="col">Generic suggestions</th>
+              <th scope="col">Specific suggestions</th>
+              <th scope="col">Completed AI attempts</th>
+              <th scope="col">Share of population</th>
+              <th scope="col">Exactly 3 generic + 3 specific</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in compensation_count_pair_rows %}
+            <tr>
+              <td>{{ row.population_label }}</td>
+              <td>{{ row.composition_label }}</td>
+              <td>{{ row.generic_count }}</td>
+              <td>{{ row.specific_count }}</td>
+              <td>{{ row.attempt_count }}</td>
+              <td>{{ row.percentage_text }}</td>
+              <td>{{ row.exact_three_plus_three_text }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p>No exact compensation suggestion-count combinations were available.</p>
+      {% endif %}
+
+      <h3>Workflow consistency checks</h3>
+      <p>
+        These checks identify combinations that may merit follow-up, such as
+        AI supplying No while text suggestions were still offered or a final
+        Yes value without the expected suggestion set.
+      </p>
+      {% if compensation_consistency_rows %}
+      <div class="retry-table-wrapper" role="region"
+           aria-label="Compensation workflow consistency checks" tabindex="0">
+        <table class="retry-table">
+          <caption>
+            Descriptive compensation workflow-consistency checks
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Observed condition</th>
+              <th scope="col">Completed AI attempts</th>
+              <th scope="col">Denominator population</th>
+              <th scope="col">Denominator attempts</th>
+              <th scope="col">Percentage</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in compensation_consistency_rows %}
+            <tr>
+              <th scope="row">{{ row.label }}</th>
+              <td>{{ row.attempt_count }}</td>
+              <td>{{ row.population_label }}</td>
+              <td>{{ row.population_count }}</td>
+              <td>{{ row.percentage_text }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p>No compensation workflow-consistency aggregates were available.</p>
+      {% endif %}
+      <p class="caution">
+        Consistency checks can overlap, so do not add their counts or
+        percentages as though they divide attempts into exclusive groups.
+        They are descriptive flags, not proof of model malfunction or user
+        intent.
+      </p>
+
+      <p>
+        Compensation edit and retention outcomes also appear in
+        <a href="#field-adoption-heading">AI field adoption and editing</a>.
+        Suggestion-position patterns appear in
+        <a href="#suggestion-choice-heading">Suggestion choice</a>, and
+        eligible formula-based text indicators appear in
+        <a href="#readability-heading">Readability indicators</a>.
+      </p>
+
       <details class="explanation-panel">
         <summary>How to interpret compensation choices</summary>
         <div class="explanation-panel-content">
@@ -1371,10 +1477,18 @@ _TEMPLATE = """<!doctype html>
             received 30 individual generic suggestions, 30 remains useful offer
             context but is not the percentage denominator.
           </p>
+          <p>
+            <strong>Synthetic offer-composition example:</strong> suppose 10
+            final-Yes attempts include 6 with both kinds at 3 generic and 3
+            specific, 2 with generic only at counts of 1 and 2, and 2 with
+            specific only. The composition chart shows 6, 2, 2, and 0 across
+            the four categories; the exact-count table preserves the 3+3,
+            1+0, 2+0, and 0+specific-count combinations.
+          </p>
           <p class="caution">
-            These totals cannot show how many attempts received exactly three
-            generic and three specific suggestions. They also do not establish
-            preference, suggestion quality, or causal benefit.
+            These summaries describe what was captured as offered and selected.
+            They do not establish preference, suggestion quality, causal
+            benefit, model malfunction, or user intent.
           </p>
         </div>
       </details>
@@ -2110,6 +2224,30 @@ class CompensationTextView:
 
 
 @dataclass(frozen=True, slots=True)
+class CompensationCountPairView:
+    """One exact generic/specific offer-count combination."""
+
+    population_label: str
+    composition_label: str
+    generic_count: int
+    specific_count: int
+    attempt_count: int
+    percentage_text: str
+    exact_three_plus_three_text: str
+
+
+@dataclass(frozen=True, slots=True)
+class CompensationConsistencyView:
+    """One descriptive compensation workflow-consistency check."""
+
+    label: str
+    population_label: str
+    attempt_count: int
+    population_count: int
+    percentage_text: str
+
+
+@dataclass(frozen=True, slots=True)
 class UserFeedbackView:
     """One authorized faculty-facing feedback response."""
 
@@ -2619,6 +2757,180 @@ def _compensation_text_views(
     return tuple(views)
 
 
+_COMPENSATION_POPULATION_LABELS = {
+    "ALL_COMPLETED_AI_ATTEMPTS": "All completed AI attempts",
+    "FINAL_COMPENSATION_YES": "Final compensation Yes",
+    "AI_VALUE_AVAILABLE_COMPLETED_AI_ATTEMPTS": (
+        "Completed AI attempts with an AI-supplied Yes/No value"
+    ),
+}
+_COMPENSATION_COMPOSITION_LABELS = {
+    "BOTH_KINDS": "Both generic and specific",
+    "GENERIC_ONLY": "Generic only",
+    "SPECIFIC_ONLY": "Specific only",
+    "NEITHER": "Neither kind",
+}
+_COMPENSATION_CONSISTENCY_LABELS = {
+    "AI_NO_WITH_TEXT_OFFERS": "AI supplied No but text suggestions were offered",
+    "AI_YES_WITH_NO_TEXT_OFFERS": (
+        "AI supplied Yes but no text suggestions were offered"
+    ),
+    "FINAL_YES_WITH_NO_TEXT_OFFERS": "Final Yes with no text suggestions offered",
+    "FINAL_YES_WITH_ONE_KIND_ONLY": "Final Yes with only one suggestion kind offered",
+    "FINAL_YES_WITH_NON_3_PLUS_3": "Final Yes without exactly 3 generic and 3 specific",
+}
+
+
+def _embedded_compensation_html_rows(
+    summary: pd.DataFrame,
+    *,
+    column_name: str,
+) -> list[dict[str, object]]:
+    """Return one validated embedded aggregate copied across kind rows."""
+    if column_name not in summary.columns:
+        return []
+
+    payloads = summary[column_name].dropna().astype(str).unique()
+
+    if len(payloads) == 0:
+        return []
+
+    if len(payloads) != 1:
+        raise ExplorationValidationError(
+            f"compensation_analysis_summary must contain one consistent "
+            f"{column_name} payload"
+        )
+
+    try:
+        decoded = json.loads(str(payloads[0]))
+    except json.JSONDecodeError as error:
+        raise ExplorationValidationError(
+            f"compensation_analysis_summary contains invalid {column_name}"
+        ) from error
+
+    if not isinstance(decoded, list) or any(
+        not isinstance(row, dict) for row in decoded
+    ):
+        raise ExplorationValidationError(
+            f"compensation_analysis_summary {column_name} must contain "
+            "a JSON list of objects"
+        )
+
+    return decoded
+
+
+def _boolean_yes_no(
+    value: object,
+    *,
+    value_name: str,
+) -> str:
+    """Return Yes or No for a required Boolean aggregate."""
+    if isinstance(value, bool):
+        return "Yes" if value else "No"
+
+    raise ExplorationValidationError(
+        f"embedded compensation {value_name} must contain a Boolean"
+    )
+
+
+def _compensation_count_pair_views(
+    summary: pd.DataFrame,
+) -> tuple[CompensationCountPairView, ...]:
+    """Return exact offer-count combinations for both populations."""
+    rows = _embedded_compensation_html_rows(
+        summary,
+        column_name="offer_count_pair_summary_json",
+    )
+    views: list[CompensationCountPairView] = []
+
+    for row in rows:
+        population = str(row.get("population_name"))
+        composition = str(row.get("offer_composition_category"))
+
+        if population not in _COMPENSATION_POPULATION_LABELS:
+            raise ExplorationValidationError(
+                "embedded compensation count pairs contain an unsupported population"
+            )
+
+        if composition not in _COMPENSATION_COMPOSITION_LABELS:
+            raise ExplorationValidationError(
+                "embedded compensation count pairs contain an unsupported category"
+            )
+
+        views.append(
+            CompensationCountPairView(
+                population_label=_COMPENSATION_POPULATION_LABELS[population],
+                composition_label=_COMPENSATION_COMPOSITION_LABELS[composition],
+                generic_count=_aggregate_count(
+                    row.get("generic_suggestion_count"),
+                    value_name="generic_suggestion_count",
+                ),
+                specific_count=_aggregate_count(
+                    row.get("specific_suggestion_count"),
+                    value_name="specific_suggestion_count",
+                ),
+                attempt_count=_aggregate_count(
+                    row.get("attempt_count"),
+                    value_name="attempt_count",
+                ),
+                percentage_text=(
+                    _percentage_text(row.get("attempt_percentage")) or "\\N"
+                ),
+                exact_three_plus_three_text=_boolean_yes_no(
+                    row.get("is_exact_three_plus_three"),
+                    value_name="is_exact_three_plus_three",
+                ),
+            )
+        )
+
+    return tuple(views)
+
+
+def _compensation_consistency_views(
+    summary: pd.DataFrame,
+) -> tuple[CompensationConsistencyView, ...]:
+    """Return descriptive workflow-consistency checks with denominators."""
+    rows = _embedded_compensation_html_rows(
+        summary,
+        column_name="workflow_consistency_summary_json",
+    )
+    views: list[CompensationConsistencyView] = []
+
+    for row in rows:
+        population = str(row.get("population_name"))
+        category = str(row.get("consistency_category"))
+
+        if population not in _COMPENSATION_POPULATION_LABELS:
+            raise ExplorationValidationError(
+                "embedded compensation consistency contains an unsupported population"
+            )
+
+        if category not in _COMPENSATION_CONSISTENCY_LABELS:
+            raise ExplorationValidationError(
+                "embedded compensation consistency contains an unsupported category"
+            )
+
+        views.append(
+            CompensationConsistencyView(
+                label=_COMPENSATION_CONSISTENCY_LABELS[category],
+                population_label=_COMPENSATION_POPULATION_LABELS[population],
+                attempt_count=_aggregate_count(
+                    row.get("attempt_count"),
+                    value_name="attempt_count",
+                ),
+                population_count=_aggregate_count(
+                    row.get("population_attempt_count"),
+                    value_name="population_attempt_count",
+                ),
+                percentage_text=(
+                    _percentage_text(row.get("attempt_percentage")) or "\\N"
+                ),
+            )
+        )
+
+    return tuple(views)
+
+
 def _empty_nontext_summary() -> pd.DataFrame:
     """Return canonical columns consumed by compensation HTML."""
     return pd.DataFrame(
@@ -2645,6 +2957,9 @@ def _empty_compensation_summary() -> pd.DataFrame:
             "offered_suggestion_count",
             "selected_suggestion_count",
             "suggestion_selection_percentage",
+            "offer_composition_summary_json",
+            "offer_count_pair_summary_json",
+            "workflow_consistency_summary_json",
         ]
     )
 
@@ -3032,6 +3347,16 @@ def render_html_report(  # noqa: PLR0913
         title=_REPORT_TITLE,
         compensation_flag=compensation_flag,
         compensation_text_rows=compensation_text_rows,
+        compensation_count_pair_rows=_compensation_count_pair_views(
+            _empty_compensation_summary()
+            if compensation_analysis_summary is None
+            else compensation_analysis_summary
+        ),
+        compensation_consistency_rows=_compensation_consistency_views(
+            _empty_compensation_summary()
+            if compensation_analysis_summary is None
+            else compensation_analysis_summary
+        ),
         user_feedback_rows=feedback_rows,
         source_context=source_context,
         faculty_summary=_faculty_summary(
@@ -3097,6 +3422,14 @@ def render_html_report(  # noqa: PLR0913
         ),
         compensation_suggestion_use_html=_figure_html(
             charts.compensation_suggestion_use,
+            include_plotlyjs=False,
+        ),
+        compensation_offer_composition_all_html=_figure_html(
+            charts.compensation_offer_composition_all,
+            include_plotlyjs=False,
+        ),
+        compensation_offer_composition_final_yes_html=_figure_html(
+            charts.compensation_offer_composition_final_yes,
             include_plotlyjs=False,
         ),
         readability_change_direction_html=_figure_html(

@@ -1,4 +1,5 @@
 from collections.abc import Callable
+import json
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -17,6 +18,7 @@ from study_posting_audit_exploration.publication import (
     build_author_attempt_start_experience_chart,
     build_author_experience_chart,
     build_author_handoff_chart,
+    build_compensation_offer_composition_chart,
     build_compensation_suggestion_use_chart,
     build_completed_study_author_context_chart,
     build_completed_study_mix_chart,
@@ -669,7 +671,37 @@ def field_adoption_rows() -> pd.DataFrame:
 
 
 def compensation_analysis_rows() -> pd.DataFrame:
-    """Return synthetic generic and specific compensation summaries."""
+    """Return synthetic generic, specific, and composition summaries."""
+    composition = [
+        {
+            "summary_grain": "OFFER_COMPOSITION",
+            "population_name": population,
+            "offer_composition_category": category,
+            "generic_suggestion_count": None,
+            "specific_suggestion_count": None,
+            "attempt_count": count,
+            "population_attempt_count": population_count,
+            "attempt_percentage": 100.0 * count / population_count,
+            "is_exact_three_plus_three": None,
+            "consistency_category": None,
+        }
+        for population, population_count, category, count in (
+            ("ALL_COMPLETED_AI_ATTEMPTS", 10, "BOTH_KINDS", 6),
+            ("ALL_COMPLETED_AI_ATTEMPTS", 10, "GENERIC_ONLY", 2),
+            ("ALL_COMPLETED_AI_ATTEMPTS", 10, "SPECIFIC_ONLY", 1),
+            ("ALL_COMPLETED_AI_ATTEMPTS", 10, "NEITHER", 1),
+            ("FINAL_COMPENSATION_YES", 8, "BOTH_KINDS", 6),
+            ("FINAL_COMPENSATION_YES", 8, "GENERIC_ONLY", 1),
+            ("FINAL_COMPENSATION_YES", 8, "SPECIFIC_ONLY", 1),
+            ("FINAL_COMPENSATION_YES", 8, "NEITHER", 0),
+        )
+    ]
+    composition_json = json.dumps(
+        composition,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+
     return pd.DataFrame.from_records(
         [
             {
@@ -677,12 +709,16 @@ def compensation_analysis_rows() -> pd.DataFrame:
                 "completed_ai_attempt_count_with_suggestion": 10,
                 "offered_suggestion_count": 30,
                 "selected_suggestion_count": 4,
+                "suggestion_selection_percentage": 100.0 * 4.0 / 30.0,
+                "offer_composition_summary_json": composition_json,
             },
             {
                 "compensation_suggestion_kind": "specificCompensation",
                 "completed_ai_attempt_count_with_suggestion": 8,
                 "offered_suggestion_count": 24,
                 "selected_suggestion_count": 2,
+                "suggestion_selection_percentage": 100.0 * 2.0 / 24.0,
+                "offer_composition_summary_json": composition_json,
             },
         ]
     )
@@ -1489,6 +1525,120 @@ def test_field_selected_outcomes_chart_preserves_unclassified() -> None:
     assert "edited-unclassified remains separate from replaced" in str(
         traces_by_name["Edited, unclassified"].customdata[0][1]
     )
+
+
+@pytest.mark.parametrize(
+    ("mutate", "message"),
+    [
+        (
+            lambda frame: frame.drop(columns=["offer_composition_summary_json"]),
+            "lacks required chart column",
+        ),
+        (
+            lambda frame: frame.assign(offer_composition_summary_json="not-json"),
+            "contains invalid offer_composition_summary_json",
+        ),
+        (
+            lambda frame: frame.assign(
+                offer_composition_summary_json=json.dumps({"not": "a list"})
+            ),
+            "must contain a JSON list of objects",
+        ),
+        (
+            lambda frame: frame.assign(
+                offer_composition_summary_json=[
+                    frame["offer_composition_summary_json"].iloc[0],
+                    json.dumps([]),
+                ]
+            ),
+            "must contain one consistent offer_composition_summary_json payload",
+        ),
+    ],
+)
+def test_compensation_offer_composition_chart_rejects_invalid_payloads(
+    mutate: Callable[[pd.DataFrame], pd.DataFrame],
+    message: str,
+) -> None:
+    """Reject missing, malformed, non-list, and inconsistent payloads."""
+    with pytest.raises(ExplorationValidationError, match=message):
+        build_compensation_offer_composition_chart(
+            mutate(compensation_analysis_rows()),
+            population_name="ALL_COMPLETED_AI_ATTEMPTS",
+            title="Synthetic title",
+        )
+
+
+def test_compensation_offer_composition_chart_returns_population_empty_state() -> None:
+    """Render an empty state when a requested population is absent."""
+    figure = build_compensation_offer_composition_chart(
+        compensation_analysis_rows(),
+        population_name="SYNTHETIC_ABSENT",
+        title="Synthetic absent population",
+    )
+
+    assert figure.layout.annotations[0].text
+
+
+@pytest.mark.parametrize(
+    ("mutate_rows", "message"),
+    [
+        (
+            lambda rows: rows[:-1],
+            "lacks required categories",
+        ),
+        (
+            lambda rows: [
+                {
+                    **row,
+                    "population_attempt_count": (
+                        11
+                        if row["offer_composition_category"] == "BOTH_KINDS"
+                        else row["population_attempt_count"]
+                    ),
+                }
+                for row in rows
+            ],
+            "inconsistent population counts",
+        ),
+        (
+            lambda rows: [
+                {
+                    **row,
+                    "attempt_count": (
+                        7
+                        if row["offer_composition_category"] == "BOTH_KINDS"
+                        else row["attempt_count"]
+                    ),
+                }
+                for row in rows
+            ],
+            "counts do not reconcile",
+        ),
+    ],
+)
+def test_compensation_offer_composition_chart_reconciles_categories(
+    mutate_rows: Callable[[list[dict[str, object]]], list[dict[str, object]]],
+    message: str,
+) -> None:
+    """Require complete, denominator-consistent composition rows."""
+    summary = compensation_analysis_rows()
+    rows = json.loads(summary["offer_composition_summary_json"].iloc[0])
+    all_rows = [
+        row for row in rows if row["population_name"] == "ALL_COMPLETED_AI_ATTEMPTS"
+    ]
+    other_rows = [
+        row for row in rows if row["population_name"] != "ALL_COMPLETED_AI_ATTEMPTS"
+    ]
+    summary["offer_composition_summary_json"] = json.dumps(
+        [*mutate_rows(all_rows), *other_rows]
+    )
+
+    with pytest.raises(ExplorationValidationError, match=message):
+        build_compensation_offer_composition_chart(
+            summary,
+            population_name="ALL_COMPLETED_AI_ATTEMPTS",
+            title="Synthetic title",
+        )
 
 
 def test_compensation_suggestion_use_chart_is_attempt_level() -> None:

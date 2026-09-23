@@ -1,4 +1,5 @@
 from collections.abc import Callable
+import json
 from pathlib import Path
 
 import pandas as pd
@@ -462,22 +463,143 @@ def nontext_compensation_rows() -> pd.DataFrame:
 
 
 def compensation_analysis_rows() -> pd.DataFrame:
-    """Return aggregate-only generic and specific suggestion rows."""
+    """Return synthetic compensation use and embedded composition summaries."""
+    composition = [
+        {
+            "summary_grain": "OFFER_COMPOSITION",
+            "population_name": population,
+            "offer_composition_category": category,
+            "generic_suggestion_count": None,
+            "specific_suggestion_count": None,
+            "attempt_count": count,
+            "population_attempt_count": population_count,
+            "attempt_percentage": 100.0 * count / population_count,
+            "is_exact_three_plus_three": None,
+            "consistency_category": None,
+        }
+        for population, population_count, category, count in (
+            ("ALL_COMPLETED_AI_ATTEMPTS", 10, "BOTH_KINDS", 6),
+            ("ALL_COMPLETED_AI_ATTEMPTS", 10, "GENERIC_ONLY", 2),
+            ("ALL_COMPLETED_AI_ATTEMPTS", 10, "SPECIFIC_ONLY", 1),
+            ("ALL_COMPLETED_AI_ATTEMPTS", 10, "NEITHER", 1),
+            ("FINAL_COMPENSATION_YES", 8, "BOTH_KINDS", 6),
+            ("FINAL_COMPENSATION_YES", 8, "GENERIC_ONLY", 1),
+            ("FINAL_COMPENSATION_YES", 8, "SPECIFIC_ONLY", 1),
+            ("FINAL_COMPENSATION_YES", 8, "NEITHER", 0),
+        )
+    ]
+    count_pairs = [
+        {
+            "summary_grain": "OFFER_COUNT_PAIR",
+            "population_name": population,
+            "offer_composition_category": category,
+            "generic_suggestion_count": generic_count,
+            "specific_suggestion_count": specific_count,
+            "attempt_count": count,
+            "population_attempt_count": population_count,
+            "attempt_percentage": 100.0 * count / population_count,
+            "is_exact_three_plus_three": (generic_count == 3 and specific_count == 3),
+            "consistency_category": None,
+        }
+        for (
+            population,
+            population_count,
+            category,
+            generic_count,
+            specific_count,
+            count,
+        ) in (
+            ("ALL_COMPLETED_AI_ATTEMPTS", 10, "BOTH_KINDS", 3, 3, 6),
+            ("ALL_COMPLETED_AI_ATTEMPTS", 10, "GENERIC_ONLY", 1, 0, 1),
+            ("ALL_COMPLETED_AI_ATTEMPTS", 10, "GENERIC_ONLY", 2, 0, 1),
+            ("ALL_COMPLETED_AI_ATTEMPTS", 10, "SPECIFIC_ONLY", 0, 3, 1),
+            ("ALL_COMPLETED_AI_ATTEMPTS", 10, "NEITHER", 0, 0, 1),
+            ("FINAL_COMPENSATION_YES", 8, "BOTH_KINDS", 3, 3, 6),
+            ("FINAL_COMPENSATION_YES", 8, "GENERIC_ONLY", 2, 0, 1),
+            ("FINAL_COMPENSATION_YES", 8, "SPECIFIC_ONLY", 0, 3, 1),
+        )
+    ]
+    consistency = [
+        {
+            "summary_grain": "WORKFLOW_CONSISTENCY",
+            "population_name": population,
+            "offer_composition_category": None,
+            "generic_suggestion_count": None,
+            "specific_suggestion_count": None,
+            "attempt_count": count,
+            "population_attempt_count": population_count,
+            "attempt_percentage": 100.0 * count / population_count,
+            "is_exact_three_plus_three": None,
+            "consistency_category": category,
+        }
+        for population, population_count, category, count in (
+            (
+                "AI_VALUE_AVAILABLE_COMPLETED_AI_ATTEMPTS",
+                9,
+                "AI_NO_WITH_TEXT_OFFERS",
+                1,
+            ),
+            (
+                "AI_VALUE_AVAILABLE_COMPLETED_AI_ATTEMPTS",
+                9,
+                "AI_YES_WITH_NO_TEXT_OFFERS",
+                1,
+            ),
+            (
+                "FINAL_COMPENSATION_YES",
+                8,
+                "FINAL_YES_WITH_NO_TEXT_OFFERS",
+                0,
+            ),
+            (
+                "FINAL_COMPENSATION_YES",
+                8,
+                "FINAL_YES_WITH_ONE_KIND_ONLY",
+                2,
+            ),
+            (
+                "FINAL_COMPENSATION_YES",
+                8,
+                "FINAL_YES_WITH_NON_3_PLUS_3",
+                2,
+            ),
+        )
+    ]
+    embedded = {
+        "offer_composition_summary_json": json.dumps(
+            composition,
+            sort_keys=True,
+            separators=(",", ":"),
+        ),
+        "offer_count_pair_summary_json": json.dumps(
+            count_pairs,
+            sort_keys=True,
+            separators=(",", ":"),
+        ),
+        "workflow_consistency_summary_json": json.dumps(
+            consistency,
+            sort_keys=True,
+            separators=(",", ":"),
+        ),
+    }
+
     return pd.DataFrame.from_records(
         [
             {
                 "compensation_suggestion_kind": "genericCompensation",
-                "completed_ai_attempt_count_with_suggestion": 6,
-                "offered_suggestion_count": 18,
+                "completed_ai_attempt_count_with_suggestion": 10,
+                "offered_suggestion_count": 30,
                 "selected_suggestion_count": 4,
-                "suggestion_selection_percentage": 100.0 * 4.0 / 18.0,
+                "suggestion_selection_percentage": 100.0 * 4.0 / 30.0,
+                **embedded,
             },
             {
                 "compensation_suggestion_kind": "specificCompensation",
-                "completed_ai_attempt_count_with_suggestion": 5,
-                "offered_suggestion_count": 15,
-                "selected_suggestion_count": 3,
-                "suggestion_selection_percentage": 20.0,
+                "completed_ai_attempt_count_with_suggestion": 8,
+                "offered_suggestion_count": 24,
+                "selected_suggestion_count": 2,
+                "suggestion_selection_percentage": 100.0 * 2.0 / 24.0,
+                **embedded,
             },
         ]
     )
@@ -1564,13 +1686,16 @@ def test_html_report_toc_targets_unique_sections_in_report_order() -> None:
         "user-feedback-heading",
     )
 
+    nav_start = html.index('<nav aria-labelledby="report-contents-heading">')
+    nav_end = html.index("</nav>", nav_start)
+    navigation = html[nav_start:nav_end]
     href_positions = []
     target_positions = []
 
     for section_id in expected_ids:
-        assert html.count(f'href="#{section_id}"') == 1
+        assert navigation.count(f'href="#{section_id}"') == 1
         assert html.count(f'id="{section_id}"') == 1
-        href_positions.append(html.index(f'href="#{section_id}"'))
+        href_positions.append(navigation.index(f'href="#{section_id}"'))
         target_positions.append(html.index(f'id="{section_id}"'))
 
     assert href_positions == sorted(href_positions)
@@ -1894,23 +2019,39 @@ def test_html_report_explains_compensation_choices() -> None:
     generic_start = html.index(">Generic compensation<")
     generic_end = html.index("</tr>", generic_start)
     generic_row = " ".join(html[generic_start:generic_end].split())
-    assert ">6<" in generic_row
-    assert ">18<" in generic_row
+    assert ">10<" in generic_row
+    assert ">30<" in generic_row
     assert ">4<" in generic_row
-    assert ">66.7%<" in generic_row
+    assert ">40.0%<" in generic_row
 
     specific_start = html.index(">Specific compensation<")
     specific_end = html.index("</tr>", specific_start)
     specific_row = " ".join(html[specific_start:specific_end].split())
-    assert ">5<" in specific_row
-    assert ">15<" in specific_row
-    assert ">3<" in specific_row
-    assert ">60.0%<" in specific_row
+    assert ">8<" in specific_row
+    assert ">24<" in specific_row
+    assert ">2<" in specific_row
+    assert ">25.0%<" in specific_row
 
     assert "At most one compensation text suggestion" in normalized
     assert "the attempt-level selection percentage is 40%" in normalized
     assert "30 remains useful offer context" in normalized
-    assert "exactly three generic and three specific suggestions" in normalized
+    assert "Compensation text offer composition among all" in html
+    assert "Compensation text offer composition when final compensation is Yes" in html
+    assert "Observed generic and specific suggestion-count combinations" in normalized
+    assert "All completed AI attempts" in normalized
+    assert "Final compensation Yes" in normalized
+    assert "Both generic and specific" in normalized
+    assert "Exactly 3 generic + 3 specific" in normalized
+    assert "Descriptive compensation workflow-consistency checks" in normalized
+    assert "AI supplied No but text suggestions were offered" in normalized
+    assert "Consistency checks can overlap" in normalized
+    assert "do not add their counts or percentages" in normalized
+    assert "not proof of model malfunction or user intent" in normalized
+    assert "Synthetic offer-composition example" in normalized
+    assert "the exact-count table preserves" in normalized
+    assert 'href="#field-adoption-heading"' in html
+    assert 'href="#suggestion-choice-heading"' in html
+    assert 'href="#readability-heading"' in html
 
     summary = html.index("<summary>How to interpret compensation choices</summary>")
     panel_start = html.rfind('<details class="explanation-panel">', 0, summary)
@@ -2050,6 +2191,203 @@ def test_html_report_rejects_invalid_compensation_text_aggregates(
             repeated_attempt_source_consistency_summary=repeated_source_rows(),
             charts=charts(),
             compensation_analysis_summary=invalid,
+        )
+
+
+@pytest.mark.parametrize(
+    ("column_name", "payload", "message"),
+    [
+        (
+            "offer_count_pair_summary_json",
+            "not-json",
+            "contains invalid offer_count_pair_summary_json",
+        ),
+        (
+            "offer_count_pair_summary_json",
+            json.dumps({"not": "a list"}),
+            "must contain a JSON list of objects",
+        ),
+        (
+            "offer_count_pair_summary_json",
+            json.dumps(
+                [
+                    {
+                        "population_name": "SYNTHETIC_UNKNOWN",
+                        "offer_composition_category": "BOTH_KINDS",
+                        "generic_suggestion_count": 3,
+                        "specific_suggestion_count": 3,
+                        "attempt_count": 1,
+                        "attempt_percentage": 10.0,
+                        "is_exact_three_plus_three": True,
+                    }
+                ]
+            ),
+            "count pairs contain an unsupported population",
+        ),
+        (
+            "workflow_consistency_summary_json",
+            json.dumps(
+                [
+                    {
+                        "population_name": "FINAL_COMPENSATION_YES",
+                        "consistency_category": "SYNTHETIC_UNKNOWN",
+                        "attempt_count": 1,
+                        "population_attempt_count": 2,
+                        "attempt_percentage": 50.0,
+                    }
+                ]
+            ),
+            "consistency contains an unsupported category",
+        ),
+    ],
+)
+def test_html_report_rejects_invalid_embedded_compensation_payloads(
+    column_name: str,
+    payload: str,
+    message: str,
+) -> None:
+    """Reject malformed and unsupported embedded aggregate content."""
+    summary = compensation_analysis_rows()
+    summary[column_name] = payload
+
+    with pytest.raises(ExplorationValidationError, match=message):
+        render_html_report(
+            records=feedback_records(),
+            overview_summary=overview_rows(),
+            author_handoff_summary=author_handoff_rows(),
+            retry_card_summary=retry_card_rows(),
+            retry_characteristics_summary=retry_characteristic_rows(),
+            data_quality_summary=quality_rows(),
+            repeated_attempt_source_consistency_summary=repeated_source_rows(),
+            charts=charts(),
+            compensation_analysis_summary=summary,
+        )
+
+
+def test_html_report_rejects_inconsistent_embedded_compensation_payloads() -> None:
+    """Require the repeated embedded aggregate payload to be identical."""
+    summary = compensation_analysis_rows()
+    summary.loc[
+        summary["compensation_suggestion_kind"].eq("specificCompensation"),
+        "offer_count_pair_summary_json",
+    ] = json.dumps([])
+
+    with pytest.raises(
+        ExplorationValidationError,
+        match="must contain one consistent offer_count_pair_summary_json payload",
+    ):
+        render_html_report(
+            records=feedback_records(),
+            overview_summary=overview_rows(),
+            author_handoff_summary=author_handoff_rows(),
+            retry_card_summary=retry_card_rows(),
+            retry_characteristics_summary=retry_characteristic_rows(),
+            data_quality_summary=quality_rows(),
+            repeated_attempt_source_consistency_summary=repeated_source_rows(),
+            charts=charts(),
+            compensation_analysis_summary=summary,
+        )
+
+
+def test_html_report_compensation_tables_show_exact_pairs_and_denominators() -> None:
+    """Show joint offer counts and explicit consistency denominators."""
+    html = render_html_report(
+        records=feedback_records(),
+        overview_summary=overview_rows(),
+        author_handoff_summary=author_handoff_rows(),
+        retry_card_summary=retry_card_rows(),
+        retry_characteristics_summary=retry_characteristic_rows(),
+        data_quality_summary=quality_rows(),
+        repeated_attempt_source_consistency_summary=repeated_source_rows(),
+        charts=charts(),
+        compensation_analysis_summary=compensation_analysis_rows(),
+    )
+    normalized = " ".join(html.split())
+
+    assert "Observed generic and specific suggestion-count combinations" in normalized
+    assert (
+        "<td>All completed AI attempts</td> "
+        "<td>Both generic and specific</td> "
+        "<td>3</td> <td>3</td> <td>6</td> <td>60.0%</td> <td>Yes</td>" in normalized
+    )
+    assert (
+        "<td>All completed AI attempts</td> <td>Generic only</td> "
+        "<td>1</td> <td>0</td> <td>1</td> <td>10.0%</td> <td>No</td>" in normalized
+    )
+    assert (
+        '<th scope="row">AI supplied No but text suggestions were offered</th> '
+        "<td>1</td> "
+        "<td>Completed AI attempts with an AI-supplied Yes/No value</td> "
+        "<td>9</td> <td>11.1%</td>" in normalized
+    )
+    assert (
+        '<th scope="row">Final Yes with only one suggestion kind offered</th> '
+        "<td>2</td> <td>Final compensation Yes</td> "
+        "<td>8</td> <td>25.0%</td>" in normalized
+    )
+
+
+def test_html_report_embedded_compensation_zero_and_unsupported_values() -> None:
+    """Cover zero rates and unsupported count-pair categories."""
+    summary = compensation_analysis_rows()
+    pairs = json.loads(summary["offer_count_pair_summary_json"].iloc[0])
+    pairs[0]["attempt_percentage"] = None
+    summary["offer_count_pair_summary_json"] = json.dumps(pairs)
+
+    html = render_html_report(
+        records=feedback_records(),
+        overview_summary=overview_rows(),
+        author_handoff_summary=author_handoff_rows(),
+        retry_card_summary=retry_card_rows(),
+        retry_characteristics_summary=retry_characteristic_rows(),
+        data_quality_summary=quality_rows(),
+        repeated_attempt_source_consistency_summary=repeated_source_rows(),
+        charts=charts(),
+        compensation_analysis_summary=summary,
+    )
+    assert "\\N" in html
+
+    pairs[0]["offer_composition_category"] = "SYNTHETIC_UNKNOWN"
+    summary["offer_count_pair_summary_json"] = json.dumps(pairs)
+
+    with pytest.raises(
+        ExplorationValidationError,
+        match="count pairs contain an unsupported category",
+    ):
+        render_html_report(
+            records=feedback_records(),
+            overview_summary=overview_rows(),
+            author_handoff_summary=author_handoff_rows(),
+            retry_card_summary=retry_card_rows(),
+            retry_characteristics_summary=retry_characteristic_rows(),
+            data_quality_summary=quality_rows(),
+            repeated_attempt_source_consistency_summary=repeated_source_rows(),
+            charts=charts(),
+            compensation_analysis_summary=summary,
+        )
+
+
+def test_html_report_requires_boolean_exact_three_plus_three() -> None:
+    """Reject malformed exact-3+3 indicators."""
+    summary = compensation_analysis_rows()
+    pairs = json.loads(summary["offer_count_pair_summary_json"].iloc[0])
+    pairs[0]["is_exact_three_plus_three"] = "true"
+    summary["offer_count_pair_summary_json"] = json.dumps(pairs)
+
+    with pytest.raises(
+        ExplorationValidationError,
+        match="is_exact_three_plus_three must contain a Boolean",
+    ):
+        render_html_report(
+            records=feedback_records(),
+            overview_summary=overview_rows(),
+            author_handoff_summary=author_handoff_rows(),
+            retry_card_summary=retry_card_rows(),
+            retry_characteristics_summary=retry_characteristic_rows(),
+            data_quality_summary=quality_rows(),
+            repeated_attempt_source_consistency_summary=repeated_source_rows(),
+            charts=charts(),
+            compensation_analysis_summary=summary,
         )
 
 
