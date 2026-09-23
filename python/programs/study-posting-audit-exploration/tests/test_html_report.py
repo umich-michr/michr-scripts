@@ -1742,6 +1742,49 @@ def test_html_report_explains_suggestion_choice_denominators() -> None:
     assert "Suggestion-level selection is the percentage" in normalized_html
     assert "index 0 is the first offered suggestion" in normalized_html
     assert "does not establish that a suggestion was better" in normalized_html
+    assert "How to read the suggestion-choice charts" in html
+    assert "if 12 eligible attempts received" in normalized_html
+    assert "the bar is 75%" in normalized_html
+    assert "if a group offered 10 suggestions at index 0" in normalized_html
+    assert "its index-0 point is 40%" in normalized_html
+    assert "Later positions may have fewer opportunities" in normalized_html
+
+    summary = html.index("<summary>How to read the suggestion-choice charts</summary>")
+    panel_start = html.rfind('<details class="explanation-panel">', 0, summary)
+    panel_end = html.index("</details>", summary)
+    panel = html[panel_start:panel_end]
+    assert '<details class="explanation-panel" open' not in panel
+
+
+def test_html_report_explains_field_adoption_and_editing() -> None:
+    """Explain field offer, selection, and selected-edit populations."""
+    html = render_html_report(
+        records=feedback_records(),
+        overview_summary=overview_rows(),
+        author_handoff_summary=author_handoff_rows(),
+        retry_card_summary=retry_card_rows(),
+        retry_characteristics_summary=retry_characteristic_rows(),
+        data_quality_summary=quality_rows(),
+        repeated_attempt_source_consistency_summary=(repeated_source_rows()),
+        charts=charts(),
+    )
+    normalized_html = " ".join(html.split())
+
+    assert "How to read field adoption and editing" in html
+    assert "if 20 completed AI attempts had a description suggestion" in (
+        normalized_html
+    )
+    assert "The selection percentage is 40%" in normalized_html
+    assert "not 8 divided by every completed AI attempt" in normalized_html
+    assert "if 10 attempts selected a title suggestion" in normalized_html
+    assert "3 of those 10 selected attempts" in normalized_html
+    assert "does not show that the edit improved or harmed" in normalized_html
+
+    summary = html.index("<summary>How to read field adoption and editing</summary>")
+    panel_start = html.rfind('<details class="explanation-panel">', 0, summary)
+    panel_end = html.index("</details>", summary)
+    panel = html[panel_start:panel_end]
+    assert '<details class="explanation-panel" open' not in panel
 
 
 def test_html_report_explains_readability_indicators() -> None:
@@ -1775,6 +1818,30 @@ def test_html_report_explains_readability_indicators() -> None:
     )
     assert "Titles are short text" in normalized_html
     assert "Sample counts and tolerances appear in hover text" in normalized_html
+    assert "How to read direction and final grade bands" in html
+    assert "5 lower, 4 within tolerance, and 3 higher" in normalized_html
+    assert "segments of 5, 4, and 3" in normalized_html
+    assert "if an AI-description bar contains 20 final texts" in normalized_html
+    assert "6 of those 20 formula values fell in that band" in normalized_html
+    assert "not a reading-age assignment or a quality rating" in normalized_html
+    assert "How to read selected versus unselected differences" in html
+    assert "selected suggestion's Flesch-Kincaid value minus the mean" in (
+        normalized_html
+    )
+    assert "a bar at -0.5" in normalized_html
+    assert "selected suggestion's formula value was" in normalized_html
+    assert "0.5 grade levels higher at the median" in normalized_html
+    assert "formula-score differences only" in normalized_html
+
+    for panel_title in (
+        "How to read direction and final grade bands",
+        "How to read selected versus unselected differences",
+    ):
+        summary = html.index(f"<summary>{panel_title}</summary>")
+        panel_start = html.rfind('<details class="explanation-panel">', 0, summary)
+        panel_end = html.index("</details>", summary)
+        panel = html[panel_start:panel_end]
+        assert '<details class="explanation-panel" open' not in panel
 
     assert "Edit intensity and consensus grade-level direction" in html
     assert "How edit size is classified" in html

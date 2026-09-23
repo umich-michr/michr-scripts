@@ -1150,6 +1150,38 @@ _TEMPLATE = """<!doctype html>
   </p>
   <div class="chart">{{ field_suggestion_adoption_html | safe }}</div>
   <div class="chart">{{ field_selected_outcomes_html | safe }}</div>
+
+  <details class="explanation-panel">
+    <summary>How to read field adoption and editing</summary>
+    <div class="explanation-panel-content">
+      <h4>Offers and selections</h4>
+      <p>
+        Each field has side-by-side bars. One bar counts completed AI attempts
+        with at least one suggestion offered for that field; the other counts
+        completed AI attempts where an offered suggestion was selected.
+      </p>
+      <p>
+        <strong>Synthetic example:</strong> if 20 completed AI attempts had a
+        description suggestion and 8 selected one, the bars are 20 and 8. The
+        selection percentage is 40% of attempts with an offer, not 8 divided
+        by every completed AI attempt.
+      </p>
+
+      <h4>What happened after selection</h4>
+      <p>
+        Each stacked bar contains completed AI attempts that selected a
+        suggestion for one field. Colored segments count how the selected
+        suggestion compared with the final field text, such as exact, lightly
+        edited, heavily edited, replaced, or cleared.
+      </p>
+      <p>
+        <strong>Synthetic example:</strong> if 10 attempts selected a title
+        suggestion and 3 are in the light-edit segment, 3 of those 10 selected
+        attempts ended with a light edit. It does not show that the edit
+        improved or harmed the title.
+      </p>
+    </div>
+  </details>
 </section>
   </details>
 
@@ -1174,6 +1206,42 @@ _TEMPLATE = """<!doctype html>
   </p>
   <div class="chart">{{ suggestion_selection_by_kind_html | safe }}</div>
   <div class="chart">{{ suggestion_selection_by_index_html | safe }}</div>
+
+  <details class="explanation-panel">
+    <summary>How to read the suggestion-choice charts</summary>
+    <div class="explanation-panel-content">
+      <h4>Selection by field and kind</h4>
+      <p>
+        Each bar is one field and suggestion-kind combination. Bar height is
+        the percentage of completed AI attempts with at least one offered
+        suggestion in that combination that selected a suggestion.
+      </p>
+      <p>
+        <strong>Synthetic example:</strong> if 12 eligible attempts received
+        one or more suggestions of a kind and 9 selected one, the bar is 75%.
+        This is an attempt-level percentage even if those attempts received
+        more than 12 individual suggestions.
+      </p>
+
+      <h4>Selection by offered position</h4>
+      <p>
+        Each point shows the percentage of suggestion instances offered at one
+        zero-based position that were selected. Index 0 means first, index 1
+        means second, and so on. Lines separate field and suggestion-kind
+        combinations.
+      </p>
+      <p>
+        <strong>Synthetic example:</strong> if a group offered 10 suggestions
+        at index 0 and 4 were selected, its index-0 point is 40%.
+      </p>
+      <p class="caution">
+        Later positions may have fewer opportunities because not every attempt
+        offers the same number of suggestions. Compare positions with their
+        offered counts; a higher point does not by itself show that position or
+        suggestion quality caused selection.
+      </p>
+    </div>
+  </details>
 </section>
   </details>
 
@@ -1197,6 +1265,39 @@ _TEMPLATE = """<!doctype html>
   </p>
   <div class="chart">{{ readability_change_direction_html | safe }}</div>
   <div class="chart">{{ final_grade_bands_html | safe }}</div>
+
+  <details class="explanation-panel">
+    <summary>How to read direction and final grade bands</summary>
+    <div class="explanation-panel-content">
+      <h4>Selected-to-final direction</h4>
+      <p>
+        Each stacked bar is one field and counts attempts with usable selected
+        and final Flesch-Kincaid values. Its segments show whether the final
+        value was lower, within the no-material-change tolerance, or higher
+        than the selected suggestion's value.
+      </p>
+      <p>
+        <strong>Synthetic example:</strong> if 12 paired descriptions include
+        5 lower, 4 within tolerance, and 3 higher final values, the stacked bar
+        has segments of 5, 4, and 3.
+      </p>
+
+      <h4>Observed final grade bands</h4>
+      <p>
+        Each stacked bar is one field and final authoring mode. Its full height
+        is the number of observed nonblank final texts with a usable
+        Flesch-Kincaid value; colored segments divide those texts into formula
+        grade bands.
+      </p>
+      <p>
+        <strong>Synthetic example:</strong> if an AI-description bar contains
+        20 final texts and 6 are in the above-grade-8-through-grade-10 segment,
+        6 of those 20 formula values fell in that band. The band is not a
+        reading-age assignment or a quality rating.
+      </p>
+    </div>
+  </details>
+
   <h3>Selected versus unselected suggestions</h3>
   <p>
     This comparison uses completed AI attempts only. A field appears only when
@@ -1215,6 +1316,30 @@ _TEMPLATE = """<!doctype html>
   <div class="chart">
     {{ selected_vs_unselected_readability_html | safe }}
   </div>
+
+  <details class="explanation-panel">
+    <summary>How to read selected versus unselected differences</summary>
+    <div class="explanation-panel-content">
+      <p>
+        Each field has one bar. For every comparable attempt, the calculation
+        is the selected suggestion's Flesch-Kincaid value minus the mean value
+        of that attempt's unselected suggestions. The chart shows the median
+        of those attempt-level differences.
+      </p>
+      <p>
+        <strong>Synthetic example:</strong> a bar at -0.5 means the middle
+        selected-minus-mean-unselected difference was 0.5 grade levels below
+        zero. A bar at +0.5 means the selected suggestion's formula value was
+        0.5 grade levels higher at the median.
+      </p>
+      <p class="caution">
+        Positive or negative values describe formula-score differences only.
+        Selection does not prove that the chosen suggestion was clearer,
+        better, more accurate, or more accessible.
+      </p>
+    </div>
+  </details>
+
   <h3>Edit intensity and readability direction</h3>
   <p>
     This chart explores whether the size of a selected-suggestion edit is
