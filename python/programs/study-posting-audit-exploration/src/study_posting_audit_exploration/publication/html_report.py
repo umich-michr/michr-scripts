@@ -610,8 +610,11 @@ _TEMPLATE = """<!doctype html>
         <p>
           <strong>Synthetic example:</strong> if a report contains 40 attempts
           and the completed-AI segment contains 10, then 10 of the 40 attempts
-          were completed AI attempts. This does not mean 10 different studies
-          used AI, because one study can have several attempts.
+          were completed AI attempts. Because the source contract permits at
+          most one completed attempt per study, these are also 10 distinct
+          completed studies whose final authoring mode was AI. Earlier
+          incomplete AI attempts can show AI exposure, but an incomplete-only
+          study did not create a posting and is not a completed application use.
         </p>
 
         <h4>Completion-pathway cards</h4>
@@ -889,7 +892,7 @@ _TEMPLATE = """<!doctype html>
           <p class="pathway-value">
             {{ card.study_count }} studies ({{ card.percentage_text }})
           </p>
-          <p>Median attempts: {{ card.median_attempts_text }}</p>
+          <p>Median recorded attempts per study: {{ card.median_attempts_text }}</p>
           <p>{{ card.mode_mix_text }}</p>
         </article>
         {% endfor %}
@@ -964,6 +967,22 @@ _TEMPLATE = """<!doctype html>
             multiple attempts and then completed, that card reports 24%.
             This identifies a repeated-attempt pattern but does not explain
             why another attempt was needed.
+          </p>
+          <p>
+            Mode labels summarize the recorded attempts in each study pathway.
+            <strong>AI-only</strong> means every recorded pathway attempt used
+            AI authoring; <strong>manual-only</strong> means every recorded
+            pathway attempt used manual authoring; and <strong>both modes</strong>
+            means a multi-attempt study had at least one AI attempt and at least
+            one manual attempt. A single attempt is never classified as using
+            both modes.
+          </p>
+          <p>
+            Median recorded attempts is calculated from the total recorded
+            attempt count for each study in the card. A completed study can
+            therefore contribute several preceding incomplete attempts plus
+            its one unique completed attempt; the metric is not structurally
+            fixed at one.
           </p>
 
           <h4>Horizontal pathway chart</h4>
@@ -1123,8 +1142,9 @@ _TEMPLATE = """<!doctype html>
     bars.
   </p>
   <p class="caution">
-    Hover over a bar to see its attempt authoring mode, median prior-study
-    count, number of author-attempt observations with a value, unit, and
+    Bar height is the mean prior-study count, the error line spans the 25th
+    through 75th percentiles, and a diamond marks the median. Hover also shows
+    author-attempt observations with values, missing observations, and the
     metric definition.
   </p>
   <div class="chart">
@@ -1143,9 +1163,11 @@ _TEMPLATE = """<!doctype html>
   <p class="caution">
     Counts may differ because the attempt-start chart counts author-attempt
     observations, while query-time charts count distinct authors once per
-    metric; missing values can further reduce either count. Hover over a
-    bar to see the adoption group, median, distinct authors with a value,
-    unit, and metric definition.
+    metric; missing values can further reduce either count. Study-count bars
+    show means with 25th-to-75th-percentile error lines and median diamonds.
+    Day-count bars retain medians with 25th-to-75th-percentile error lines.
+    Hover includes mean or median, quartiles, contributing and missing author
+    counts, unit, and metric definition.
   </p>
   <div class="chart">{{ author_experience_studies_html | safe }}</div>
   <div class="chart">{{ author_experience_days_html | safe }}</div>
@@ -1155,39 +1177,51 @@ _TEMPLATE = """<!doctype html>
     <div class="explanation-panel-content">
       <h4>Attempt-time chart</h4>
       <p>
-        Each bar shows the median number of prior studies across attempts in
-        one authoring mode. Because attempts are counted, an author with three
-        attempts contributes three observations.
+        Each bar shows the mean number of prior studies across attempts in one
+        authoring mode. The error line spans the 25th through 75th percentiles,
+        and the diamond marks the median. Because attempts are counted, an
+        author with three attempts contributes three observations.
       </p>
       <p>
         <strong>Synthetic example:</strong> if five AI attempts have prior-study
-        counts of 0, 1, 2, 4, and 8, the AI bar is 2 studies, the middle value.
+        counts of 0, 1, 2, 4, and 8, the mean bar is 3 studies and the median
+        diamond is 2 studies. The difference helps show that larger values can
+        pull the mean above the middle observation.
       </p>
 
       <h4>Query-time charts</h4>
       <p>
         Each cluster is an author adoption group, and each colored bar is one
-        experience or activity metric. Bar height is the median among distinct
-        authors who had a value for that metric when the report query ran.
+        experience or activity metric. Study-count bars show the mean among
+        distinct authors, with the median marked separately. Day-count bars
+        show the median. Every error line spans the 25th through 75th
+        percentiles.
       </p>
       <p>
-        <strong>Synthetic example:</strong> if the “authors with any AI
-        attempt” group has a 6-day bar for distinct login days, the median
-        author in that group had 6 distinct calendar days with a recorded
-        login. It does not mean each author had 6 login days.
+        Distinct login days is the number of different calendar dates on which
+        an author had at least one recorded successful login. Multiple logins
+        on the same date count once; this is neither the number of login events
+        nor the elapsed span between first and last login.
+      </p>
+      <p>
+        <strong>Synthetic example:</strong> if Alex logged in three times on
+        day 1, ten times on day 5, and once on day 100, Alex has exactly three
+        distinct login days. If a group median is six distinct login days,
+        half of authors with observed values had six or fewer distinct login
+        dates and half had six or more; it does not mean every author had six.
       </p>
       <p class="caution">
         Attempt-time and query-time bars use different observation units and
         time points, so their heights should not be compared as if they
-        measured the same population. Larger medians do not establish that
-        experience caused authoring-mode choice or completion.
+        measured the same population. Larger means or medians do not establish
+        that experience caused authoring-mode choice or completion.
       </p>
     </div>
   </details>
 
   <p class="caution">
-    These descriptive medians must not be interpreted as causes of
-    authoring-mode choice or study outcomes.
+    These descriptive means, medians, and percentile ranges must not be
+    interpreted as causes of authoring-mode choice or study outcomes.
   </p>
 </section>
 
@@ -3312,6 +3346,7 @@ def _retry_cards(
     for row in summary.to_dict(orient="records"):
         group_name = str(row["retry_card_group"])
         mode_mix = (
+            "Recorded pathway modes — "
             f"AI-only: {_nullable_number_text(row['ai_only_study_count'])}; "
             f"manual-only: "
             f"{_nullable_number_text(row['manual_only_study_count'])}; "

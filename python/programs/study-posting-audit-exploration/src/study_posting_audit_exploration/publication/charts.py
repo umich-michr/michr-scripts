@@ -127,7 +127,11 @@ _REQUIRED_ATTEMPT_START_EXPERIENCE_COLUMNS: tuple[str, ...] = (
     "experience_metric_name",
     "experience_metric_unit",
     "author_attempt_count_with_nonmissing_metric",
+    "author_attempt_count_missing_metric",
+    "percentile_25_author_attempt_value",
     "median_author_attempt_value",
+    "average_author_attempt_value",
+    "percentile_75_author_attempt_value",
 )
 
 _REQUIRED_CURRENT_AUTHOR_EXPERIENCE_COLUMNS: tuple[str, ...] = (
@@ -135,7 +139,11 @@ _REQUIRED_CURRENT_AUTHOR_EXPERIENCE_COLUMNS: tuple[str, ...] = (
     "experience_metric_name",
     "experience_metric_unit",
     "author_count_with_nonmissing_metric",
+    "author_count_missing_metric",
+    "percentile_25_author_value",
     "median_author_value",
+    "average_author_value",
+    "percentile_75_author_value",
 )
 
 _REQUIRED_GROUPED_STUDY_COLUMNS: tuple[str, ...] = (
@@ -1259,7 +1267,7 @@ def build_retry_pathways_chart(
 def build_author_attempt_start_experience_chart(
     attempt_start_experience_summary: pd.DataFrame,
 ) -> go.Figure:
-    """Return median prior-study experience at attempt start."""
+    """Return mean prior-study experience with interquartile and median context."""
     _require_columns(
         attempt_start_experience_summary,
         required=_REQUIRED_ATTEMPT_START_EXPERIENCE_COLUMNS,
@@ -1274,9 +1282,9 @@ def build_author_attempt_start_experience_chart(
         & attempt_start_experience_summary["experience_metric_name"].eq(
             _ATTEMPT_START_EXPERIENCE_METRIC
         )
-    ].dropna(subset=["median_author_attempt_value"])
+    ].dropna(subset=["average_author_attempt_value"])
 
-    title = "Median studies created before attempt start"
+    title = "Mean studies created before attempt start"
 
     if rows.empty:
         return _empty_figure(
@@ -1288,48 +1296,100 @@ def build_author_attempt_start_experience_chart(
         str(row["attempt_authoring_mode"]): row
         for row in rows.to_dict(orient="records")
     }
+    modes = [mode for mode in _AUTHORING_MODE_ORDER if mode in rows_by_mode]
+    means = [
+        float(rows_by_mode[mode]["average_author_attempt_value"]) for mode in modes
+    ]
+    percentile_25 = [
+        float(rows_by_mode[mode]["percentile_25_author_attempt_value"])
+        for mode in modes
+    ]
     medians = [
-        float(rows_by_mode[mode]["median_author_attempt_value"])
-        if mode in rows_by_mode
-        else 0.0
-        for mode in _AUTHORING_MODE_ORDER
+        float(rows_by_mode[mode]["median_author_attempt_value"]) for mode in modes
     ]
-    observation_counts = [
-        int(rows_by_mode[mode]["author_attempt_count_with_nonmissing_metric"])
-        if mode in rows_by_mode
-        else 0
-        for mode in _AUTHORING_MODE_ORDER
+    percentile_75 = [
+        float(rows_by_mode[mode]["percentile_75_author_attempt_value"])
+        for mode in modes
     ]
-    figure = go.Figure(
-        data=[
-            go.Bar(
-                x=list(_AUTHORING_MODE_ORDER),
-                y=medians,
-                customdata=[
-                    [
-                        observation_count,
-                        _ATTEMPT_START_EXPERIENCE_DEFINITION,
-                    ]
-                    for observation_count in observation_counts
-                ],
-                hovertemplate=(
-                    "Attempt authoring mode: %{x}<br>"
-                    "Median prior studies: %{y:.2f}<br>"
-                    "Author-attempt observations with value: "
-                    "%{customdata[0]}<br>"
-                    "Unit: studies<br>"
-                    "Definition: %{customdata[1]}"
-                    "<extra></extra>"
-                ),
-            )
+    customdata = [
+        [
+            percentile_25_value,
+            median,
+            percentile_75_value,
+            int(row["author_attempt_count_with_nonmissing_metric"]),
+            int(row["author_attempt_count_missing_metric"]),
+            _ATTEMPT_START_EXPERIENCE_DEFINITION,
         ]
+        for row, percentile_25_value, median, percentile_75_value in (
+            (
+                rows_by_mode[mode],
+                percentile_25[index],
+                medians[index],
+                percentile_75[index],
+            )
+            for index, mode in enumerate(modes)
+        )
+    ]
+
+    figure = go.Figure()
+    figure.add_bar(
+        name="Mean",
+        x=modes,
+        y=means,
+        error_y={
+            "type": "data",
+            "symmetric": False,
+            "array": [
+                max(percentile_75_value - mean, 0.0)
+                for mean, percentile_75_value in zip(
+                    means,
+                    percentile_75,
+                    strict=True,
+                )
+            ],
+            "arrayminus": [
+                max(mean - percentile_25_value, 0.0)
+                for mean, percentile_25_value in zip(
+                    means,
+                    percentile_25,
+                    strict=True,
+                )
+            ],
+            "visible": True,
+        },
+        customdata=customdata,
+        hovertemplate=(
+            "Attempt authoring mode: %{x}<br>"
+            "Mean prior studies: %{y:.2f}<br>"
+            "25th percentile: %{customdata[0]:.2f}<br>"
+            "Median: %{customdata[1]:.2f}<br>"
+            "75th percentile: %{customdata[2]:.2f}<br>"
+            "Author-attempt observations with value: %{customdata[3]}<br>"
+            "Author-attempt observations missing value: %{customdata[4]}<br>"
+            "Unit: studies<br>"
+            "Definition: %{customdata[5]}"
+            "<extra></extra>"
+        ),
+    )
+    figure.add_scatter(
+        name="Median",
+        x=modes,
+        y=medians,
+        mode="markers",
+        marker={"color": "#111827", "size": 9, "symbol": "diamond"},
+        customdata=customdata,
+        hovertemplate=(
+            "Attempt authoring mode: %{x}<br>"
+            "Median prior studies: %{y:.2f}"
+            "<extra>Median marker</extra>"
+        ),
     )
     figure.update_layout(
         title=title,
         template="plotly_white",
         xaxis_title="Attempt authoring mode",
-        yaxis_title="Median prior studies created",
-        showlegend=False,
+        yaxis_title="Prior studies created",
+        legend_title_text="Summary",
     )
 
     return figure
@@ -1340,12 +1400,15 @@ def build_author_experience_chart(
     *,
     metric_unit: str,
 ) -> go.Figure:
-    """Return query-time median author experience for one measurement unit."""
+    """Return query-time author distributions with interquartile context."""
     _require_columns(
         current_author_experience_summary,
         required=_REQUIRED_CURRENT_AUTHOR_EXPERIENCE_COLUMNS,
         frame_name="current_author_experience_summary",
     )
+    use_mean = metric_unit == "studies"
+    central_column = "average_author_value" if use_mean else "median_author_value"
+    central_label = "Mean" if use_mean else "Median"
     rows = current_author_experience_summary.loc[
         current_author_experience_summary["experience_metric_unit"].eq(metric_unit)
         & current_author_experience_summary["experience_metric_name"].isin(
@@ -1354,10 +1417,12 @@ def build_author_experience_chart(
         & current_author_experience_summary["author_adoption_group"].isin(
             _AUTHOR_ADOPTION_GROUP_ORDER
         )
-    ].dropna(subset=["median_author_value"])
+    ].dropna(subset=[central_column])
 
     unit_label = "Studies" if metric_unit == "studies" else "Days"
-    title = f"Median author experience at report query time: {unit_label.lower()}"
+    title = (
+        f"{central_label} author experience at report query time: {unit_label.lower()}"
+    )
 
     if rows.empty:
         return _empty_figure(
@@ -1369,57 +1434,101 @@ def build_author_experience_chart(
         )
 
     figure = go.Figure()
-
+    group_labels = [
+        _AUTHOR_ADOPTION_GROUP_LABELS[group] for group in _AUTHOR_ADOPTION_GROUP_ORDER
+    ]
     metric_names = tuple(
         str(value) for value in rows["experience_metric_name"].unique()
     )
 
     for metric_name in metric_names:
         metric_rows = rows.loc[rows["experience_metric_name"].eq(metric_name)]
-        medians_by_group: Mapping[str, float] = {
-            str(row["author_adoption_group"]): float(row["median_author_value"])
+        rows_by_group = {
+            str(row["author_adoption_group"]): row
             for row in metric_rows.to_dict(orient="records")
         }
-        counts_by_group: Mapping[str, int] = {
-            str(row["author_adoption_group"]): int(
-                row["author_count_with_nonmissing_metric"]
-            )
-            for row in metric_rows.to_dict(orient="records")
-        }
-        figure.add_bar(
-            name=_AUTHOR_EXPERIENCE_METRIC_LABELS[metric_name],
-            x=[
-                _AUTHOR_ADOPTION_GROUP_LABELS[group]
-                for group in _AUTHOR_ADOPTION_GROUP_ORDER
-            ],
-            y=[
-                medians_by_group.get(group, 0.0)
-                for group in _AUTHOR_ADOPTION_GROUP_ORDER
-            ],
-            customdata=[
+        central_values: list[float] = []
+        lower_errors: list[float] = []
+        upper_errors: list[float] = []
+        medians: list[float] = []
+        customdata: list[list[object]] = []
+
+        for group in _AUTHOR_ADOPTION_GROUP_ORDER:
+            row = rows_by_group.get(group)
+            if row is None:
+                central_values.append(0.0)
+                lower_errors.append(0.0)
+                upper_errors.append(0.0)
+                medians.append(0.0)
+                customdata.append([None, None, None, 0, 0, unit_label.lower(), ""])
+                continue
+
+            central = float(row[central_column])
+            percentile_25 = float(row["percentile_25_author_value"])
+            median = float(row["median_author_value"])
+            percentile_75 = float(row["percentile_75_author_value"])
+            central_values.append(central)
+            lower_errors.append(max(central - percentile_25, 0.0))
+            upper_errors.append(max(percentile_75 - central, 0.0))
+            medians.append(median)
+            customdata.append(
                 [
-                    counts_by_group.get(group, 0),
+                    percentile_25,
+                    median,
+                    percentile_75,
+                    int(row["author_count_with_nonmissing_metric"]),
+                    int(row["author_count_missing_metric"]),
                     unit_label.lower(),
                     _AUTHOR_EXPERIENCE_METRIC_DEFINITIONS[metric_name],
                 ]
-                for group in _AUTHOR_ADOPTION_GROUP_ORDER
-            ],
+            )
+
+        figure.add_bar(
+            name=_AUTHOR_EXPERIENCE_METRIC_LABELS[metric_name],
+            x=group_labels,
+            y=central_values,
+            error_y={
+                "type": "data",
+                "symmetric": False,
+                "array": upper_errors,
+                "arrayminus": lower_errors,
+                "visible": True,
+            },
+            customdata=customdata,
             hovertemplate=(
                 "Author adoption group: %{x}<br>"
-                "Median: %{y:.2f}<br>"
-                "Distinct authors with value: %{customdata[0]}<br>"
-                "Unit: %{customdata[1]}<br>"
-                "Definition: %{customdata[2]}"
+                f"{central_label}: %{{y:.2f}}<br>"
+                "25th percentile: %{customdata[0]:.2f}<br>"
+                "Median: %{customdata[1]:.2f}<br>"
+                "75th percentile: %{customdata[2]:.2f}<br>"
+                "Distinct authors with value: %{customdata[3]}<br>"
+                "Distinct authors missing value: %{customdata[4]}<br>"
+                "Unit: %{customdata[5]}<br>"
+                "Definition: %{customdata[6]}"
                 "<extra>%{fullData.name}</extra>"
             ),
         )
+        if use_mean:
+            figure.add_scatter(
+                name=f"{_AUTHOR_EXPERIENCE_METRIC_LABELS[metric_name]} median",
+                x=group_labels,
+                y=medians,
+                mode="markers",
+                marker={"color": "#111827", "size": 8, "symbol": "diamond"},
+                showlegend=False,
+                hovertemplate=(
+                    "Author adoption group: %{x}<br>"
+                    "Median: %{y:.2f}"
+                    f"<extra>{_AUTHOR_EXPERIENCE_METRIC_LABELS[metric_name]}</extra>"
+                ),
+            )
 
     figure.update_layout(
         title=title,
         template="plotly_white",
         barmode="group",
         xaxis_title="Author adoption group",
-        yaxis_title=f"Median {unit_label.lower()}",
+        yaxis_title=f"{central_label} {unit_label.lower()}",
         legend_title_text="Query-time experience metric",
     )
 

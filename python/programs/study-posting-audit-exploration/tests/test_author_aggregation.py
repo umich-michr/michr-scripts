@@ -150,7 +150,10 @@ def test_attempt_start_experience_summary_uses_attempt_grain(
     assert all_attempts["author_attempt_count_with_nonmissing_metric"] == 2
     assert all_attempts["author_attempt_count_missing_metric"] == 0
     assert all_attempts["minimum_author_attempt_value"] == 2.0
+    assert all_attempts["percentile_25_author_attempt_value"] == 3.0
     assert all_attempts["median_author_attempt_value"] == 4.0
+    assert all_attempts["average_author_attempt_value"] == 4.0
+    assert all_attempts["percentile_75_author_attempt_value"] == 5.0
     assert all_attempts["maximum_author_attempt_value"] == 6.0
 
 
@@ -174,7 +177,10 @@ def test_current_author_experience_summary_uses_author_grain(
     assert all_authors["author_count_with_nonmissing_metric"] == 2
     assert all_authors["author_count_missing_metric"] == 0
     assert all_authors["minimum_author_value"] == 1.0
+    assert all_authors["percentile_25_author_value"] == 2.0
     assert all_authors["median_author_value"] == 3.0
+    assert all_authors["average_author_value"] == 3.0
+    assert all_authors["percentile_75_author_value"] == 4.0
     assert all_authors["maximum_author_value"] == 5.0
 
 

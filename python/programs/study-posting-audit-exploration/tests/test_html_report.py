@@ -293,7 +293,11 @@ def attempt_start_experience_rows() -> pd.DataFrame:
                 ),
                 "experience_metric_unit": "studies",
                 "author_attempt_count_with_nonmissing_metric": 4,
+                "author_attempt_count_missing_metric": 1,
+                "percentile_25_author_attempt_value": 1.0,
                 "median_author_attempt_value": 2.0,
+                "average_author_attempt_value": 3.0,
+                "percentile_75_author_attempt_value": 4.0,
             },
             {
                 "author_adoption_group": "ALL_AUTHORS",
@@ -304,7 +308,11 @@ def attempt_start_experience_rows() -> pd.DataFrame:
                 ),
                 "experience_metric_unit": "studies",
                 "author_attempt_count_with_nonmissing_metric": 3,
+                "author_attempt_count_missing_metric": 0,
+                "percentile_25_author_attempt_value": 3.0,
                 "median_author_attempt_value": 5.0,
+                "average_author_attempt_value": 6.0,
+                "percentile_75_author_attempt_value": 8.0,
             },
         ]
     )
@@ -320,7 +328,11 @@ def current_author_experience_rows() -> pd.DataFrame:
             ),
             "experience_metric_unit": "studies",
             "author_count_with_nonmissing_metric": 4,
+            "author_count_missing_metric": 1,
+            "percentile_25_author_value": 7.0,
             "median_author_value": 10.0,
+            "average_author_value": 11.0,
+            "percentile_75_author_value": 13.0,
         },
         {
             "author_adoption_group": "AI_ONLY",
@@ -329,21 +341,33 @@ def current_author_experience_rows() -> pd.DataFrame:
             ),
             "experience_metric_unit": "studies",
             "author_count_with_nonmissing_metric": 2,
+            "author_count_missing_metric": 0,
+            "percentile_25_author_value": 6.0,
             "median_author_value": 8.0,
+            "average_author_value": 9.0,
+            "percentile_75_author_value": 10.0,
         },
         {
             "author_adoption_group": "ALL_AUTHORS",
             "experience_metric_name": ("distinct_login_days_as_of_report_query_count"),
             "experience_metric_unit": "days",
             "author_count_with_nonmissing_metric": 4,
+            "author_count_missing_metric": 1,
+            "percentile_25_author_value": 20.0,
             "median_author_value": 30.0,
+            "average_author_value": 35.0,
+            "percentile_75_author_value": 40.0,
         },
         {
             "author_adoption_group": "AI_ONLY",
             "experience_metric_name": ("distinct_login_days_as_of_report_query_count"),
             "experience_metric_unit": "days",
             "author_count_with_nonmissing_metric": 2,
+            "author_count_missing_metric": 0,
+            "percentile_25_author_value": 15.0,
             "median_author_value": 20.0,
+            "average_author_value": 22.0,
+            "percentile_75_author_value": 25.0,
         },
     ]
 
@@ -1339,8 +1363,8 @@ def test_html_report_is_self_contained_and_accessible() -> None:
 
     assert 'id="author-experience-heading"' in html
     assert "Author experience and activity" in html
-    assert "Median studies created before attempt start" in html
-    assert "Median author experience at report query time: studies" in html
+    assert "Mean studies created before attempt start" in html
+    assert "Mean author experience at report query time: studies" in html
     assert "Median author experience at report query time: days" in html
     assert "These charts describe attempt authors" in normalized_html
     assert "The first chart uses an author-attempt grain" in normalized_html
@@ -1513,13 +1537,15 @@ def test_html_report_explains_author_experience_and_study_mix() -> None:
 
     assert "How to compare attempt-time and query-time experience" in html
     assert "five AI attempts have prior-study counts" in normalized_html
-    assert "the AI bar is 2 studies" in normalized_html
+    assert "the mean bar is 3 studies" in normalized_html
+    assert "the median diamond is 2 studies" in normalized_html
     assert "an author with three attempts contributes three observations" in (
         normalized_html
     )
-    assert "the median author in that group had 6 distinct calendar days" in (
-        normalized_html
-    )
+    assert "Alex has exactly three distinct login days" in normalized_html
+    assert "half of authors with observed values had six or fewer" in normalized_html
+    assert "half had six or more" in normalized_html
+    assert "neither the number of login events" in normalized_html
     assert "different observation units and time points" in normalized_html
 
     experience_summary = html.index(
@@ -1818,6 +1844,19 @@ def test_html_report_explains_observed_retry_patterns() -> None:
     assert "Each study appears in exactly one card." in normalized
     assert "12 of 50 studies" in normalized
     assert "A study appears in only one bar" in normalized
+    assert (
+        "<strong>AI-only</strong> means every recorded pathway attempt "
+        "used AI authoring" in normalized
+    )
+    assert (
+        "<strong>manual-only</strong> means every recorded pathway attempt "
+        "used manual authoring" in normalized
+    )
+    assert "A single attempt is never classified as using both modes" in normalized
+    assert (
+        "several preceding incomplete attempts plus its one unique completed attempt"
+        in normalized
+    )
     assert "does not mean zero percent" in normalized
     assert "observed activity span is 2 days" in normalized
     assert "follow-up after the latest attempt is 7 days" in normalized
@@ -1921,7 +1960,10 @@ def test_html_report_explains_overview_charts_in_plain_language() -> None:
     assert panel_start >= 0
     assert '<details class="explanation-panel" open' not in panel
     assert "This chart counts audit attempts, not studies." in normalized
-    assert "one study can have several attempts" in normalized
+    assert "several segments can come from attempts for the same study" in normalized
+    assert "these are also 10 distinct completed studies" in normalized
+    assert "final authoring mode was AI" in normalized
+    assert "incomplete-only study did not create a posting" in normalized
     assert "Each completed study contributes once." in normalized
     assert "5 of 20 completed studies" in normalized
     assert "the middle half of recorded values" in normalized

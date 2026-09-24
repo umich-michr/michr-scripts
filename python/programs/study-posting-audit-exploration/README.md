@@ -154,7 +154,12 @@ free text.
   stored.
 - `CREATED_BY_ID` is the created study's creator ID, not the author identity for
   preceding attempts.
-- A study can have no more than one `COMPLETE` attempt.
+- A study can have no more than one `COMPLETE` attempt. A completed attempt
+  creates the study posting, so each completed AI attempt corresponds to one
+  distinct completed study whose final authoring mode was AI.
+- An incomplete AI attempt shows attempted AI use or AI exposure but does not
+  create a posting. A study with only incomplete attempts is not counted as a
+  completed or realized application use.
 - Attempts within a study are ordered by `START_TIME`, followed by audit ID as
   the deterministic tie-breaker.
 
@@ -230,7 +235,14 @@ completed attempt; attempts after completion remain visible through the
 existing quality warning but do not redefine the completion pathway. Studies
 without a completed attempt use every captured attempt.
 
-The 13 stable pathway categories are exhaustive and mutually exclusive:
+The 13 stable pathway categories are exhaustive and mutually exclusive.
+Mode labels describe all recorded attempts in the relevant study pathway:
+AI-only means every pathway attempt used AI authoring; manual-only means every
+pathway attempt used manual authoring; both modes means a multi-attempt study
+had at least one AI attempt and at least one manual attempt. A single attempt
+never uses both modes.
+
+The categories are:
 
 - single-attempt AI or manual completion;
 - repeated AI-only or manual-only completion;
@@ -399,9 +411,18 @@ outputs, or dropdown filtering for completed-study author context.
 The author-experience section describes attempt authors, not PI-specific
 experience unless the PI was also the attempt author. The attempt-start chart
 counts author-attempt observations and can include one author more than once.
-Query-time charts count each distinct author at most once per metric and
-adoption group. Counts can differ across those charts because their analytical
-grains differ and because missing metric values are excluded.
+It shows mean prior studies with a 25th-to-75th-percentile interval and a
+separate median marker. Query-time charts count each distinct author at most
+once per metric and adoption group. Study-count metrics use mean bars with
+interquartile intervals and median markers; day-count metrics retain median
+bars with interquartile intervals. Hover includes the contributing and missing
+counts.
+
+Distinct login days means the number of distinct calendar dates with at least
+one recorded successful login. Multiple logins on the same date count once. It
+is neither the number of login events nor the elapsed span from first to latest
+login. Counts can differ across charts because their analytical units differ
+and because missing metric values are excluded.
 
 The field-adoption section uses completed AI attempt-and-field aggregates.
 Offer and selection counts can have different field-specific populations.
@@ -600,9 +621,11 @@ study or author may be represented in more than one appointment group.
   authoring mode, effective role, and appointment group.
 - `attempt_start_experience_summary.csv` reports distributions of prior studies
   created before each attempt's `START_TIME`, grouped by author adoption,
-  completion, and authoring mode.
+  completion, and authoring mode. It includes mean, median, quartiles, and
+  missing counts at the author-attempt level.
 - `current_author_experience_summary.csv` reports author-grain distributions for
-  experience and activity values measured as of the report query.
+  experience and activity values measured as of the report query, including
+  mean, median, quartiles, and missing counts.
 
 Aggregate author files do not contain usernames or audit IDs. Identifier-bearing
 author details remain in `analysis-audit-records/author_history.csv`.

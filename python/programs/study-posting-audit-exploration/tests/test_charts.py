@@ -275,7 +275,11 @@ def attempt_start_experience_rows() -> pd.DataFrame:
                 ),
                 "experience_metric_unit": "studies",
                 "author_attempt_count_with_nonmissing_metric": 6,
+                "author_attempt_count_missing_metric": 1,
+                "percentile_25_author_attempt_value": 1.0,
                 "median_author_attempt_value": 2.0,
+                "average_author_attempt_value": 3.0,
+                "percentile_75_author_attempt_value": 4.0,
             },
             {
                 "author_adoption_group": "ALL_AUTHORS",
@@ -286,7 +290,11 @@ def attempt_start_experience_rows() -> pd.DataFrame:
                 ),
                 "experience_metric_unit": "studies",
                 "author_attempt_count_with_nonmissing_metric": 4,
+                "author_attempt_count_missing_metric": 0,
+                "percentile_25_author_attempt_value": 3.0,
                 "median_author_attempt_value": 5.0,
+                "average_author_attempt_value": 6.0,
+                "percentile_75_author_attempt_value": 8.0,
             },
             {
                 "author_adoption_group": "AI_ONLY",
@@ -297,7 +305,11 @@ def attempt_start_experience_rows() -> pd.DataFrame:
                 ),
                 "experience_metric_unit": "studies",
                 "author_attempt_count_with_nonmissing_metric": 3,
+                "author_attempt_count_missing_metric": 0,
+                "percentile_25_author_attempt_value": 0.0,
                 "median_author_attempt_value": 1.0,
+                "average_author_attempt_value": 1.5,
+                "percentile_75_author_attempt_value": 2.0,
             },
         ]
     )
@@ -347,7 +359,11 @@ def current_author_experience_rows() -> pd.DataFrame:
                     "experience_metric_name": metric_name,
                     "experience_metric_unit": metric_unit,
                     "author_count_with_nonmissing_metric": 4,
+                    "author_count_missing_metric": 1,
+                    "percentile_25_author_value": max(median - 2.0, 0.0),
                     "median_author_value": median,
+                    "average_author_value": median + 1.0,
+                    "percentile_75_author_value": median + 3.0,
                 }
             )
 
@@ -1444,12 +1460,21 @@ def test_author_attempt_start_experience_chart_uses_attempt_grain() -> None:
         attempt_start_experience_rows()
     )
     bar = figure.data[0]
+    median_markers = figure.data[1]
 
-    assert figure.layout.title.text == ("Median studies created before attempt start")
+    assert figure.layout.title.text == ("Mean studies created before attempt start")
     assert list(bar.x) == ["AI", "MANUAL"]
-    assert list(bar.y) == [2.0, 5.0]
-    assert [values[0] for values in bar.customdata] == [6, 4]
+    assert list(bar.y) == [3.0, 6.0]
+    assert list(bar.error_y.array) == [1.0, 2.0]
+    assert list(bar.error_y.arrayminus) == [2.0, 3.0]
+    assert list(median_markers.y) == [2.0, 5.0]
+    assert [values[3] for values in bar.customdata] == [6, 4]
+    assert [values[4] for values in bar.customdata] == [1, 0]
     assert "Author-attempt observations with value" in str(bar.hovertemplate)
+    assert "Author-attempt observations missing value" in str(bar.hovertemplate)
+    assert "25th percentile" in str(bar.hovertemplate)
+    assert "Median:" in str(bar.hovertemplate)
+    assert "75th percentile" in str(bar.hovertemplate)
     assert "Definition:" in str(bar.hovertemplate)
 
 
@@ -1461,10 +1486,14 @@ def test_query_time_author_experience_tooltip_uses_author_grain() -> None:
     bar = figure.data[0]
 
     assert "Distinct authors with value" in str(bar.hovertemplate)
+    assert "Distinct authors missing value" in str(bar.hovertemplate)
+    assert "25th percentile" in str(bar.hovertemplate)
+    assert "75th percentile" in str(bar.hovertemplate)
     assert "Unit:" in str(bar.hovertemplate)
     assert "Definition:" in str(bar.hovertemplate)
-    assert bar.customdata[0][0] == 4
-    assert bar.customdata[0][1] == "days"
+    assert bar.customdata[0][3] == 4
+    assert bar.customdata[0][4] == 1
+    assert bar.customdata[0][5] == "days"
 
 
 def test_author_experience_chart_separates_units() -> None:
@@ -1479,18 +1508,20 @@ def test_author_experience_chart_separates_units() -> None:
 
     assert (
         studies_figure.layout.title.text
-        == "Median author experience at report query time: studies"
+        == "Mean author experience at report query time: studies"
     )
     assert studies_figure.layout.barmode == "group"
-    assert len(studies_figure.data) == 2
+    assert len(studies_figure.data) == 4
     assert list(studies_figure.data[0].x) == [
         "All authors",
         "AI only",
         "Manual only",
         "Both AI and manual",
     ]
-    assert list(studies_figure.data[0].y) == [12.0, 8.0, 15.0, 11.0]
-    assert list(studies_figure.data[1].y) == [5.0, 3.0, 7.0, 4.0]
+    assert list(studies_figure.data[0].y) == [13.0, 9.0, 16.0, 12.0]
+    assert list(studies_figure.data[1].y) == [12.0, 8.0, 15.0, 11.0]
+    assert list(studies_figure.data[2].y) == [6.0, 4.0, 8.0, 5.0]
+    assert list(studies_figure.data[3].y) == [5.0, 3.0, 7.0, 4.0]
 
     assert (
         days_figure.layout.title.text
@@ -1499,6 +1530,8 @@ def test_author_experience_chart_separates_units() -> None:
     assert len(days_figure.data) == 2
     assert list(days_figure.data[0].y) == [30.0, 20.0, 45.0, 35.0]
     assert list(days_figure.data[1].y) == [300.0, 180.0, 420.0, 360.0]
+    assert list(days_figure.data[0].error_y.array) == [3.0, 3.0, 3.0, 3.0]
+    assert list(days_figure.data[0].error_y.arrayminus) == [2.0, 2.0, 2.0, 2.0]
 
 
 def test_field_suggestion_adoption_chart_uses_explicit_denominator() -> None:
