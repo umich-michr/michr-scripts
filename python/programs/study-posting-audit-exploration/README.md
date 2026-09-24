@@ -330,10 +330,12 @@ table is the narrow authorized exception and projects only `records.csv.ID` and
 
 The report begins with:
 
-- a table of contents with anchor links;
+- a grouped table of contents with stable anchor links;
 - a concise faculty summary;
-- a captured-data overview;
-- data-quality context.
+- overview and key findings;
+- data quality and interpretation limits.
+
+Its 14 top-level sections follow a faculty-facing narrative: overview, workflow, author and study context, AI interaction, readability and source indicators, and self-reported feedback. Every section begins with a concise statement of its analytical unit and eligible population. Chart-specific explanations appear beside the relevant chart, while longer definitions and examples remain in progressive-disclosure panels.
 
 Detailed sections use native HTML `details` and `summary` controls for
 progressive disclosure. Executive, quality, pathway, and feedback sections are

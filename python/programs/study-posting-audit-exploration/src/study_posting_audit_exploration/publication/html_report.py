@@ -322,14 +322,56 @@ _TEMPLATE = """<!doctype html>
         display: block;
       }
     }
-  </style>
+
+    .section-purpose {
+      margin: 0 0 1rem;
+      padding: 0.85rem 1rem;
+      border-left: 0.3rem solid #2f65a7;
+      background: #f4f7fb;
+    }
+    .contents-intro {
+      margin-bottom: 1rem;
+      color: #40566f;
+    }
+    .contents-groups {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+      gap: 1rem;
+    }
+    .contents-group {
+      margin: 0;
+      padding: 0.75rem 1rem;
+      border: 1px solid #ccd8e5;
+      border-radius: 0.5rem;
+      background: #ffffff;
+    }
+    .contents-group h3 {
+      margin: 0 0 0.4rem;
+      font-size: 1rem;
+    }
+    .contents-group ol {
+      margin: 0;
+      padding-left: 1.5rem;
+    }
+    .back-to-contents {
+      margin-top: 1.5rem;
+      font-size: 0.92rem;
+    }
+    @media print {
+      .back-to-contents {
+        display: none;
+      }
+    }
+</style>
 </head>
 <body>
 <main>
   <header>
     <h1>{{ title }}</h1>
     <p class="lede">
-      Aggregate exploratory analysis of normalized study-posting audit data.
+      The report moves from key findings and workflow patterns to author and study
+      context, AI interaction, writing and source indicators, and self-reported
+      feedback.
     </p>
     <p class="caution">
       These descriptive results do not establish causality and must not be
@@ -338,40 +380,120 @@ _TEMPLATE = """<!doctype html>
   </header>
 
   <nav aria-labelledby="report-contents-heading">
-    <h2 id="report-contents-heading">Report contents</h2>
-    <ol class="report-toc">
-      <li><a href="#executive-overview-heading">Captured data at a glance</a></li>
-      <li><a href="#data-quality-heading">Data quality</a></li>
-      <li><a href="#study-pathways-heading">Study pathways and author handoffs</a></li>
-      <li>
-        <a href="#retry-pathways-heading">
-          Retry pathways and observed workflow patterns
-        </a>
-      </li>
-      <li><a href="#author-experience-heading">Author experience and activity</a></li>
-      <li>
-        <a href="#completed-study-author-context-heading">
-          Completed-study author context
-        </a>
-      </li>
-      <li><a href="#author-context-heading">Appointment context</a></li>
-      <li><a href="#study-mix-heading">Participant and department mix</a></li>
-      <li><a href="#field-adoption-heading">AI field adoption and editing</a></li>
-      <li><a href="#suggestion-choice-heading">Suggestion choice</a></li>
-      <li>
-        <a href="#compensation-heading">
-          Compensation choices and text suggestions
-        </a>
-      </li>
-      <li><a href="#readability-heading">Readability indicators</a></li>
-      <li>
-        <a href="#content-source-heading">
-          Source context, repeated attempts, and latency
-        </a>
-      </li>
-      <li><a href="#user-feedback-heading">User feedback on AI assistance</a></li>
-    </ol>
-  </nav>
+  <h2 id="report-contents-heading">Report contents</h2>
+  <p class="contents-intro">
+    Follow the report from summary and workflow through context, AI
+    interaction, text and source indicators, and feedback.
+  </p>
+  <div class="contents-groups">
+    <section class="contents-group"
+             aria-labelledby="contents-overview">
+      <h3 id="contents-overview">Overview</h3>
+      <ol class="report-contents" start="1">
+        <li>
+          <a href="#executive-overview-heading">
+            Overview and key findings
+          </a>
+        </li>
+        <li>
+          <a href="#data-quality-heading">
+            Data quality and interpretation limits
+          </a>
+        </li>
+      </ol>
+    </section>
+    <section class="contents-group"
+             aria-labelledby="contents-workflow">
+      <h3 id="contents-workflow">Workflow</h3>
+      <ol class="report-contents" start="3">
+        <li>
+          <a href="#study-pathways-heading">
+            Study completion pathways
+          </a>
+        </li>
+        <li>
+          <a href="#retry-pathways-heading">
+            Retry patterns and workflow sequences
+          </a>
+        </li>
+      </ol>
+    </section>
+    <section class="contents-group"
+             aria-labelledby="contents-context">
+      <h3 id="contents-context">Context</h3>
+      <ol class="report-contents" start="5">
+        <li>
+          <a href="#author-experience-heading">
+            Author experience and activity
+          </a>
+        </li>
+        <li>
+          <a href="#completed-study-author-context-heading">
+            Completion-author role and PI status
+          </a>
+        </li>
+        <li>
+          <a href="#author-context-heading">
+            Appointment context
+          </a>
+        </li>
+        <li>
+          <a href="#study-mix-heading">
+            Study population and department mix
+          </a>
+        </li>
+      </ol>
+    </section>
+    <section class="contents-group"
+             aria-labelledby="contents-ai-interaction">
+      <h3 id="contents-ai-interaction">AI interaction</h3>
+      <ol class="report-contents" start="9">
+        <li>
+          <a href="#field-adoption-heading">
+            AI suggestion adoption and editing
+          </a>
+        </li>
+        <li>
+          <a href="#suggestion-choice-heading">
+            Suggestion choice and position
+          </a>
+        </li>
+        <li>
+          <a href="#compensation-heading">
+            Compensation suggestions and final choices
+          </a>
+        </li>
+      </ol>
+    </section>
+    <section class="contents-group"
+             aria-labelledby="contents-text-and-source">
+      <h3 id="contents-text-and-source">Text and source</h3>
+      <ol class="report-contents" start="12">
+        <li>
+          <a href="#readability-heading">
+            Readability and editing patterns
+          </a>
+        </li>
+        <li>
+          <a href="#content-source-heading">
+            Source material, repeated attempts, and latency
+          </a>
+        </li>
+      </ol>
+    </section>
+    <section class="contents-group"
+             aria-labelledby="contents-feedback">
+      <h3 id="contents-feedback">Feedback</h3>
+      <ol class="report-contents" start="14">
+        <li>
+          <a href="#user-feedback-heading">
+            User feedback on AI assistance
+          </a>
+        </li>
+      </ol>
+    </section>
+  </div>
+</nav>
 
   <aside class="faculty-summary" aria-labelledby="faculty-summary-heading">
     <h2 id="faculty-summary-heading">Faculty summary</h2>
@@ -410,10 +532,18 @@ _TEMPLATE = """<!doctype html>
 
     <details class="report-section" open>
     <summary id="executive-overview-heading">
-      Captured data at a glance
+      Overview and key findings
     </summary>
     <section aria-labelledby="executive-overview-heading">
-    <div class="kpi-grid">
+
+<p class="section-purpose">
+  <strong>What this section shows:</strong>
+  the size of the captured audit, how attempts ended, how completed studies
+  reached completion, and recorded timing for completed attempts. Cards and the
+  outcome chart distinguish attempt counts from study counts; each completed study
+  contributes one unique completed attempt.
+</p>
+<div class="kpi-grid">
       {% for card in kpi_cards %}
       <article class="kpi-card">
         <p class="kpi-label">{{ card.label }}</p>
@@ -529,14 +659,26 @@ _TEMPLATE = """<!doctype html>
       completed study contributes one unique completed attempt.
     </p>
   </section>
-  </details>
 
-    <details class="report-section" open>
+<p class="back-to-contents">
+  <a href="#report-contents-heading">
+    Back to report contents
+  </a>
+</p>
+</details>
+<details class="report-section" open>
     <summary id="data-quality-heading">
-      Data quality
+      Data quality and interpretation limits
     </summary>
     <section aria-labelledby="data-quality-heading">
-    <p>
+
+<p class="section-purpose">
+  <strong>What this section shows:</strong>
+  the validation guarantees and nonfatal warning checks for this report run. Fatal
+  checks prevent publication; warning occurrences describe retained conditions and
+  are not a distinct-attempt count.
+</p>
+<p>
       This successful publication passed every fatal validation check.
       Fatal conditions stop publication, so affected fatal counts are zero
       in a generated report.
@@ -595,14 +737,26 @@ _TEMPLATE = """<!doctype html>
       checklist, definitions, denominators, and consequences.
     </p>
   </section>
-  </details>
 
-    <details class="report-section" open>
+<p class="back-to-contents">
+  <a href="#report-contents-heading">
+    Back to report contents
+  </a>
+</p>
+</details>
+<details class="report-section" open>
     <summary id="study-pathways-heading">
-      Study pathways and author handoffs
+      Study completion pathways
     </summary>
     <section aria-labelledby="study-pathways-heading">
-    <p>
+
+<p class="section-purpose">
+  <strong>What this section shows:</strong>
+  how completed studies reached their unique completed attempt and whether authors
+  changed along the way. The analytical unit is one completed study, and each
+  completed study contributes exactly once.
+</p>
+<p>
       These charts count completed studies. Each completed study contributes
       once, using the AI or manual mode recorded on its unique completed
       attempt. The first chart separates studies completed on their first
@@ -697,15 +851,26 @@ _TEMPLATE = """<!doctype html>
 
     <div class="chart">{{ author_handoffs_html | safe }}</div>
   </section>
-  </details>
 
-
-    <details class="report-section">
+<p class="back-to-contents">
+  <a href="#report-contents-heading">
+    Back to report contents
+  </a>
+</p>
+</details>
+<details class="report-section">
     <summary id="retry-pathways-heading">
-      Retry pathways and observed workflow patterns
+      Retry patterns and workflow sequences
     </summary>
     <section aria-labelledby="retry-pathways-heading">
-      <p>
+
+<p class="section-purpose">
+  <strong>What this section shows:</strong>
+  mutually exclusive recorded attempt sequences for all studies with captured
+  attempts. “No completion observed” means no COMPLETE attempt appears in this
+  report; it is not a final outcome or evidence of abandonment.
+</p>
+<p>
         Each study appears once in the cards and pathway chart. The patterns
         summarize recorded completion state, authoring modes, author changes,
         AI errors, returned-result AI attempts, source comparisons, feedback
@@ -924,14 +1089,26 @@ _TEMPLATE = """<!doctype html>
         </div>
       </details>
     </section>
-    </details>
 
-    <details class="report-section">
+<p class="back-to-contents">
+  <a href="#report-contents-heading">
+    Back to report contents
+  </a>
+</p>
+</details>
+<details class="report-section">
     <summary id="author-experience-heading">
       Author experience and activity
     </summary>
     <section aria-labelledby="author-experience-heading">
-  <p>
+
+<p class="section-purpose">
+  <strong>What this section shows:</strong>
+  author experience at two distinct grains. Attempt-start measures use
+  author-attempt observations and may include one author more than once;
+  query-time measures count distinct authors with usable values.
+</p>
+<p>
     These charts describe attempt authors, not experience measures for
     named study principal investigators unless that principal investigator
     was also the attempt author.
@@ -1013,14 +1190,26 @@ _TEMPLATE = """<!doctype html>
     authoring-mode choice or study outcomes.
   </p>
 </section>
-  </details>
 
-    <details class="report-section">
+<p class="back-to-contents">
+  <a href="#report-contents-heading">
+    Back to report contents
+  </a>
+</p>
+</details>
+<details class="report-section">
     <summary id="completed-study-author-context-heading">
-      Completed studies by authoring mode and completion-author context
+      Completion-author role and PI status
     </summary>
     <section aria-labelledby="completed-study-author-context-heading">
-    <p>
+
+<p class="section-purpose">
+  <strong>What this section shows:</strong>
+  the study-specific role and principal-investigator status of the completion
+  author. The analytical unit is one completed study, classified by the unique
+  completed attempt.
+</p>
+<p>
       Each completed study contributes exactly once through its unique
       completed attempt. AI or manual mode is the final authoring mode on that
       attempt. The role and principal-investigator status shown here are also
@@ -1064,13 +1253,27 @@ _TEMPLATE = """<!doctype html>
       </div>
     </details>
   </section>
-  </details>
 
-    <details class="report-section">
+<p class="back-to-contents">
+  <a href="#report-contents-heading">
+    Back to report contents
+  </a>
+</p>
+</details>
+<details class="report-section">
     <summary id="author-context-heading">
-      Author and principal-investigator appointment context
+      Appointment context
     </summary>
-    <p>
+
+<section aria-labelledby="author-context-heading">
+<p class="section-purpose">
+  <strong>What this section shows:</strong>
+  appointment context for attempt authors and principal investigators. Counts use
+  distinct represented authors; appointment groups can overlap and are not
+  intended to sum to 100%.
+</p>
+</section>
+<p>
       Appointment values are parsed from comma-separated
       <code>Title:Department:School</code> entries. The charts summarize
       schools, departments, and titles separately.
@@ -1113,14 +1316,26 @@ _TEMPLATE = """<!doctype html>
       </div>
     </details>
   </section>
-  </details>
 
-    <details class="report-section">
+<p class="back-to-contents">
+  <a href="#report-contents-heading">
+    Back to report contents
+  </a>
+</p>
+</details>
+<details class="report-section">
     <summary id="study-mix-heading">
-      Participant and department mix
+      Study population and department mix
     </summary>
     <section aria-labelledby="study-mix-heading">
-    <p>
+
+<p class="section-purpose">
+  <strong>What this section shows:</strong>
+  participant-type and department composition among completed studies. The
+  analytical unit is one completed study; these distributions do not compare
+  category-specific completion rates.
+</p>
+<p>
       These horizontal bars count completed studies by participant type and
       study department. One bar represents one category, and its length is the
       number of completed studies in that category.
@@ -1134,14 +1349,27 @@ _TEMPLATE = """<!doctype html>
     <div class="chart">{{ participant_mix_html | safe }}</div>
     <div class="chart">{{ department_mix_html | safe }}</div>
   </section>
-  </details>
 
-    <details class="report-section">
+<p class="back-to-contents">
+  <a href="#report-contents-heading">
+    Back to report contents
+  </a>
+</p>
+</details>
+<details class="report-section">
     <summary id="field-adoption-heading">
-      AI field adoption and editing
+      AI suggestion adoption and editing
     </summary>
     <section aria-labelledby="field-adoption-heading">
-  <p>
+
+<p class="section-purpose">
+  <strong>What this section shows:</strong>
+  which study-posting fields received AI suggestions, which fields had a selected
+  suggestion, and what happened to selected text. The analytical unit is a
+  completed AI attempt-and-field; field-specific eligible denominators are shown
+  with the results.
+</p>
+<p>
     These charts summarize completed AI attempts at the field level. An
     offer means at least one suggestion was available for the field; a
     selection means the author selected one offered suggestion.
@@ -1189,14 +1417,26 @@ _TEMPLATE = """<!doctype html>
     </div>
   </details>
 </section>
-  </details>
 
-  <details class="report-section">
+<p class="back-to-contents">
+  <a href="#report-contents-heading">
+    Back to report contents
+  </a>
+</p>
+</details>
+<details class="report-section">
     <summary id="suggestion-choice-heading">
-    Suggestion choice
+    Suggestion choice and position
   </summary>
   <section aria-labelledby="suggestion-choice-heading">
-  <p>
+
+<p class="section-purpose">
+  <strong>What this section shows:</strong>
+  selection at the suggestion-instance level and by zero-based position. Index 0
+  is the first offered suggestion; for title, purpose, and about it is the
+  prompt-intended highest rank, not proof of objective quality.
+</p>
+<p>
     These charts summarize completed AI attempts without displaying
     suggestion text. Attempt-level selection is the percentage of eligible
     attempts with at least one selected suggestion. Suggestion-level
@@ -1249,14 +1489,26 @@ _TEMPLATE = """<!doctype html>
     </div>
   </details>
 </section>
-  </details>
 
-  <details class="report-section">
+<p class="back-to-contents">
+  <a href="#report-contents-heading">
+    Back to report contents
+  </a>
+</p>
+</details>
+<details class="report-section">
     <summary id="compensation-heading">
-      Compensation choices and text suggestions
+      Compensation suggestions and final choices
     </summary>
     <section aria-labelledby="compensation-heading">
-      <p>
+
+<p class="section-purpose">
+  <strong>What this section shows:</strong>
+  AI-supplied and final compensation choices, generic and specific text offers,
+  selected suggestion kinds, offer composition, and workflow-consistency flags.
+  Each table or chart states its eligible attempt denominator.
+</p>
+<p>
         This section includes completed AI attempts only. It first compares
         the compensation Yes/No value supplied by AI with the final saved
         value. It then summarizes generic and specific compensation text
@@ -1493,14 +1745,26 @@ _TEMPLATE = """<!doctype html>
         </div>
       </details>
     </section>
-  </details>
 
-  <details class="report-section">
+<p class="back-to-contents">
+  <a href="#report-contents-heading">
+    Back to report contents
+  </a>
+</p>
+</details>
+<details class="report-section">
     <summary id="readability-heading">
-    Readability indicators
+    Readability and editing patterns
   </summary>
   <section aria-labelledby="readability-heading">
-  <p>
+
+<p class="section-purpose">
+  <strong>What this section shows:</strong>
+  formula-based readability indicators for observed nonblank final text and
+  eligible selected-to-final pairs. Titles are especially unstable because they
+  are short; lower grade levels are not automatically better.
+</p>
+<p>
     These charts use Flesch-Kincaid grade as one descriptive indicator.
     Selected-to-final change is calculated as final minus selected.
     Negative values indicate a lower final formula value; positive values
@@ -1681,14 +1945,26 @@ _TEMPLATE = """<!doctype html>
     {{ edit_readability_relationship_html | safe }}
   </div>
 </section>
-  </details>
 
-    <details class="report-section">
+<p class="back-to-contents">
+  <a href="#report-contents-heading">
+    Back to report contents
+  </a>
+</p>
+</details>
+<details class="report-section">
     <summary id="content-source-heading">
-      Source context, repeated attempts, and latency
+      Source material, repeated attempts, and latency
     </summary>
     <section aria-labelledby="content-source-heading">
-    <p>
+
+<p class="section-purpose">
+  <strong>What this section shows:</strong>
+  reported and inferred source material, input methods, source size, latency, and
+  repeated-attempt source comparisons. Population and transition denominators
+  differ across charts and are identified before interpretation.
+</p>
+<p>
       This section separates generation activity from completed study
       creation. An <strong>AI generation that returned a result</strong> is an
       AI generation that did not end in either recorded AI-error category. It
@@ -1895,14 +2171,26 @@ _TEMPLATE = """<!doctype html>
       </div>
     </details>
   </section>
-  </details>
 
-    <details class="report-section" open>
+<p class="back-to-contents">
+  <a href="#report-contents-heading">
+    Back to report contents
+  </a>
+</p>
+</details>
+<details class="report-section" open>
     <summary id="user-feedback-heading">
       User feedback on AI assistance
     </summary>
     <section aria-labelledby="user-feedback-heading">
-    <p>
+
+<p class="section-purpose">
+  <strong>What this section shows:</strong>
+  six self-reported comments available in this run, ordered by audit-record ID.
+  They describe perceived usefulness or concerns and do not establish causal
+  benefit, accuracy, accessibility, or effectiveness.
+</p>
+<p>
       These comments are self-reported feedback about the perceived usefulness
       of AI assistance. They are descriptive and do not establish causal
       benefit, writing quality, correctness, accessibility, or effectiveness.
@@ -1935,7 +2223,13 @@ _TEMPLATE = """<!doctype html>
     <p>No user feedback about AI usefulness was available for this report.</p>
     {% endif %}
   </section>
-  </details>
+
+<p class="back-to-contents">
+  <a href="#report-contents-heading">
+    Back to report contents
+  </a>
+</p>
+</details>
 
 </main>
 </body>

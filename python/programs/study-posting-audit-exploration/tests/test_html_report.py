@@ -1325,7 +1325,7 @@ def test_html_report_is_self_contained_and_accessible() -> None:
     assert "<h1>Study Posting Audit Exploration</h1>" in html
     assert 'id="executive-overview-heading"' in html
     assert 'id="study-pathways-heading"' in html
-    assert "Study pathways and author handoffs" in html
+    assert "Study completion pathways" in html
     assert "Completed-study pathways by final authoring mode" in html
     assert "Author handoffs before study completion" in html
     assert "Distinct studies" in html
@@ -1352,7 +1352,7 @@ def test_html_report_is_self_contained_and_accessible() -> None:
     assert "missing values can further reduce either count" in normalized_html
     assert "not historical snapshots of individual attempts" in normalized_html
     assert 'id="study-mix-heading"' in html
-    assert "Participant and department mix" in html
+    assert "Study population and department mix" in html
     assert "Completed studies by participant type" in html
     assert "Completed studies by department" in html
     assert "Other and missing categories are retained" in normalized_html
@@ -1379,7 +1379,7 @@ def test_html_report_explains_source_context_and_latency() -> None:
     )
     normalized = " ".join(rendered.split())
 
-    assert "Source context, repeated attempts, and latency" in rendered
+    assert "Source material, repeated attempts, and latency" in rendered
     assert "All AI generations that returned a result" in rendered
     assert "Completed AI-assisted attempts" in rendered
     assert "Input method for AI generations that returned a result" in rendered
@@ -1554,7 +1554,7 @@ def test_html_report_explains_appointment_context() -> None:
     normalized_html = " ".join(html.split())
 
     assert 'id="author-context-heading"' in html
-    assert "Author and principal-investigator appointment context" in html
+    assert "Appointment context" in html
     assert "Distinct authors by effective role" not in html
     assert "Authors classified as study principal investigators" not in html
     assert "Author appointment schools" in html
@@ -1597,7 +1597,7 @@ def test_html_report_explains_completed_study_author_context() -> None:
     normalized_html = " ".join(html.split())
 
     assert 'id="completed-study-author-context-heading"' in html
-    assert "Completed studies by authoring mode and completion-author context" in html
+    assert "Completion-author role and PI status" in html
     assert "Completed studies by authoring mode and completion-author role" in html
     assert "Completed studies by authoring mode and completion-author PI status" in html
     assert "Each completed study contributes exactly once" in normalized_html
@@ -1685,6 +1685,45 @@ def test_html_report_toc_targets_unique_sections_in_report_order() -> None:
         "content-source-heading",
         "user-feedback-heading",
     )
+    expected_visible_titles = (
+        "Overview and key findings",
+        "Data quality and interpretation limits",
+        "Study completion pathways",
+        "Retry patterns and workflow sequences",
+        "Author experience and activity",
+        "Completion-author role and PI status",
+        "Appointment context",
+        "Study population and department mix",
+        "AI suggestion adoption and editing",
+        "Suggestion choice and position",
+        "Compensation suggestions and final choices",
+        "Readability and editing patterns",
+        "Source material, repeated attempts, and latency",
+        "User feedback on AI assistance",
+    )
+    normalized_html = " ".join(html.split())
+    for visible_title in expected_visible_titles:
+        assert visible_title in normalized_html
+
+    expected_titles = (
+        "Overview and key findings",
+        "Data quality and interpretation limits",
+        "Study completion pathways",
+        "Retry patterns and workflow sequences",
+        "Author experience and activity",
+        "Completion-author role and PI status",
+        "Appointment context",
+        "Study population and department mix",
+        "AI suggestion adoption and editing",
+        "Suggestion choice and position",
+        "Compensation suggestions and final choices",
+        "Readability and editing patterns",
+        "Source material, repeated attempts, and latency",
+        "User feedback on AI assistance",
+    )
+    normalized_html = " ".join(html.split())
+    for title in expected_titles:
+        assert title in normalized_html
 
     nav_start = html.index('<nav aria-labelledby="report-contents-heading">')
     nav_end = html.index("</nav>", nav_start)
@@ -1759,7 +1798,7 @@ def test_html_report_explains_observed_retry_patterns() -> None:
     )
     normalized = " ".join(html.split())
 
-    assert "Retry pathways and observed workflow patterns" in html
+    assert "Retry patterns and workflow sequences" in html
     assert "One recorded attempt, completed" in html
     assert "Multiple recorded attempts, no completion observed" in html
     assert "Observed retry pathways" in html
@@ -2008,7 +2047,7 @@ def test_html_report_explains_compensation_choices() -> None:
     normalized = " ".join(html.split())
 
     assert 'id="compensation-heading"' in html
-    assert "Compensation choices and text suggestions" in html
+    assert "Compensation suggestions and final choices" in html
     assert "completed AI attempts only" in normalized
     assert "do not show whether the user actively clicked" in normalized
     assert "Compensation Yes/No comparison among completed AI attempts" in normalized
