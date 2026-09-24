@@ -278,7 +278,7 @@ def attempt_start_experience_rows() -> pd.DataFrame:
                 "author_attempt_count_missing_metric": 1,
                 "percentile_25_author_attempt_value": 1.0,
                 "median_author_attempt_value": 2.0,
-                "average_author_attempt_value": 3.0,
+                "average_author_attempt_value": 9.0,
                 "percentile_75_author_attempt_value": 4.0,
             },
             {
@@ -1455,27 +1455,30 @@ def test_author_handoff_chart_aggregates_categories_by_mode() -> None:
     assert list(figure.data[3].y) == [0, 3]
 
 
-def test_author_attempt_start_experience_chart_uses_attempt_grain() -> None:
+def test_author_attempt_start_chart_uses_exact_percentile_interval() -> None:
     figure = build_author_attempt_start_experience_chart(
         attempt_start_experience_rows()
     )
-    bar = figure.data[0]
-    median_markers = figure.data[1]
+    interval, median_markers, mean_markers = figure.data
 
-    assert figure.layout.title.text == ("Mean studies created before attempt start")
-    assert list(bar.x) == ["AI", "MANUAL"]
-    assert list(bar.y) == [3.0, 6.0]
-    assert list(bar.error_y.array) == [1.0, 2.0]
-    assert list(bar.error_y.arrayminus) == [2.0, 3.0]
+    assert figure.layout.title.text == (
+        "Studies created before attempt start: distribution summary"
+    )
+    assert list(interval.x) == ["AI", "AI", "AI", "MANUAL", "MANUAL", "MANUAL"]
+    assert list(interval.y) == [1.0, 4.0, None, 3.0, 8.0, None]
+    assert list(median_markers.x) == ["AI", "MANUAL"]
     assert list(median_markers.y) == [2.0, 5.0]
-    assert [values[3] for values in bar.customdata] == [6, 4]
-    assert [values[4] for values in bar.customdata] == [1, 0]
-    assert "Author-attempt observations with value" in str(bar.hovertemplate)
-    assert "Author-attempt observations missing value" in str(bar.hovertemplate)
-    assert "25th percentile" in str(bar.hovertemplate)
-    assert "Median:" in str(bar.hovertemplate)
-    assert "75th percentile" in str(bar.hovertemplate)
-    assert "Definition:" in str(bar.hovertemplate)
+    assert list(mean_markers.y) == [9.0, 6.0]
+    assert float(mean_markers.y[0]) > float(interval.y[1])
+    assert [values[4] for values in mean_markers.customdata] == [6, 4]
+    assert [values[5] for values in mean_markers.customdata] == [1, 0]
+    assert "Observations with value" in str(mean_markers.hovertemplate)
+    assert "Observations missing value" in str(mean_markers.hovertemplate)
+    assert "25th percentile" in str(mean_markers.hovertemplate)
+    assert "Median:" in str(mean_markers.hovertemplate)
+    assert "Mean:" in str(mean_markers.hovertemplate)
+    assert "75th percentile" in str(mean_markers.hovertemplate)
+    assert "Definition:" in str(mean_markers.hovertemplate)
 
 
 def test_query_time_author_experience_tooltip_uses_author_grain() -> None:
@@ -1483,55 +1486,49 @@ def test_query_time_author_experience_tooltip_uses_author_grain() -> None:
         current_author_experience_rows(),
         metric_unit="days",
     )
-    bar = figure.data[0]
+    median_markers = figure.data[1]
 
-    assert "Distinct authors with value" in str(bar.hovertemplate)
-    assert "Distinct authors missing value" in str(bar.hovertemplate)
-    assert "25th percentile" in str(bar.hovertemplate)
-    assert "75th percentile" in str(bar.hovertemplate)
-    assert "Unit:" in str(bar.hovertemplate)
-    assert "Definition:" in str(bar.hovertemplate)
-    assert bar.customdata[0][3] == 4
-    assert bar.customdata[0][4] == 1
-    assert bar.customdata[0][5] == "days"
+    assert "Observations with value" in str(median_markers.hovertemplate)
+    assert "Observations missing value" in str(median_markers.hovertemplate)
+    assert "25th percentile" in str(median_markers.hovertemplate)
+    assert "75th percentile" in str(median_markers.hovertemplate)
+    assert "Unit:" in str(median_markers.hovertemplate)
+    assert "Definition:" in str(median_markers.hovertemplate)
+    assert median_markers.customdata[0][4] == 4
+    assert median_markers.customdata[0][5] == 1
+    assert median_markers.customdata[0][6] == "days"
 
 
-def test_author_experience_chart_separates_units() -> None:
-    studies_figure = build_author_experience_chart(
-        current_author_experience_rows(),
-        metric_unit="studies",
+def test_author_experience_chart_facets_metrics_and_omits_missing_groups() -> None:
+    rows = current_author_experience_rows()
+    missing = rows["experience_metric_name"].eq(
+        "other_study_memberships_as_of_report_query_count"
+    ) & rows["author_adoption_group"].eq("BOTH_AI_AND_MANUAL")
+    rows = rows.loc[~missing]
+
+    studies_figure = build_author_experience_chart(rows, metric_unit="studies")
+    days_figure = build_author_experience_chart(rows, metric_unit="days")
+
+    assert studies_figure.layout.title.text == (
+        "Author experience at report query time: studies"
     )
-    days_figure = build_author_experience_chart(
-        current_author_experience_rows(),
-        metric_unit="days",
-    )
-
-    assert (
-        studies_figure.layout.title.text
-        == "Mean author experience at report query time: studies"
-    )
-    assert studies_figure.layout.barmode == "group"
-    assert len(studies_figure.data) == 4
-    assert list(studies_figure.data[0].x) == [
-        "All authors",
-        "AI only",
-        "Manual only",
-        "Both AI and manual",
+    assert [annotation.text for annotation in studies_figure.layout.annotations] == [
+        "Total studies created",
+        "Other study memberships",
     ]
-    assert list(studies_figure.data[0].y) == [13.0, 9.0, 16.0, 12.0]
-    assert list(studies_figure.data[1].y) == [12.0, 8.0, 15.0, 11.0]
-    assert list(studies_figure.data[2].y) == [6.0, 4.0, 8.0, 5.0]
-    assert list(studies_figure.data[3].y) == [5.0, 3.0, 7.0, 4.0]
+    assert len(studies_figure.data) == 6
+    membership_interval = studies_figure.data[3]
+    assert "Both AI and manual" not in list(membership_interval.x)
+    assert 0.0 not in [value for value in membership_interval.y if value is not None]
 
-    assert (
-        days_figure.layout.title.text
-        == "Median author experience at report query time: days"
+    assert days_figure.layout.title.text == (
+        "Author experience at report query time: days"
     )
-    assert len(days_figure.data) == 2
-    assert list(days_figure.data[0].y) == [30.0, 20.0, 45.0, 35.0]
-    assert list(days_figure.data[1].y) == [300.0, 180.0, 420.0, 360.0]
-    assert list(days_figure.data[0].error_y.array) == [3.0, 3.0, 3.0, 3.0]
-    assert list(days_figure.data[0].error_y.arrayminus) == [2.0, 2.0, 2.0, 2.0]
+    assert [annotation.text for annotation in days_figure.layout.annotations] == [
+        "Distinct login days",
+        "Login-history span",
+    ]
+    assert len(days_figure.data) == 6
 
 
 def test_field_suggestion_adoption_chart_uses_explicit_denominator() -> None:

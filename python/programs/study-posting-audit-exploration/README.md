@@ -265,7 +265,10 @@ all studies with captured attempts.
 with AI, completed manually, and no completion observed. General percentages
 use all studies in the row; source-signature change percentages use
 source-comparison-eligible studies; feedback percentages use AI-exposed
-studies. A missing percentage means its denominator is zero.
+studies. A missing percentage means its denominator is zero. The faculty-facing
+three-row table omits median attempts because the existing multiple-attempt
+count and percentage describe retries more directly; the aggregate retains the
+median for technical use.
 
 A returned-result AI attempt excludes both recorded AI-error result categories;
 eligible user-dropped AI attempts remain included. Source-signature equality is
@@ -411,12 +414,12 @@ outputs, or dropdown filtering for completed-study author context.
 The author-experience section describes attempt authors, not PI-specific
 experience unless the PI was also the attempt author. The attempt-start chart
 counts author-attempt observations and can include one author more than once.
-It shows mean prior studies with a 25th-to-75th-percentile interval and a
-separate median marker. Query-time charts count each distinct author at most
-once per metric and adoption group. Study-count metrics use mean bars with
-interquartile intervals and median markers; day-count metrics retain median
-bars with interquartile intervals. Hover includes the contributing and missing
-counts.
+It shows a 25th-to-75th-percentile interval with separate median and mean
+markers. Query-time charts count each distinct author at most once per metric
+and adoption group. Each metric has a separate panel with the same interval,
+median-diamond, and mean-circle design. Missing group-and-metric combinations
+are omitted rather than rendered as zero. Hover includes quartiles, median,
+mean, and the contributing and missing counts.
 
 Distinct login days means the number of distinct calendar dates with at least
 one recorded successful login. Multiple logins on the same date count once. It

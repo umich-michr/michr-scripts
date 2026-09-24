@@ -1363,9 +1363,9 @@ def test_html_report_is_self_contained_and_accessible() -> None:
 
     assert 'id="author-experience-heading"' in html
     assert "Author experience and activity" in html
-    assert "Mean studies created before attempt start" in html
-    assert "Mean author experience at report query time: studies" in html
-    assert "Median author experience at report query time: days" in html
+    assert "Studies created before attempt start: distribution summary" in html
+    assert "Author experience at report query time: studies" in html
+    assert "Author experience at report query time: days" in html
     assert "These charts describe attempt authors" in normalized_html
     assert "The first chart uses an author-attempt grain" in normalized_html
     assert "The next two charts use a unique-author grain" in normalized_html
@@ -1537,8 +1537,12 @@ def test_html_report_explains_author_experience_and_study_mix() -> None:
 
     assert "How to compare attempt-time and query-time experience" in html
     assert "five AI attempts have prior-study counts" in normalized_html
-    assert "the mean bar is 3 studies" in normalized_html
     assert "the median diamond is 2 studies" in normalized_html
+    assert "the mean circle is 3 studies" in normalized_html
+    assert "percentile interval still ends at the actual 75th percentile" in (
+        normalized_html
+    )
+    assert "An absent group is omitted rather than plotted at zero" in normalized_html
     assert "an author with three attempts contributes three observations" in (
         normalized_html
     )
@@ -1808,6 +1812,33 @@ def test_html_report_uses_progressive_disclosure_defaults() -> None:
     assert html.count('<details class="report-section"') == 14
     assert "details.report-section:not([open]) > section" in html
     assert "display: block" in html
+
+
+def test_html_report_omits_retry_median_from_table_but_retains_context() -> None:
+    """Keep median attempts in cards and pathway hover, not the outcome table."""
+    chart_bundle = charts()
+    html = render_html_report(
+        records=feedback_records(),
+        overview_summary=overview_rows(),
+        author_handoff_summary=author_handoff_rows(),
+        retry_card_summary=retry_card_rows(),
+        retry_characteristics_summary=retry_characteristic_rows(),
+        data_quality_summary=quality_rows(),
+        repeated_attempt_source_consistency_summary=repeated_source_rows(),
+        charts=chart_bundle,
+    )
+    normalized = " ".join(html.split())
+    retry_section = html.index('<summary id="retry-pathways-heading">')
+    table_start = html.index(
+        '<div class="retry-table-wrapper" role="region"',
+        retry_section,
+    )
+    table_end = html.index("</table>", table_start)
+    retry_table = html[table_start:table_end]
+
+    assert "Median attempts" not in retry_table
+    assert "Median recorded attempts per study: 3" in normalized
+    assert "Median attempts:" in str(chart_bundle.retry_pathways.data[0].hovertemplate)
 
 
 def test_html_report_explains_observed_retry_patterns() -> None:

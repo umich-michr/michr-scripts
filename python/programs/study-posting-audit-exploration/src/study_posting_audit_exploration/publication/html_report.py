@@ -917,7 +917,6 @@ _TEMPLATE = """<!doctype html>
             <tr>
               <th scope="col">Study group</th>
               <th scope="col">Studies</th>
-              <th scope="col">Median attempts</th>
               <th scope="col">Both modes</th>
               <th scope="col">Author change</th>
               <th scope="col">AI error</th>
@@ -935,7 +934,6 @@ _TEMPLATE = """<!doctype html>
             <tr>
               <th scope="row">{{ row.label }}</th>
               <td>{{ row.study_count }}</td>
-              <td>{{ row.median_attempts_text }}</td>
               <td>{{ row.both_modes_text }}</td>
               <td>{{ row.author_change_text }}</td>
               <td>{{ row.ai_error_text }}</td>
@@ -1142,8 +1140,8 @@ _TEMPLATE = """<!doctype html>
     bars.
   </p>
   <p class="caution">
-    Bar height is the mean prior-study count, the error line spans the 25th
-    through 75th percentiles, and a diamond marks the median. Hover also shows
+    The thick interval runs from the 25th through 75th percentiles, the
+    diamond marks the median, and the circle marks the mean. Hover also shows
     author-attempt observations with values, missing observations, and the
     metric definition.
   </p>
@@ -1163,10 +1161,11 @@ _TEMPLATE = """<!doctype html>
   <p class="caution">
     Counts may differ because the attempt-start chart counts author-attempt
     observations, while query-time charts count distinct authors once per
-    metric; missing values can further reduce either count. Study-count bars
-    show means with 25th-to-75th-percentile error lines and median diamonds.
-    Day-count bars retain medians with 25th-to-75th-percentile error lines.
-    Hover includes mean or median, quartiles, contributing and missing author
+    metric; missing values can further reduce either count. Each query-time
+    metric has its own panel. Thick intervals show the 25th through 75th
+    percentiles, diamonds show medians, and circles show means. Missing
+    group-and-metric combinations are omitted rather than shown as zero.
+    Hover includes quartiles, median, mean, contributing and missing author
     counts, unit, and metric definition.
   </p>
   <div class="chart">{{ author_experience_studies_html | safe }}</div>
@@ -1177,25 +1176,26 @@ _TEMPLATE = """<!doctype html>
     <div class="explanation-panel-content">
       <h4>Attempt-time chart</h4>
       <p>
-        Each bar shows the mean number of prior studies across attempts in one
-        authoring mode. The error line spans the 25th through 75th percentiles,
-        and the diamond marks the median. Because attempts are counted, an
-        author with three attempts contributes three observations.
+        Each authoring mode has a thick interval from the 25th to 75th
+        percentile, containing the middle half of observed prior-study counts.
+        The diamond is the median and the circle is the mean. Because attempts
+        are counted, an author with three attempts contributes three
+        observations.
       </p>
       <p>
         <strong>Synthetic example:</strong> if five AI attempts have prior-study
-        counts of 0, 1, 2, 4, and 8, the mean bar is 3 studies and the median
-        diamond is 2 studies. The difference helps show that larger values can
-        pull the mean above the middle observation.
+        counts of 0, 1, 2, 4, and 8, the median diamond is 2 studies and the
+        mean circle is 3 studies. A mean above the 75th percentile can occur
+        when a smaller number of large values pulls the mean upward; the
+        percentile interval still ends at the actual 75th percentile.
       </p>
 
       <h4>Query-time charts</h4>
       <p>
-        Each cluster is an author adoption group, and each colored bar is one
-        experience or activity metric. Study-count bars show the mean among
-        distinct authors, with the median marked separately. Day-count bars
-        show the median. Every error line spans the 25th through 75th
-        percentiles.
+        Each experience or activity metric has its own panel so unlike scales
+        are not overlaid. Within a panel, each observed author-adoption group
+        has a 25th-to-75th-percentile interval, median diamond, and mean circle.
+        An absent group is omitted rather than plotted at zero.
       </p>
       <p>
         Distinct login days is the number of different calendar dates on which
@@ -2514,7 +2514,6 @@ class RetryCharacteristicView:
 
     label: str
     study_count: int
-    median_attempts_text: str
     both_modes_text: str
     author_change_text: str
     ai_error_text: str
@@ -3392,7 +3391,6 @@ def _retry_characteristic_views(
     required = (
         "study_outcome_group",
         "study_count",
-        "median_attempt_count",
         "percentage_with_both_modes",
         "percentage_with_author_change",
         "percentage_with_ai_error",
@@ -3449,7 +3447,6 @@ def _retry_characteristic_views(
             RetryCharacteristicView(
                 label=labels.get(group, group),
                 study_count=study_count,
-                median_attempts_text=_nullable_number_text(row["median_attempt_count"]),
                 both_modes_text=_percentage_with_denominator(
                     row["percentage_with_both_modes"],
                     study_count,
