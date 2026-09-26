@@ -1,6 +1,8 @@
+import json
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 from study_posting_audit_exploration import (
     ExplorationInputConfig,
@@ -198,3 +200,223 @@ def test_author_analysis_tables_compose_all_outputs(
     assert not tables.grouped_author_summary.empty
     assert not tables.attempt_start_experience_summary.empty
     assert not tables.current_author_experience_summary.empty
+
+
+def test_current_author_experience_embeds_deterministic_percentile_bins() -> None:
+    """Embed one canonical identifier-free aggregate payload on every row."""
+    authors = pd.DataFrame.from_records(
+        [
+            {
+                "author_user_name": f"forbidden-author-{index}@example.edu",
+                "author_adoption_group": group,
+                "total_studies_created_as_of_report_query_count": total,
+                "other_study_memberships_as_of_report_query_count": membership,
+                "distinct_login_days_as_of_report_query_count": index + 1,
+                "login_history_span_days_as_of_report_query": 10 * (index + 1),
+            }
+            for index, (group, total, membership) in enumerate(
+                (
+                    ("AI_ONLY", 1, 0),
+                    ("AI_ONLY", 2, 1),
+                    ("MANUAL_ONLY", 3, 1),
+                    ("MANUAL_ONLY", 4, 2),
+                    ("BOTH_AI_AND_MANUAL", 20, 10),
+                )
+            )
+        ]
+    )
+
+    first = build_current_author_experience_summary(authors)
+    second = build_current_author_experience_summary(authors)
+
+    assert first["author_activity_percentile_bins_json"].nunique() == 1
+    assert (
+        first["author_activity_percentile_bins_json"].iloc[0]
+        == second["author_activity_percentile_bins_json"].iloc[0]
+    )
+
+    payload = first["author_activity_percentile_bins_json"].iloc[0]
+    assert isinstance(payload, str)
+    assert "forbidden-author" not in payload
+    assert "author_user_name" not in payload
+    assert "NaN" not in payload
+
+    rows = json.loads(payload)
+    assert len(rows) == 2 * 4 * 4
+    assert {row["metric_name"] for row in rows} == {
+        "total_studies_created_as_of_report_query_count",
+        "other_study_memberships_as_of_report_query_count",
+    }
+    assert {row["binning_scheme"] for row in rows} == {
+        "OVERALL_AUTHOR_PERCENTILES_50_75_90"
+    }
+
+
+def test_current_author_percentile_bins_share_boundaries_and_reconcile() -> None:
+    """Use overall boundaries for every group and reconcile every denominator."""
+    authors = pd.DataFrame.from_records(
+        [
+            {
+                "author_adoption_group": group,
+                "total_studies_created_as_of_report_query_count": total,
+                "other_study_memberships_as_of_report_query_count": membership,
+                "distinct_login_days_as_of_report_query_count": 1,
+                "login_history_span_days_as_of_report_query": 1,
+            }
+            for group, total, membership in (
+                ("AI_ONLY", 1, 0),
+                ("AI_ONLY", 2, 1),
+                ("MANUAL_ONLY", 3, 1),
+                ("MANUAL_ONLY", 4, 2),
+                ("BOTH_AI_AND_MANUAL", 20, None),
+            )
+        ]
+    )
+
+    summary = build_current_author_experience_summary(authors)
+    rows = json.loads(summary["author_activity_percentile_bins_json"].iloc[0])
+
+    for metric_name in {row["metric_name"] for row in rows}:
+        metric_rows = [row for row in rows if row["metric_name"] == metric_name]
+        boundaries_by_group = {
+            row["author_adoption_group"]: tuple(
+                (
+                    item["lower_bound"],
+                    item["upper_bound"],
+                    item["lower_bound_inclusive"],
+                    item["upper_bound_inclusive"],
+                )
+                for item in metric_rows
+                if item["author_adoption_group"] == row["author_adoption_group"]
+            )
+            for row in metric_rows
+        }
+        assert len(set(boundaries_by_group.values())) == 1
+
+        for group in {row["author_adoption_group"] for row in metric_rows}:
+            group_rows = [
+                row for row in metric_rows if row["author_adoption_group"] == group
+            ]
+            denominator = group_rows[0]["observed_value_denominator"]
+            assert sum(row["author_count"] for row in group_rows) == denominator
+            percentages = [
+                row["author_percentage"]
+                for row in group_rows
+                if row["author_percentage"] is not None
+            ]
+            if denominator:
+                assert sum(percentages) == pytest.approx(100.0)
+            else:
+                assert percentages == []
+
+
+def test_current_author_percentile_bins_preserve_tied_empty_bins() -> None:
+    """Keep four deterministic bins when percentile boundaries are tied."""
+    authors = pd.DataFrame.from_records(
+        [
+            {
+                "author_adoption_group": "AI_ONLY",
+                "total_studies_created_as_of_report_query_count": 2,
+                "other_study_memberships_as_of_report_query_count": 0,
+                "distinct_login_days_as_of_report_query_count": 1,
+                "login_history_span_days_as_of_report_query": 1,
+            }
+            for _ in range(4)
+        ]
+    )
+
+    summary = build_current_author_experience_summary(authors)
+    rows = [
+        row
+        for row in json.loads(summary["author_activity_percentile_bins_json"].iloc[0])
+        if row["metric_name"] == "total_studies_created_as_of_report_query_count"
+        and row["author_adoption_group"] == "ALL_AUTHORS"
+    ]
+
+    assert [row["bin_sequence"] for row in rows] == [1, 2, 3, 4]
+    assert [row["author_count"] for row in rows] == [4, 0, 0, 0]
+    assert [row["upper_bound"] for row in rows[:3]] == [2.0, 2.0, 2.0]
+
+
+def test_current_author_percentile_bins_handle_all_missing_metrics() -> None:
+    """Publish an empty payload when both binned metrics have no values."""
+    authors = pd.DataFrame.from_records(
+        [
+            {
+                "author_adoption_group": "AI_ONLY",
+                "total_studies_created_as_of_report_query_count": None,
+                "other_study_memberships_as_of_report_query_count": None,
+                "distinct_login_days_as_of_report_query_count": 1,
+                "login_history_span_days_as_of_report_query": 1,
+            }
+        ]
+    )
+
+    summary = build_current_author_experience_summary(authors)
+
+    assert json.loads(summary["author_activity_percentile_bins_json"].iloc[0]) == []
+
+
+@pytest.mark.parametrize(
+    ("value", "error_type", "message"),
+    [
+        ("not-a-count", TypeError, "contains nonnumeric"),
+        (-1, ValueError, "must be nonnegative"),
+        (1.5, ValueError, "must be integral"),
+        (float("inf"), ValueError, "must be finite"),
+    ],
+)
+def test_current_author_percentile_bins_reject_invalid_values(
+    value: object,
+    error_type: type[Exception],
+    message: str,
+) -> None:
+    """Reject invalid author-count values rather than publishing bad bins."""
+    authors = pd.DataFrame.from_records(
+        [
+            {
+                "author_adoption_group": "AI_ONLY",
+                "total_studies_created_as_of_report_query_count": value,
+                "other_study_memberships_as_of_report_query_count": 0,
+                "distinct_login_days_as_of_report_query_count": 1,
+                "login_history_span_days_as_of_report_query": 1,
+            }
+        ]
+    )
+
+    with pytest.raises(error_type, match=message):
+        build_current_author_experience_summary(authors)
+
+
+def test_current_author_percentile_bins_treat_only_missing_as_missing() -> None:
+    """Exclude true missing values while retaining valid zero counts."""
+    authors = pd.DataFrame.from_records(
+        [
+            {
+                "author_adoption_group": "AI_ONLY",
+                "total_studies_created_as_of_report_query_count": None,
+                "other_study_memberships_as_of_report_query_count": 0,
+                "distinct_login_days_as_of_report_query_count": 1,
+                "login_history_span_days_as_of_report_query": 1,
+            },
+            {
+                "author_adoption_group": "MANUAL_ONLY",
+                "total_studies_created_as_of_report_query_count": 0,
+                "other_study_memberships_as_of_report_query_count": None,
+                "distinct_login_days_as_of_report_query_count": 1,
+                "login_history_span_days_as_of_report_query": 1,
+            },
+        ]
+    )
+
+    summary = build_current_author_experience_summary(authors)
+    rows = [
+        row
+        for row in json.loads(summary["author_activity_percentile_bins_json"].iloc[0])
+        if row["metric_name"] == "total_studies_created_as_of_report_query_count"
+        and row["author_adoption_group"] == "ALL_AUTHORS"
+    ]
+
+    assert rows[0]["author_count"] == 1
+    assert rows[0]["observed_value_denominator"] == 1
+    assert rows[0]["missing_author_count"] == 1

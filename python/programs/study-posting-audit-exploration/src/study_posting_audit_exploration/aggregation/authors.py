@@ -1,6 +1,9 @@
 """Grouped author and experience summaries."""
 
 from dataclasses import dataclass
+import json
+import math
+from numbers import Real
 
 import pandas as pd
 
@@ -85,6 +88,7 @@ CURRENT_AUTHOR_EXPERIENCE_COLUMNS: tuple[str, ...] = (
     "percentile_90_author_value",
     "maximum_author_value",
     "experience_value_definition",
+    "author_activity_percentile_bins_json",
 )
 
 _CURRENT_EXPERIENCE_METRICS: tuple[
@@ -112,6 +116,12 @@ _CURRENT_EXPERIENCE_METRICS: tuple[
         "Elapsed days from first to latest login available at query time.",
     ),
 )
+_AUTHOR_ACTIVITY_BIN_METRICS: tuple[str, ...] = (
+    "total_studies_created_as_of_report_query_count",
+    "other_study_memberships_as_of_report_query_count",
+)
+_AUTHOR_ACTIVITY_BIN_SCHEME = "OVERALL_AUTHOR_PERCENTILES_50_75_90"
+_AUTHOR_ACTIVITY_UPPER_TAIL_BIN_SEQUENCE = 4
 
 
 @dataclass(frozen=True, slots=True)
@@ -527,18 +537,238 @@ def _current_experience_row(
     }
 
 
+def _json_number(value: object) -> int | float:
+    """Return one finite nonnegative integral count value for JSON."""
+    if isinstance(value, bool) or not isinstance(value, Real):
+        raise TypeError("author activity values must be numeric")
+
+    number = float(value)
+    if not math.isfinite(number):
+        raise ValueError("author activity values must be finite")
+    if number < 0:
+        raise ValueError("author activity values must be nonnegative")
+    if not number.is_integer():
+        raise ValueError("author activity values must be integral")
+
+    return int(number)
+
+
+def _observed_author_activity_values(
+    authors: pd.DataFrame,
+    metric_name: str,
+) -> pd.Series:
+    """Return validated observed values for one author activity metric."""
+    source = authors[metric_name]
+    numeric = pd.to_numeric(source, errors="coerce")
+    invalid = source.notna() & numeric.isna()
+
+    if invalid.any():
+        raise TypeError(f"{metric_name} contains nonnumeric author activity values")
+
+    observed = numeric.loc[numeric.notna()]
+    for value in observed.tolist():
+        _json_number(value)
+
+    return observed.astype("float64")
+
+
+def _author_activity_boundaries(
+    authors: pd.DataFrame,
+    metric_name: str,
+) -> tuple[float, float, float] | None:
+    """Return shared overall P50, P75, and P90 boundaries."""
+    observed = _observed_author_activity_values(authors, metric_name)
+    if observed.empty:
+        return None
+
+    return (
+        float(observed.quantile(0.50)),
+        float(observed.quantile(0.75)),
+        float(observed.quantile(0.90)),
+    )
+
+
+def _author_activity_bin_specs(
+    boundaries: tuple[float, float, float],
+) -> tuple[
+    tuple[int, float | None, float | None, bool, bool, str],
+    ...,
+]:
+    """Return deterministic mutually exclusive percentile-bin rules."""
+    median, percentile_75, percentile_90 = boundaries
+    return (
+        (
+            1,
+            None,
+            median,
+            False,
+            True,
+            f"At or below overall median ({median:g})",
+        ),
+        (
+            2,
+            median,
+            percentile_75,
+            False,
+            True,
+            f"Above median through overall 75th percentile ({percentile_75:g})",
+        ),
+        (
+            3,
+            percentile_75,
+            percentile_90,
+            False,
+            True,
+            f"Above 75th through overall 90th percentile ({percentile_90:g})",
+        ),
+        (
+            4,
+            percentile_90,
+            None,
+            False,
+            False,
+            f"Above overall 90th percentile ({percentile_90:g})",
+        ),
+    )
+
+
+def _author_activity_bin_contains(
+    value: float,
+    *,
+    sequence: int,
+    lower_bound: float | None,
+    upper_bound: float | None,
+) -> bool:
+    """Return whether one observed value belongs to one bin."""
+    if sequence == 1:
+        return upper_bound is not None and value <= upper_bound
+    if sequence in (2, 3):
+        return (
+            lower_bound is not None
+            and upper_bound is not None
+            and value > lower_bound
+            and value <= upper_bound
+        )
+    if sequence == _AUTHOR_ACTIVITY_UPPER_TAIL_BIN_SEQUENCE:
+        return lower_bound is not None and value > lower_bound
+
+    raise ValueError("unsupported author activity bin sequence")
+
+
+def _author_activity_bin_rows(
+    authors: pd.DataFrame,
+    metric_name: str,
+) -> list[dict[str, object]]:
+    """Return identifier-free aggregate bin rows for one metric."""
+    boundaries = _author_activity_boundaries(authors, metric_name)
+    if boundaries is None:
+        return []
+
+    rows: list[dict[str, object]] = []
+    specs = _author_activity_bin_specs(boundaries)
+
+    for adoption_group in _ADOPTION_GROUPS:
+        population = authors
+        if adoption_group != _ALL_AUTHORS:
+            population = population.loc[
+                population["author_adoption_group"].eq(adoption_group)
+            ]
+
+        observed = _observed_author_activity_values(
+            population,
+            metric_name,
+        )
+
+        denominator = len(observed)
+        missing_count = len(population) - denominator
+        counts: list[int] = []
+        for (
+            sequence,
+            lower_bound,
+            upper_bound,
+            _lower_inclusive,
+            _upper_inclusive,
+            _label,
+        ) in specs:
+            count = sum(
+                _author_activity_bin_contains(
+                    float(value),
+                    sequence=sequence,
+                    lower_bound=lower_bound,
+                    upper_bound=upper_bound,
+                )
+                for value in observed.tolist()
+            )
+            counts.append(count)
+
+        if sum(counts) != denominator:
+            raise ValueError("author activity percentile-bin counts do not reconcile")
+
+        for spec, count in zip(specs, counts, strict=True):
+            (
+                sequence,
+                lower_bound,
+                upper_bound,
+                lower_inclusive,
+                upper_inclusive,
+                label,
+            ) = spec
+            rows.append(
+                {
+                    "metric_name": metric_name,
+                    "author_adoption_group": adoption_group,
+                    "bin_sequence": sequence,
+                    "lower_bound": lower_bound,
+                    "upper_bound": upper_bound,
+                    "lower_bound_inclusive": lower_inclusive,
+                    "upper_bound_inclusive": upper_inclusive,
+                    "display_label": label,
+                    "author_count": count,
+                    "observed_value_denominator": denominator,
+                    "author_percentage": (
+                        100.0 * count / denominator if denominator > 0 else None
+                    ),
+                    "missing_author_count": missing_count,
+                    "binning_scheme": _AUTHOR_ACTIVITY_BIN_SCHEME,
+                }
+            )
+
+    return rows
+
+
+def _author_activity_percentile_bins_json(
+    authors: pd.DataFrame,
+) -> str:
+    """Return canonical identifier-free author activity bin aggregates."""
+    records = [
+        row
+        for metric_name in _AUTHOR_ACTIVITY_BIN_METRICS
+        for row in _author_activity_bin_rows(authors, metric_name)
+    ]
+    return json.dumps(
+        records,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    )
+
+
 def build_current_author_experience_summary(
     authors: pd.DataFrame,
 ) -> pd.DataFrame:
     """Return query-time author experience and activity distributions."""
+    payload = _author_activity_percentile_bins_json(authors)
     rows = [
-        _current_experience_row(
-            authors,
-            adoption_group=adoption_group,
-            metric_name=metric_name,
-            metric_unit=metric_unit,
-            definition=definition,
-        )
+        {
+            **_current_experience_row(
+                authors,
+                adoption_group=adoption_group,
+                metric_name=metric_name,
+                metric_unit=metric_unit,
+                definition=definition,
+            ),
+            "author_activity_percentile_bins_json": payload,
+        }
         for adoption_group in _ADOPTION_GROUPS
         for metric_name, metric_unit, definition in (_CURRENT_EXPERIENCE_METRICS)
     ]
