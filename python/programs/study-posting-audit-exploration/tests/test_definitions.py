@@ -104,6 +104,9 @@ def test_metric_definitions_describe_special_policies() -> None:
         definitions["metric_name"].str.contains("source_signature")
     ]
     latency_rows = definitions.loc[definitions["metric_name"].str.contains("latency")]
+    author_activity_payload = definitions.loc[
+        definitions["metric_name"].eq("author_activity_percentile_bins_json")
+    ]
 
     assert percentage_rows["denominator_definition"].ne("Not applicable.").all()
     assert percentage_rows["interpretation_notes"].str.contains("descriptive").all()
@@ -118,6 +121,16 @@ def test_metric_definitions_describe_special_policies() -> None:
     )
     assert source_signature_rows["interpretation_notes"].str.contains("proxy").all()
     assert latency_rows["interpretation_notes"].str.contains("descriptive").all()
+    assert len(author_activity_payload) == 1
+    payload = author_activity_payload.iloc[0]
+    assert payload["measurement_unit"] == "JSON aggregate payload"
+    assert "identifier-free JSON list" in payload["calculation_definition"]
+    assert "50th-, 75th-, and 90th-percentile" in (payload["calculation_definition"])
+    assert "authors with an observed value" in (payload["denominator_definition"])
+    assert "separate missing-author counts" in (payload["missing_value_treatment"])
+    assert "OVERALL_AUTHOR_PERCENTILES_50_75_90" in (payload["interpretation_notes"])
+    assert "no author identifiers" in payload["interpretation_notes"]
+    assert "do not establish" in payload["interpretation_notes"]
 
 
 def test_metric_definitions_accept_stable_schema_mapping() -> None:

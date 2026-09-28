@@ -1149,27 +1149,70 @@ _TEMPLATE = """<!doctype html>
     {{ author_attempt_start_experience_html | safe }}
   </div>
 
-  <h3>Experience and activity when the report query ran</h3>
+  <h3>Login context when the report query ran</h3>
   <p>
-    The next two charts use a unique-author grain. Each distinct attempt
-    author contributes at most once to each metric and adoption group.
-    Values include total studies created, other-study memberships,
-    distinct calendar login days, and elapsed days between the earliest and
-    latest available login timestamps when the report query ran. These are
-    not historical snapshots of individual attempts.
+    This visible chart uses a unique-author grain. Each distinct attempt author
+    contributes at most once to each metric and adoption group. Distinct login
+    days counts calendar dates with at least one recorded successful login;
+    login-history span measures elapsed days between the earliest and latest
+    available successful-login timestamps. A long span can still be based on
+    few distinct login days. These values are not historical snapshots of
+    individual attempts.
   </p>
   <p class="caution">
     Counts may differ because the attempt-start chart counts author-attempt
     observations, while query-time charts count distinct authors once per
-    metric; missing values can further reduce either count. Each query-time
-    metric has its own panel. Thick intervals show the 25th through 75th
-    percentiles, diamonds show medians, and circles show means. Missing
-    group-and-metric combinations are omitted rather than shown as zero.
-    Hover includes quartiles, median, mean, contributing and missing author
-    counts, unit, and metric definition.
+    metric; missing values can further reduce either count. Thick intervals
+    show the 25th through 75th percentiles, diamonds show medians, and circles
+    show means. Missing group-and-metric combinations are omitted rather than
+    shown as zero. Hover includes quartiles, median, mean, 90th percentile,
+    contributing and missing author counts, unit, and metric definition.
   </p>
-  <div class="chart">{{ author_experience_studies_html | safe }}</div>
   <div class="chart">{{ author_experience_days_html | safe }}</div>
+
+  <details class="explanation-panel">
+    <summary>Additional study-creation and membership context</summary>
+    <div class="explanation-panel-content">
+      <p>
+        Total studies created and other-study memberships are strongly
+        right-skewed in these aggregates, particularly for authors observed
+        using both modes. The robust summary therefore shows the middle-half
+        interval from the 25th through 75th percentiles and the median diamond
+        visibly. Mean and 90th percentile remain available in hover.
+      </p>
+      <div class="chart">{{ author_experience_studies_html | safe }}</div>
+
+      <h4>Author shares within shared overall percentile bins</h4>
+      <p>
+        Boundaries are derived separately for each metric across all distinct
+        authors with an observed value. The same boundaries apply to every
+        adoption group: at or below the overall median; above the median
+        through the overall 75th percentile; above the 75th through the overall
+        90th percentile; and above the overall 90th percentile. Values exactly
+        on the median, 75th-percentile, or 90th-percentile boundary remain in
+        the lower adjacent bin.
+      </p>
+      <p>
+        Each horizontal adoption-group bar represents 100% of authors with an
+        observed value for that metric. Missing values are excluded from the
+        bar denominator and reported separately in hover. Tied boundaries can
+        make a bin empty; the explicit empty bin remains so the shared rules
+        stay visible and counts still reconcile.
+      </p>
+      <div class="chart">
+        {{ author_total_studies_distribution_html | safe }}
+      </div>
+      <div class="chart">
+        {{ author_other_memberships_distribution_html | safe }}
+      </div>
+      <p class="caution">
+        Adoption groups describe recorded authoring histories. Differences may
+        reflect observation length and opportunities to create or join studies;
+        they do not establish that an authoring mode caused greater activity,
+        measure engagement quality, or establish tenure.
+      </p>
+    </div>
+  </details>
 
   <details class="explanation-panel">
     <summary>How to compare attempt-time and query-time experience</summary>
@@ -3728,6 +3771,14 @@ def render_html_report(  # noqa: PLR0913
         ),
         author_experience_days_html=_figure_html(
             charts.author_experience_days,
+            include_plotlyjs=False,
+        ),
+        author_total_studies_distribution_html=_figure_html(
+            charts.author_total_studies_distribution,
+            include_plotlyjs=False,
+        ),
+        author_other_memberships_distribution_html=_figure_html(
+            charts.author_other_memberships_distribution,
             include_plotlyjs=False,
         ),
         field_suggestion_adoption_html=_figure_html(

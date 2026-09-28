@@ -63,6 +63,8 @@ _EDIT_NOTE: Final = (
 _VALUE_SELECTION_RULE: Final = (
     "Use the population and grouping dimensions published in the same aggregate row."
 )
+_AUTHOR_ACTIVITY_BIN_PAYLOAD = "author_activity_percentile_bins_json"
+_AUTHOR_ACTIVITY_BIN_SCHEME = "OVERALL_AUTHOR_PERCENTILES_50_75_90"
 
 _STATISTIC_DEFINITIONS: tuple[tuple[str, str], ...] = (
     (
@@ -228,6 +230,9 @@ def _label(metric_name: str) -> str:
 
 def _unit(metric_name: str) -> str:
     """Return the measurement unit implied by one aggregate-column name."""
+    if metric_name == _AUTHOR_ACTIVITY_BIN_PAYLOAD:
+        return "JSON aggregate payload"
+
     return _first_matching_value(
         metric_name,
         _UNIT_RULES,
@@ -256,6 +261,16 @@ def _definition(metric_name: str) -> str:
 
     if statistic_definition:
         return statistic_definition
+
+    if metric_name == _AUTHOR_ACTIVITY_BIN_PAYLOAD:
+        return (
+            "Canonical identifier-free JSON list of aggregate percentile-bin "
+            "rows for total studies created and other-study memberships. "
+            "Each metric uses shared overall 50th-, 75th-, and "
+            "90th-percentile boundaries across all distinct authors with an "
+            "observed value. Every adoption group retains four mutually "
+            "exclusive bins, including bins with zero authors."
+        )
 
     if "percentage" in metric_name:
         return "One hundred times the documented numerator divided by its denominator."
@@ -298,6 +313,13 @@ def _numerator(metric_name: str) -> str:
 
 def _denominator(metric_name: str) -> str:
     """Return denominator guidance for one aggregate column."""
+    if metric_name == _AUTHOR_ACTIVITY_BIN_PAYLOAD:
+        return (
+            "For each metric and adoption group, authors with an observed "
+            "value for that metric; missing authors are excluded and reported "
+            "separately in the embedded aggregate rows."
+        )
+
     if "percentage" not in metric_name:
         return "Not applicable."
 
@@ -317,6 +339,13 @@ def _is_distribution_column(metric_name: str) -> bool:
 
 def _missing_treatment(metric_name: str) -> str:
     """Return missing-value treatment for one aggregate column."""
+    if metric_name == _AUTHOR_ACTIVITY_BIN_PAYLOAD:
+        return (
+            "Missing author values are excluded from each observed-value "
+            "denominator and retained as separate missing-author counts. "
+            "An empty JSON list means no binned metric had an observed value."
+        )
+
     if metric_name == "final_text_attempt_count_missing_or_blank":
         return (
             "Unavailable under the normalized input contract and always "
@@ -337,6 +366,15 @@ def _missing_treatment(metric_name: str) -> str:
 
 def _interpretation(metric_name: str) -> str:
     """Return interpretation guidance for one aggregate column."""
+    if metric_name == _AUTHOR_ACTIVITY_BIN_PAYLOAD:
+        return (
+            f"The payload uses {_AUTHOR_ACTIVITY_BIN_SCHEME}. It contains "
+            "aggregate rows only and no author identifiers. Percentages are "
+            "descriptive and use authors with observed values as denominators. "
+            "Adoption-group differences do not establish that authoring mode "
+            "caused greater activity, engagement quality, or tenure."
+        )
+
     notes = [
         note
         for applies, note in (

@@ -146,6 +146,8 @@ _REQUIRED_CURRENT_AUTHOR_EXPERIENCE_COLUMNS: tuple[str, ...] = (
     "median_author_value",
     "average_author_value",
     "percentile_75_author_value",
+    "percentile_90_author_value",
+    "author_activity_percentile_bins_json",
 )
 
 _REQUIRED_GROUPED_STUDY_COLUMNS: tuple[str, ...] = (
@@ -348,6 +350,41 @@ _AUTHOR_ADOPTION_GROUP_LABELS: Mapping[str, str] = {
     "MANUAL_ONLY": "Manual only",
     "BOTH_AI_AND_MANUAL": "Both AI and manual",
 }
+
+_AUTHOR_ACTIVITY_BIN_METRICS: tuple[str, ...] = (
+    "total_studies_created_as_of_report_query_count",
+    "other_study_memberships_as_of_report_query_count",
+)
+_AUTHOR_ACTIVITY_BIN_SCHEME = "OVERALL_AUTHOR_PERCENTILES_50_75_90"
+_AUTHOR_ACTIVITY_FIRST_BIN_SEQUENCE = 1
+_AUTHOR_ACTIVITY_SECOND_BIN_SEQUENCE = 2
+_AUTHOR_ACTIVITY_THIRD_BIN_SEQUENCE = 3
+_AUTHOR_ACTIVITY_UPPER_TAIL_BIN_SEQUENCE = 4
+_AUTHOR_ACTIVITY_BIN_SEQUENCES: tuple[int, ...] = (
+    _AUTHOR_ACTIVITY_FIRST_BIN_SEQUENCE,
+    _AUTHOR_ACTIVITY_SECOND_BIN_SEQUENCE,
+    _AUTHOR_ACTIVITY_THIRD_BIN_SEQUENCE,
+    _AUTHOR_ACTIVITY_UPPER_TAIL_BIN_SEQUENCE,
+)
+_PERCENTAGE_MAXIMUM = 100.0
+_AUTHOR_ACTIVITY_BIN_FIELDS = frozenset(
+    {
+        "metric_name",
+        "author_adoption_group",
+        "bin_sequence",
+        "lower_bound",
+        "upper_bound",
+        "lower_bound_inclusive",
+        "upper_bound_inclusive",
+        "display_label",
+        "author_count",
+        "observed_value_denominator",
+        "author_percentage",
+        "missing_author_count",
+        "binning_scheme",
+    }
+)
+_AUTHOR_ACTIVITY_PERCENTAGE_TOLERANCE = 1e-9
 
 _AUTHOR_EXPERIENCE_METRIC_LABELS: Mapping[str, str] = {
     "total_studies_created_as_of_report_query_count": "Total studies created",
@@ -591,6 +628,8 @@ class ExplorationCharts:
     author_attempt_start_experience: go.Figure
     author_experience_studies: go.Figure
     author_experience_days: go.Figure
+    author_total_studies_distribution: go.Figure
+    author_other_memberships_distribution: go.Figure
     completed_study_participant_mix: go.Figure
     completed_study_department_mix: go.Figure
     completed_studies_by_completion_author_role: go.Figure
@@ -1276,8 +1315,10 @@ class _DistributionSummarySpec:
     median_column: str
     average_column: str
     percentile_75_column: str
+    percentile_90_column: str | None
     unit: str
     definition: str
+    show_mean_marker: bool = True
 
 
 def _distribution_number(
@@ -1311,6 +1352,11 @@ def _distribution_hover_data(
         _distribution_number(row, spec.median_column),
         _distribution_number(row, spec.average_column),
         _distribution_number(row, spec.percentile_75_column),
+        (
+            _distribution_number(row, spec.percentile_90_column)
+            if spec.percentile_90_column is not None
+            else None
+        ),
         int(_distribution_number(row, spec.count_column)),
         int(_distribution_number(row, spec.missing_column)),
         spec.unit,
@@ -1335,7 +1381,7 @@ def _add_distribution_summary_traces(
     subplot_row: int | None = None,
     show_legend: bool = True,
 ) -> None:
-    """Add Q1-to-Q3 intervals plus median and mean markers."""
+    """Add Q1-to-Q3 intervals and median, with an optional mean marker."""
     percentile_25 = _distribution_values(rows, spec.percentile_25_column)
     medians = _distribution_values(rows, spec.median_column)
     means = _distribution_values(rows, spec.average_column)
@@ -1379,42 +1425,45 @@ def _add_distribution_summary_traces(
             "Median: %{customdata[1]:.2f}<br>"
             "Mean: %{customdata[2]:.2f}<br>"
             "75th percentile: %{customdata[3]:.2f}<br>"
-            "Observations with value: %{customdata[4]}<br>"
-            "Observations missing value: %{customdata[5]}<br>"
-            "Unit: %{customdata[6]}<br>"
-            "Definition: %{customdata[7]}"
+            "90th percentile: %{customdata[4]}<br>"
+            "Observations with value: %{customdata[5]}<br>"
+            "Observations missing value: %{customdata[6]}<br>"
+            "Unit: %{customdata[7]}<br>"
+            "Definition: %{customdata[8]}"
             "<extra></extra>"
         ),
         showlegend=show_legend,
         **subplot,
     )
-    figure.add_scatter(
-        name="Mean",
-        x=categories,
-        y=means,
-        mode="markers",
-        marker={
-            "color": "#2563EB",
-            "line": {"color": "#1E3A8A", "width": 1},
-            "size": 11,
-            "symbol": "circle",
-        },
-        customdata=hover_data,
-        hovertemplate=(
-            "Group: %{x}<br>"
-            "25th percentile: %{customdata[0]:.2f}<br>"
-            "Median: %{customdata[1]:.2f}<br>"
-            "Mean: %{customdata[2]:.2f}<br>"
-            "75th percentile: %{customdata[3]:.2f}<br>"
-            "Observations with value: %{customdata[4]}<br>"
-            "Observations missing value: %{customdata[5]}<br>"
-            "Unit: %{customdata[6]}<br>"
-            "Definition: %{customdata[7]}"
-            "<extra></extra>"
-        ),
-        showlegend=show_legend,
-        **subplot,
-    )
+    if spec.show_mean_marker:
+        figure.add_scatter(
+            name="Mean",
+            x=categories,
+            y=means,
+            mode="markers",
+            marker={
+                "color": "#2563EB",
+                "line": {"color": "#1E3A8A", "width": 1},
+                "size": 11,
+                "symbol": "circle",
+            },
+            customdata=hover_data,
+            hovertemplate=(
+                "Group: %{x}<br>"
+                "25th percentile: %{customdata[0]:.2f}<br>"
+                "Median: %{customdata[1]:.2f}<br>"
+                "Mean: %{customdata[2]:.2f}<br>"
+                "75th percentile: %{customdata[3]:.2f}<br>"
+                "90th percentile: %{customdata[4]}<br>"
+                "Observations with value: %{customdata[5]}<br>"
+                "Observations missing value: %{customdata[6]}<br>"
+                "Unit: %{customdata[7]}<br>"
+                "Definition: %{customdata[8]}"
+                "<extra></extra>"
+            ),
+            showlegend=show_legend,
+            **subplot,
+        )
 
 
 def build_author_attempt_start_experience_chart(
@@ -1470,6 +1519,7 @@ def build_author_attempt_start_experience_chart(
             median_column="median_author_attempt_value",
             average_column="average_author_attempt_value",
             percentile_75_column="percentile_75_author_attempt_value",
+            percentile_90_column=None,
             unit="studies",
             definition=_ATTEMPT_START_EXPERIENCE_DEFINITION,
         ),
@@ -1485,17 +1535,603 @@ def build_author_attempt_start_experience_chart(
     return figure
 
 
+def _author_activity_payload_number(
+    value: object,
+    *,
+    value_name: str,
+    allow_none: bool = False,
+) -> float | None:
+    """Return one finite number from an author-activity payload."""
+    if value is None and allow_none:
+        return None
+    if isinstance(value, bool) or not isinstance(value, Real):
+        raise ExplorationValidationError(
+            f"author activity percentile bins {value_name} must be numeric"
+        )
+
+    number = float(value)
+    if not math.isfinite(number):
+        raise ExplorationValidationError(
+            f"author activity percentile bins {value_name} must be finite"
+        )
+
+    return number
+
+
+def _author_activity_payload_count(
+    value: object,
+    *,
+    value_name: str,
+) -> int:
+    """Return one nonnegative integral payload count."""
+    number = _author_activity_payload_number(value, value_name=value_name)
+    if number is None or not number.is_integer() or number < 0:
+        raise ExplorationValidationError(
+            f"author activity percentile bins {value_name} must be "
+            "a nonnegative integer"
+        )
+    return int(number)
+
+
+def _author_activity_payload_percentage(
+    value: object,
+    *,
+    denominator: int,
+) -> float | None:
+    """Return a percentage consistent with its count denominator."""
+    if denominator == 0:
+        if value is not None:
+            raise ExplorationValidationError(
+                "author activity percentile bins author_percentage must be null "
+                "when the observed-value denominator is zero"
+            )
+        return None
+
+    number = _author_activity_payload_number(
+        value,
+        value_name="author_percentage",
+    )
+    if number is None or number < 0 or number > _PERCENTAGE_MAXIMUM:
+        raise ExplorationValidationError(
+            "author activity percentile bins author_percentage must be "
+            "between zero and 100"
+        )
+    return number
+
+
+def _author_activity_expected_label(
+    sequence: int,
+    *,
+    lower_bound: float | None,
+    upper_bound: float | None,
+) -> str:
+    """Return the canonical display label for one validated bin."""
+    if sequence == _AUTHOR_ACTIVITY_FIRST_BIN_SEQUENCE and upper_bound is not None:
+        return f"At or below overall median ({upper_bound:g})"
+    if sequence == _AUTHOR_ACTIVITY_SECOND_BIN_SEQUENCE and upper_bound is not None:
+        return f"Above median through overall 75th percentile ({upper_bound:g})"
+    if sequence == _AUTHOR_ACTIVITY_THIRD_BIN_SEQUENCE and upper_bound is not None:
+        return f"Above 75th through overall 90th percentile ({upper_bound:g})"
+    if sequence == _AUTHOR_ACTIVITY_UPPER_TAIL_BIN_SEQUENCE and lower_bound is not None:
+        return f"Above overall 90th percentile ({lower_bound:g})"
+
+    raise ExplorationValidationError(
+        "author activity percentile bins contain invalid bounds"
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class _AuthorActivityBinRow:
+    """One decoded and validated author-activity percentile-bin row."""
+
+    metric_name: str
+    author_adoption_group: str
+    bin_sequence: int
+    lower_bound: float | None
+    upper_bound: float | None
+    lower_bound_inclusive: bool
+    upper_bound_inclusive: bool
+    display_label: str
+    author_count: int
+    observed_value_denominator: int
+    author_percentage: float | None
+    missing_author_count: int
+    binning_scheme: str
+
+
+def _decode_author_activity_payload(
+    current_author_experience_summary: pd.DataFrame,
+) -> list[dict[str, object]]:
+    """Decode exactly one consistently repeated JSON-list payload."""
+    _require_columns(
+        current_author_experience_summary,
+        required=_REQUIRED_CURRENT_AUTHOR_EXPERIENCE_COLUMNS,
+        frame_name="current_author_experience_summary",
+    )
+    if current_author_experience_summary.empty:
+        return []
+
+    raw_payloads = current_author_experience_summary[
+        "author_activity_percentile_bins_json"
+    ]
+    if raw_payloads.isna().any():
+        raise ExplorationValidationError(
+            "current_author_experience_summary must contain a nonmissing "
+            "author_activity_percentile_bins_json payload on every row"
+        )
+
+    payloads = raw_payloads.astype(str).unique()
+    if len(payloads) != 1:
+        raise ExplorationValidationError(
+            "current_author_experience_summary must contain one consistent "
+            "author_activity_percentile_bins_json payload"
+        )
+
+    try:
+        decoded = json.loads(str(payloads[0]))
+    except (json.JSONDecodeError, TypeError) as error:
+        raise ExplorationValidationError(
+            "current_author_experience_summary contains invalid "
+            "author_activity_percentile_bins_json"
+        ) from error
+
+    if not isinstance(decoded, list) or any(
+        not isinstance(row, dict) for row in decoded
+    ):
+        raise ExplorationValidationError(
+            "current_author_experience_summary "
+            "author_activity_percentile_bins_json must contain "
+            "a JSON list of objects"
+        )
+
+    return cast("list[dict[str, object]]", decoded)
+
+
+def _author_activity_bounds(
+    row: Mapping[str, object],
+    *,
+    sequence: int,
+) -> tuple[float | None, float | None, bool, bool]:
+    """Validate and return one bin's bounds and inclusion rules."""
+    lower_bound = _author_activity_payload_number(
+        row["lower_bound"],
+        value_name="lower_bound",
+        allow_none=True,
+    )
+    upper_bound = _author_activity_payload_number(
+        row["upper_bound"],
+        value_name="upper_bound",
+        allow_none=True,
+    )
+    lower_inclusive = row["lower_bound_inclusive"]
+    upper_inclusive = row["upper_bound_inclusive"]
+
+    if not isinstance(lower_inclusive, bool) or not isinstance(
+        upper_inclusive,
+        bool,
+    ):
+        raise ExplorationValidationError(
+            "author activity percentile bins inclusivity values must be Boolean"
+        )
+
+    expected_shapes: Mapping[
+        int,
+        tuple[str | None, str | None, bool, bool],
+    ] = {
+        _AUTHOR_ACTIVITY_FIRST_BIN_SEQUENCE: (
+            None,
+            "number",
+            False,
+            True,
+        ),
+        _AUTHOR_ACTIVITY_SECOND_BIN_SEQUENCE: (
+            "number",
+            "number",
+            False,
+            True,
+        ),
+        _AUTHOR_ACTIVITY_THIRD_BIN_SEQUENCE: (
+            "number",
+            "number",
+            False,
+            True,
+        ),
+        _AUTHOR_ACTIVITY_UPPER_TAIL_BIN_SEQUENCE: (
+            "number",
+            None,
+            False,
+            False,
+        ),
+    }
+    actual_shape = (
+        None if lower_bound is None else "number",
+        None if upper_bound is None else "number",
+        lower_inclusive,
+        upper_inclusive,
+    )
+    if actual_shape != expected_shapes[sequence]:
+        raise ExplorationValidationError(
+            "author activity percentile bins contain invalid bounds or inclusivity"
+        )
+    if (
+        lower_bound is not None
+        and upper_bound is not None
+        and lower_bound > upper_bound
+    ):
+        raise ExplorationValidationError(
+            "author activity percentile bins lower bounds must not exceed upper bounds"
+        )
+
+    return (
+        lower_bound,
+        upper_bound,
+        lower_inclusive,
+        upper_inclusive,
+    )
+
+
+def _validate_author_activity_payload_row(
+    row: dict[str, object],
+) -> _AuthorActivityBinRow:
+    """Validate one decoded author-activity percentile-bin row."""
+    fields = frozenset(row)
+    if fields != _AUTHOR_ACTIVITY_BIN_FIELDS:
+        missing = sorted(_AUTHOR_ACTIVITY_BIN_FIELDS - fields)
+        extra = sorted(fields - _AUTHOR_ACTIVITY_BIN_FIELDS)
+        raise ExplorationValidationError(
+            "author activity percentile bins contain an invalid field set: "
+            f"missing={missing!r}, extra={extra!r}"
+        )
+
+    metric_name = row["metric_name"]
+    if not isinstance(metric_name, str) or (
+        metric_name not in _AUTHOR_ACTIVITY_BIN_METRICS
+    ):
+        raise ExplorationValidationError(
+            "author activity percentile bins contain an unsupported metric"
+        )
+
+    adoption_group = row["author_adoption_group"]
+    if not isinstance(adoption_group, str) or (
+        adoption_group not in _AUTHOR_ADOPTION_GROUP_ORDER
+    ):
+        raise ExplorationValidationError(
+            "author activity percentile bins contain an unsupported "
+            "author adoption group"
+        )
+
+    if row["binning_scheme"] != _AUTHOR_ACTIVITY_BIN_SCHEME:
+        raise ExplorationValidationError(
+            "author activity percentile bins contain an unsupported binning scheme"
+        )
+
+    sequence_value = row["bin_sequence"]
+    if (
+        isinstance(sequence_value, bool)
+        or not isinstance(sequence_value, Integral)
+        or int(sequence_value) not in _AUTHOR_ACTIVITY_BIN_SEQUENCES
+    ):
+        raise ExplorationValidationError(
+            "author activity percentile bins contain an unsupported bin sequence"
+        )
+    sequence = int(sequence_value)
+
+    (
+        lower_bound,
+        upper_bound,
+        lower_inclusive,
+        upper_inclusive,
+    ) = _author_activity_bounds(row, sequence=sequence)
+
+    label = row["display_label"]
+    expected_label = _author_activity_expected_label(
+        sequence,
+        lower_bound=lower_bound,
+        upper_bound=upper_bound,
+    )
+    if not isinstance(label, str) or label != expected_label:
+        raise ExplorationValidationError(
+            "author activity percentile bins contain an inconsistent display label"
+        )
+
+    author_count = _author_activity_payload_count(
+        row["author_count"],
+        value_name="author_count",
+    )
+    denominator = _author_activity_payload_count(
+        row["observed_value_denominator"],
+        value_name="observed_value_denominator",
+    )
+    missing_count = _author_activity_payload_count(
+        row["missing_author_count"],
+        value_name="missing_author_count",
+    )
+    percentage = _author_activity_payload_percentage(
+        row["author_percentage"],
+        denominator=denominator,
+    )
+
+    if author_count > denominator:
+        raise ExplorationValidationError(
+            "author activity percentile bin counts exceed their "
+            "observed-value denominator"
+        )
+
+    expected_percentage = (
+        _PERCENTAGE_MAXIMUM * author_count / denominator if denominator > 0 else None
+    )
+    if (
+        expected_percentage is not None
+        and percentage is not None
+        and not math.isclose(
+            percentage,
+            expected_percentage,
+            rel_tol=0.0,
+            abs_tol=_AUTHOR_ACTIVITY_PERCENTAGE_TOLERANCE,
+        )
+    ):
+        raise ExplorationValidationError(
+            "author activity percentile bin percentages do not reconcile"
+        )
+
+    return _AuthorActivityBinRow(
+        metric_name=metric_name,
+        author_adoption_group=adoption_group,
+        bin_sequence=sequence,
+        lower_bound=lower_bound,
+        upper_bound=upper_bound,
+        lower_bound_inclusive=lower_inclusive,
+        upper_bound_inclusive=upper_inclusive,
+        display_label=label,
+        author_count=author_count,
+        observed_value_denominator=denominator,
+        author_percentage=percentage,
+        missing_author_count=missing_count,
+        binning_scheme=_AUTHOR_ACTIVITY_BIN_SCHEME,
+    )
+
+
+def _validate_author_activity_group(
+    bins_by_sequence: Mapping[int, _AuthorActivityBinRow],
+) -> tuple[float, float, float]:
+    """Validate one metric-and-group set and return its boundaries."""
+    if set(bins_by_sequence) != set(_AUTHOR_ACTIVITY_BIN_SEQUENCES):
+        raise ExplorationValidationError(
+            "author activity percentile bins must contain sequences one "
+            "through four for every metric and group"
+        )
+
+    ordered = [
+        bins_by_sequence[sequence] for sequence in _AUTHOR_ACTIVITY_BIN_SEQUENCES
+    ]
+    denominators = {row.observed_value_denominator for row in ordered}
+    missing_counts = {row.missing_author_count for row in ordered}
+    if len(denominators) != 1 or len(missing_counts) != 1:
+        raise ExplorationValidationError(
+            "author activity percentile bins contain inconsistent "
+            "denominators or missing counts"
+        )
+
+    denominator = next(iter(denominators))
+    if sum(row.author_count for row in ordered) != denominator:
+        raise ExplorationValidationError(
+            "author activity percentile bin counts do not reconcile"
+        )
+
+    percentages = [row.author_percentage for row in ordered]
+    if denominator > 0:
+        percentage_total = sum(value for value in percentages if value is not None)
+        if not math.isclose(
+            percentage_total,
+            _PERCENTAGE_MAXIMUM,
+            rel_tol=0.0,
+            abs_tol=_AUTHOR_ACTIVITY_PERCENTAGE_TOLERANCE,
+        ):
+            raise ExplorationValidationError(
+                "author activity percentile bin percentages do not sum to 100"
+            )
+    elif any(value is not None for value in percentages):
+        raise ExplorationValidationError(
+            "author activity percentile bin percentages must be null "
+            "for an empty denominator"
+        )
+
+    median = ordered[0].upper_bound
+    percentile_75 = ordered[1].upper_bound
+    percentile_90 = ordered[2].upper_bound
+    if median is None or percentile_75 is None or percentile_90 is None:
+        raise ExplorationValidationError(
+            "author activity percentile bins contain invalid bounds"
+        )
+    if not median <= percentile_75 <= percentile_90:
+        raise ExplorationValidationError(
+            "author activity percentile bin boundaries must be ordered"
+        )
+    if (
+        ordered[1].lower_bound != median
+        or ordered[2].lower_bound != percentile_75
+        or ordered[3].lower_bound != percentile_90
+    ):
+        raise ExplorationValidationError(
+            "author activity percentile bins contain discontinuous boundaries"
+        )
+
+    return median, percentile_75, percentile_90
+
+
+def _validate_author_activity_payload(
+    rows: list[_AuthorActivityBinRow],
+) -> None:
+    """Validate completeness, reconciliation, and shared boundaries."""
+    rows_by_metric_group: dict[
+        tuple[str, str],
+        dict[int, _AuthorActivityBinRow],
+    ] = {}
+
+    for row in rows:
+        pair = (row.metric_name, row.author_adoption_group)
+        bins_by_sequence = rows_by_metric_group.setdefault(pair, {})
+        if row.bin_sequence in bins_by_sequence:
+            raise ExplorationValidationError(
+                "author activity percentile bins contain duplicate "
+                "metric-group-sequence rows"
+            )
+        bins_by_sequence[row.bin_sequence] = row
+
+    expected_pairs = {
+        (metric_name, group)
+        for metric_name in _AUTHOR_ACTIVITY_BIN_METRICS
+        for group in _AUTHOR_ADOPTION_GROUP_ORDER
+    }
+    if set(rows_by_metric_group) != expected_pairs:
+        raise ExplorationValidationError(
+            "author activity percentile bins must contain every supported "
+            "metric and author adoption group"
+        )
+
+    metric_boundaries: dict[str, tuple[float, float, float]] = {}
+    for (metric_name, _group), bins_by_sequence in rows_by_metric_group.items():
+        boundaries = _validate_author_activity_group(bins_by_sequence)
+        existing = metric_boundaries.setdefault(metric_name, boundaries)
+        if existing != boundaries:
+            raise ExplorationValidationError(
+                "author activity percentile bins must use shared boundaries "
+                "across adoption groups"
+            )
+
+
+def _author_activity_payload_rows(
+    current_author_experience_summary: pd.DataFrame,
+) -> list[_AuthorActivityBinRow]:
+    """Decode and strictly validate one repeated aggregate-only payload."""
+    decoded = _decode_author_activity_payload(current_author_experience_summary)
+    if not decoded:
+        return []
+
+    rows = [_validate_author_activity_payload_row(row) for row in decoded]
+    _validate_author_activity_payload(rows)
+    return rows
+
+
+def build_author_activity_percentile_bin_chart(
+    current_author_experience_summary: pd.DataFrame,
+    *,
+    metric_name: str,
+) -> go.Figure:
+    """Return a horizontal 100% stacked author-activity distribution."""
+    if metric_name not in _AUTHOR_ACTIVITY_BIN_METRICS:
+        raise ExplorationValidationError(
+            "author activity percentile-bin chart received an unsupported metric"
+        )
+
+    title = (
+        f"{_AUTHOR_EXPERIENCE_METRIC_LABELS[metric_name]} distribution "
+        "by author adoption group"
+    )
+    payload_rows = _author_activity_payload_rows(current_author_experience_summary)
+    metric_rows = [row for row in payload_rows if row.metric_name == metric_name]
+    if not metric_rows:
+        return _empty_figure(
+            title=title,
+            message=(
+                "No author activity percentile-bin aggregates are available "
+                "for this metric."
+            ),
+        )
+
+    rows_by_group_sequence = {
+        (row.author_adoption_group, row.bin_sequence): row for row in metric_rows
+    }
+    figure = go.Figure()
+    colors = (
+        "#DCE6F2",
+        "#8DB3E2",
+        "#4472C4",
+        "#17365D",
+    )
+
+    for sequence, color in zip(
+        _AUTHOR_ACTIVITY_BIN_SEQUENCES,
+        colors,
+        strict=True,
+    ):
+        ordered_rows = [
+            rows_by_group_sequence[(group, sequence)]
+            for group in _AUTHOR_ADOPTION_GROUP_ORDER
+        ]
+        labels = {row.display_label for row in ordered_rows}
+        if len(labels) != 1:
+            raise ExplorationValidationError(
+                "author activity percentile bins must use one label per "
+                "sequence across adoption groups"
+            )
+        label = next(iter(labels))
+        percentages = [
+            (row.author_percentage if row.author_percentage is not None else 0.0)
+            for row in ordered_rows
+        ]
+        customdata = [
+            [
+                row.author_count,
+                row.observed_value_denominator,
+                row.missing_author_count,
+                row.lower_bound,
+                row.upper_bound,
+                row.lower_bound_inclusive,
+                row.upper_bound_inclusive,
+                _AUTHOR_EXPERIENCE_METRIC_DEFINITIONS[metric_name],
+            ]
+            for row in ordered_rows
+        ]
+        figure.add_bar(
+            name=label,
+            orientation="h",
+            x=percentages,
+            y=[
+                _AUTHOR_ADOPTION_GROUP_LABELS[group]
+                for group in _AUTHOR_ADOPTION_GROUP_ORDER
+            ],
+            marker={"color": color},
+            customdata=customdata,
+            hovertemplate=(
+                "Group: %{y}<br>"
+                "Bin: " + label + "<br>"
+                "Authors: %{customdata[0]} of %{customdata[1]} observed "
+                "(%{x:.1f}%)<br>"
+                "Authors missing value: %{customdata[2]}<br>"
+                "Lower bound: %{customdata[3]}<br>"
+                "Upper bound: %{customdata[4]}<br>"
+                "Lower bound inclusive: %{customdata[5]}<br>"
+                "Upper bound inclusive: %{customdata[6]}<br>"
+                "Definition: %{customdata[7]}"
+                "<extra></extra>"
+            ),
+        )
+
+    figure.update_layout(
+        title=title,
+        template="plotly_white",
+        barmode="stack",
+        xaxis={
+            "title": "Authors with observed value (%)",
+            "range": [0, _PERCENTAGE_MAXIMUM],
+            "ticksuffix": "%",
+        },
+        yaxis={"title": "Author adoption group"},
+        legend_title_text="Shared overall percentile bin",
+        hovermode="closest",
+    )
+
+    return figure
+
+
 def build_author_experience_chart(
     current_author_experience_summary: pd.DataFrame,
     *,
     metric_unit: str,
 ) -> go.Figure:
     """Return faceted query-time author distribution summaries."""
-    _require_columns(
-        current_author_experience_summary,
-        required=_REQUIRED_CURRENT_AUTHOR_EXPERIENCE_COLUMNS,
-        frame_name="current_author_experience_summary",
-    )
+    _author_activity_payload_rows(current_author_experience_summary)
     rows = current_author_experience_summary.loc[
         current_author_experience_summary["experience_metric_unit"].eq(metric_unit)
         & current_author_experience_summary["experience_metric_name"].isin(
@@ -1563,8 +2199,10 @@ def build_author_experience_chart(
                 median_column="median_author_value",
                 average_column="average_author_value",
                 percentile_75_column="percentile_75_author_value",
+                percentile_90_column="percentile_90_author_value",
                 unit=unit_label.lower(),
                 definition=_AUTHOR_EXPERIENCE_METRIC_DEFINITIONS[metric_name],
+                show_mean_marker=metric_unit != "studies",
             ),
             subplot_row=position,
             show_legend=position == 1,
@@ -3673,6 +4311,18 @@ def build_exploration_charts(
         author_experience_days=build_author_experience_chart(
             inputs.current_author_experience_summary,
             metric_unit="days",
+        ),
+        author_total_studies_distribution=(
+            build_author_activity_percentile_bin_chart(
+                inputs.current_author_experience_summary,
+                metric_name=("total_studies_created_as_of_report_query_count"),
+            )
+        ),
+        author_other_memberships_distribution=(
+            build_author_activity_percentile_bin_chart(
+                inputs.current_author_experience_summary,
+                metric_name=("other_study_memberships_as_of_report_query_count"),
+            )
         ),
         completed_study_participant_mix=build_completed_study_mix_chart(
             inputs.grouped_study_summary,

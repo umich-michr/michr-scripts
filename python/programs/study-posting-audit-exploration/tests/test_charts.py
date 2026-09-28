@@ -1,5 +1,6 @@
 from collections.abc import Callable
 import json
+from typing import cast
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -14,6 +15,7 @@ from study_posting_audit_exploration.publication import (
     SourcePopulationChartSpec,
     build_attempt_outcomes_chart,
     build_attempt_timing_chart,
+    build_author_activity_percentile_bin_chart,
     build_author_appointment_context_chart,
     build_author_attempt_start_experience_chart,
     build_author_experience_chart,
@@ -364,10 +366,111 @@ def current_author_experience_rows() -> pd.DataFrame:
                     "median_author_value": median,
                     "average_author_value": median + 1.0,
                     "percentile_75_author_value": median + 3.0,
+                    "percentile_90_author_value": median + 6.0,
+                    "author_activity_percentile_bins_json": "[]",
                 }
             )
 
     return pd.DataFrame.from_records(rows)
+
+
+def author_activity_percentile_bin_rows() -> list[dict[str, object]]:
+    """Return one complete synthetic author-activity bin payload."""
+    boundaries_by_metric = {
+        "total_studies_created_as_of_report_query_count": (8.0, 12.0, 20.0),
+        "other_study_memberships_as_of_report_query_count": (3.0, 5.0, 9.0),
+    }
+    group_counts = {
+        "ALL_AUTHORS": (2, 1, 1, 1),
+        "AI_ONLY": (1, 1, 0, 0),
+        "MANUAL_ONLY": (1, 0, 1, 0),
+        "BOTH_AI_AND_MANUAL": (0, 0, 0, 1),
+    }
+    rows: list[dict[str, object]] = []
+
+    for metric_name, boundaries in boundaries_by_metric.items():
+        median, percentile_75, percentile_90 = boundaries
+        specs = (
+            (
+                1,
+                None,
+                median,
+                False,
+                True,
+                f"At or below overall median ({median:g})",
+            ),
+            (
+                2,
+                median,
+                percentile_75,
+                False,
+                True,
+                f"Above median through overall 75th percentile ({percentile_75:g})",
+            ),
+            (
+                3,
+                percentile_75,
+                percentile_90,
+                False,
+                True,
+                f"Above 75th through overall 90th percentile ({percentile_90:g})",
+            ),
+            (
+                4,
+                percentile_90,
+                None,
+                False,
+                False,
+                f"Above overall 90th percentile ({percentile_90:g})",
+            ),
+        )
+
+        for group, counts in group_counts.items():
+            denominator = sum(counts)
+            missing_count = 1
+            for spec, count in zip(specs, counts, strict=True):
+                (
+                    sequence,
+                    lower_bound,
+                    upper_bound,
+                    lower_inclusive,
+                    upper_inclusive,
+                    label,
+                ) = spec
+                rows.append(
+                    {
+                        "metric_name": metric_name,
+                        "author_adoption_group": group,
+                        "bin_sequence": sequence,
+                        "lower_bound": lower_bound,
+                        "upper_bound": upper_bound,
+                        "lower_bound_inclusive": lower_inclusive,
+                        "upper_bound_inclusive": upper_inclusive,
+                        "display_label": label,
+                        "author_count": count,
+                        "observed_value_denominator": denominator,
+                        "author_percentage": (
+                            100.0 * count / denominator if denominator else None
+                        ),
+                        "missing_author_count": missing_count,
+                        "binning_scheme": ("OVERALL_AUTHOR_PERCENTILES_50_75_90"),
+                    }
+                )
+
+    return rows
+
+
+def current_author_experience_rows_with_bin_payload() -> pd.DataFrame:
+    """Return current-author rows carrying one repeated canonical payload."""
+    rows = current_author_experience_rows()
+    payload = json.dumps(
+        author_activity_percentile_bin_rows(),
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    )
+    rows["author_activity_percentile_bins_json"] = payload
+    return rows
 
 
 def grouped_study_rows() -> pd.DataFrame:
@@ -1470,8 +1573,8 @@ def test_author_attempt_start_chart_uses_exact_percentile_interval() -> None:
     assert list(median_markers.y) == [2.0, 5.0]
     assert list(mean_markers.y) == [9.0, 6.0]
     assert float(mean_markers.y[0]) > float(interval.y[1])
-    assert [values[4] for values in mean_markers.customdata] == [6, 4]
-    assert [values[5] for values in mean_markers.customdata] == [1, 0]
+    assert [values[5] for values in mean_markers.customdata] == [6, 4]
+    assert [values[6] for values in mean_markers.customdata] == [1, 0]
     assert "Observations with value" in str(mean_markers.hovertemplate)
     assert "Observations missing value" in str(mean_markers.hovertemplate)
     assert "25th percentile" in str(mean_markers.hovertemplate)
@@ -1494,9 +1597,11 @@ def test_query_time_author_experience_tooltip_uses_author_grain() -> None:
     assert "75th percentile" in str(median_markers.hovertemplate)
     assert "Unit:" in str(median_markers.hovertemplate)
     assert "Definition:" in str(median_markers.hovertemplate)
-    assert median_markers.customdata[0][4] == 4
-    assert median_markers.customdata[0][5] == 1
-    assert median_markers.customdata[0][6] == "days"
+    assert "90th percentile" in str(median_markers.hovertemplate)
+    assert median_markers.customdata[0][4] == 36.0
+    assert median_markers.customdata[0][5] == 4
+    assert median_markers.customdata[0][6] == 1
+    assert median_markers.customdata[0][7] == "days"
 
 
 def test_author_experience_chart_facets_metrics_and_omits_missing_groups() -> None:
@@ -1516,8 +1621,9 @@ def test_author_experience_chart_facets_metrics_and_omits_missing_groups() -> No
         "Total studies created",
         "Other study memberships",
     ]
-    assert len(studies_figure.data) == 6
-    membership_interval = studies_figure.data[3]
+    assert len(studies_figure.data) == 4
+    assert all(trace.name != "Mean" for trace in studies_figure.data)
+    membership_interval = studies_figure.data[2]
     assert "Both AI and manual" not in list(membership_interval.x)
     assert 0.0 not in [value for value in membership_interval.y if value is not None]
 
@@ -1529,6 +1635,456 @@ def test_author_experience_chart_facets_metrics_and_omits_missing_groups() -> No
         "Login-history span",
     ]
     assert len(days_figure.data) == 6
+    assert [trace.name for trace in days_figure.data].count("Mean") == 2
+
+
+@pytest.mark.parametrize(
+    ("mutate_payload", "message"),
+    [
+        (
+            lambda _payload: "not-json",
+            "contains invalid author_activity_percentile_bins_json",
+        ),
+        (
+            lambda _payload: json.dumps({"not": "a list"}),
+            "must contain a JSON list of objects",
+        ),
+        (
+            lambda _payload: json.dumps([1]),
+            "must contain a JSON list of objects",
+        ),
+        (
+            lambda payload: json.dumps(
+                [{**payload[0], "unexpected": True}, *payload[1:]]
+            ),
+            "invalid field set",
+        ),
+        (
+            lambda payload: json.dumps(
+                [{**payload[0], "metric_name": "unsupported"}, *payload[1:]]
+            ),
+            "unsupported metric",
+        ),
+        (
+            lambda payload: json.dumps(
+                [
+                    {
+                        **payload[0],
+                        "author_adoption_group": "unsupported",
+                    },
+                    *payload[1:],
+                ]
+            ),
+            "unsupported author adoption group",
+        ),
+        (
+            lambda payload: json.dumps(
+                [{**payload[0], "binning_scheme": "unsupported"}, *payload[1:]]
+            ),
+            "unsupported binning scheme",
+        ),
+        (
+            lambda payload: json.dumps(
+                [{**payload[0], "bin_sequence": 9}, *payload[1:]]
+            ),
+            "unsupported bin sequence",
+        ),
+        (
+            lambda payload: json.dumps([payload[0], *payload]),
+            "duplicate metric-group-sequence",
+        ),
+        (
+            lambda payload: json.dumps(
+                [
+                    {
+                        **payload[0],
+                        "lower_bound_inclusive": True,
+                    },
+                    *payload[1:],
+                ]
+            ),
+            "invalid bounds or inclusivity",
+        ),
+        (
+            lambda payload: json.dumps(
+                [{**payload[0], "author_count": -1}, *payload[1:]]
+            ),
+            "author_count must be a nonnegative integer",
+        ),
+        (
+            lambda payload: json.dumps(
+                [{**payload[0], "author_count": 1.5}, *payload[1:]]
+            ),
+            "author_count must be a nonnegative integer",
+        ),
+        (
+            lambda payload: json.dumps(
+                [{**payload[0], "author_percentage": 99.0}, *payload[1:]]
+            ),
+            "percentages do not reconcile",
+        ),
+        (
+            lambda payload: json.dumps(
+                [
+                    {
+                        **payload[1],
+                        "missing_author_count": 99,
+                    }
+                    if index == 1
+                    else row
+                    for index, row in enumerate(payload)
+                ]
+            ),
+            "inconsistent denominators or missing counts",
+        ),
+        (
+            lambda payload: json.dumps(
+                [
+                    {
+                        **payload[1],
+                        "lower_bound": 7.0,
+                    }
+                    if index == 1
+                    else row
+                    for index, row in enumerate(payload)
+                ]
+            ),
+            "discontinuous boundaries",
+        ),
+        (
+            lambda payload: json.dumps(
+                [
+                    row
+                    for row in payload
+                    if not (
+                        row["metric_name"]
+                        == "other_study_memberships_as_of_report_query_count"
+                        and row["author_adoption_group"] == "BOTH_AI_AND_MANUAL"
+                    )
+                ]
+            ),
+            "must contain every supported metric and author adoption group",
+        ),
+    ],
+)
+def test_author_activity_payload_rejects_invalid_content(
+    mutate_payload: Callable[[list[dict[str, object]]], str],
+    message: str,
+) -> None:
+    """Reject malformed or internally inconsistent activity-bin payloads."""
+    rows = current_author_experience_rows_with_bin_payload()
+    payload = author_activity_percentile_bin_rows()
+    rows["author_activity_percentile_bins_json"] = mutate_payload(payload)
+
+    with pytest.raises(ExplorationValidationError, match=message):
+        build_author_experience_chart(rows, metric_unit="studies")
+
+
+def test_author_activity_payload_requires_one_repeated_value() -> None:
+    """Reject inconsistent repeated payload values."""
+    rows = current_author_experience_rows_with_bin_payload()
+    rows.loc[0, "author_activity_percentile_bins_json"] = "[]"
+
+    with pytest.raises(
+        ExplorationValidationError,
+        match="one consistent author_activity_percentile_bins_json payload",
+    ):
+        build_author_experience_chart(rows, metric_unit="studies")
+
+
+def test_author_activity_payload_accepts_accessible_empty_state() -> None:
+    """Accept the canonical empty list for an unavailable bin population."""
+    figure = build_author_experience_chart(
+        current_author_experience_rows(),
+        metric_unit="studies",
+    )
+
+    assert figure.layout.title.text == (
+        "Author experience at report query time: studies"
+    )
+
+
+def test_author_activity_percentile_bin_chart_stacks_to_100_percent() -> None:
+    """Use observed authors as each adoption group's 100% denominator."""
+    figure = build_author_activity_percentile_bin_chart(
+        current_author_experience_rows_with_bin_payload(),
+        metric_name="total_studies_created_as_of_report_query_count",
+    )
+
+    assert figure.layout.barmode == "stack"
+    assert len(figure.data) == 4
+    assert all(trace.orientation == "h" for trace in figure.data)
+    assert list(figure.data[0].y) == [
+        "All authors",
+        "AI only",
+        "Manual only",
+        "Both AI and manual",
+    ]
+    for group_index in range(4):
+        assert sum(
+            float(trace.x[group_index]) for trace in figure.data
+        ) == pytest.approx(100.0)
+
+    first_trace = figure.data[0]
+    assert first_trace.customdata[0][0] == 2
+    assert first_trace.customdata[0][1] == 5
+    assert first_trace.customdata[0][2] == 1
+    assert first_trace.customdata[0][4] == 8.0
+    assert "Authors missing value" in str(first_trace.hovertemplate)
+    assert "Authors with observed value" in str(figure.layout.xaxis.title.text)
+
+
+def test_author_activity_percentile_bin_chart_preserves_empty_tied_bins() -> None:
+    """Keep explicit zero-width bins when shared percentile boundaries tie."""
+    rows = author_activity_percentile_bin_rows()
+    metric_name = "total_studies_created_as_of_report_query_count"
+
+    rows_by_group: dict[str, list[dict[str, object]]] = {}
+    for row in rows:
+        if row["metric_name"] == metric_name:
+            group = str(row["author_adoption_group"])
+            rows_by_group.setdefault(group, []).append(row)
+
+    for group_rows in rows_by_group.values():
+        rows_by_sequence: dict[int, dict[str, object]] = {}
+        for row in group_rows:
+            sequence = cast("int", row["bin_sequence"])
+            rows_by_sequence[sequence] = row
+
+        denominator = cast(
+            "int",
+            group_rows[0]["observed_value_denominator"],
+        )
+        counts = {
+            sequence: cast(
+                "int",
+                rows_by_sequence[sequence]["author_count"],
+            )
+            for sequence in (1, 2, 3, 4)
+        }
+        counts[1] += counts[2] + counts[3]
+        counts[2] = 0
+        counts[3] = 0
+
+        lower_bounds: dict[int, float | None] = {
+            1: None,
+            2: 8.0,
+            3: 8.0,
+            4: 8.0,
+        }
+        upper_bounds: dict[int, float | None] = {
+            1: 8.0,
+            2: 8.0,
+            3: 8.0,
+            4: None,
+        }
+        labels = {
+            1: "At or below overall median (8)",
+            2: "Above median through overall 75th percentile (8)",
+            3: "Above 75th through overall 90th percentile (8)",
+            4: "Above overall 90th percentile (8)",
+        }
+
+        for sequence, row in rows_by_sequence.items():
+            count = counts[sequence]
+            row["lower_bound"] = lower_bounds[sequence]
+            row["upper_bound"] = upper_bounds[sequence]
+            row["display_label"] = labels[sequence]
+            row["author_count"] = count
+            row["author_percentage"] = (
+                100.0 * count / denominator if denominator else None
+            )
+
+    frame = current_author_experience_rows()
+    frame["author_activity_percentile_bins_json"] = json.dumps(
+        rows,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    )
+
+    figure = build_author_activity_percentile_bin_chart(
+        frame,
+        metric_name=metric_name,
+    )
+
+    assert len(figure.data) == 4
+    assert list(figure.data[1].x) == [0.0, 0.0, 0.0, 0.0]
+    assert list(figure.data[2].x) == [0.0, 0.0, 0.0, 0.0]
+    for group_index in range(4):
+        assert sum(
+            float(trace.x[group_index]) for trace in figure.data
+        ) == pytest.approx(100.0)
+
+
+def test_author_activity_percentile_bin_chart_has_empty_state() -> None:
+    """Render accessible text when the canonical payload is empty."""
+    figure = build_author_activity_percentile_bin_chart(
+        current_author_experience_rows(),
+        metric_name="total_studies_created_as_of_report_query_count",
+    )
+
+    assert not figure.data
+    assert figure.layout.annotations[0].text
+    assert "No author activity percentile-bin aggregates" in str(
+        figure.layout.annotations[0].text
+    )
+
+
+@pytest.mark.parametrize(
+    ("field_name", "invalid_value", "message"),
+    [
+        ("lower_bound", "not-numeric", "lower_bound must be numeric"),
+        ("upper_bound", float("inf"), "upper_bound must be finite"),
+        (
+            "lower_bound_inclusive",
+            "false",
+            "inclusivity values must be Boolean",
+        ),
+        (
+            "display_label",
+            "Wrong label",
+            "inconsistent display label",
+        ),
+        (
+            "author_percentage",
+            101.0,
+            "author_percentage must be between zero and 100",
+        ),
+    ],
+)
+def test_author_activity_payload_rejects_invalid_scalar_fields(
+    field_name: str,
+    invalid_value: object,
+    message: str,
+) -> None:
+    """Reject malformed scalar values in otherwise valid payload rows."""
+    rows = author_activity_percentile_bin_rows()
+    rows[0][field_name] = invalid_value
+    frame = current_author_experience_rows()
+    frame["author_activity_percentile_bins_json"] = json.dumps(rows)
+
+    with pytest.raises(ExplorationValidationError, match=message):
+        build_author_activity_percentile_bin_chart(
+            frame,
+            metric_name="total_studies_created_as_of_report_query_count",
+        )
+
+
+def test_author_activity_payload_rejects_reversed_bounds() -> None:
+    """Reject a lower percentile-bin bound above its upper bound."""
+    rows = author_activity_percentile_bin_rows()
+    rows[1]["lower_bound"] = 13.0
+    rows[1]["upper_bound"] = 12.0
+    frame = current_author_experience_rows()
+    frame["author_activity_percentile_bins_json"] = json.dumps(rows)
+
+    with pytest.raises(
+        ExplorationValidationError,
+        match="lower bounds must not exceed upper bounds",
+    ):
+        build_author_activity_percentile_bin_chart(
+            frame,
+            metric_name="total_studies_created_as_of_report_query_count",
+        )
+
+
+def test_author_activity_payload_rejects_count_above_denominator() -> None:
+    """Reject a bin count larger than its observed-value denominator."""
+    rows = author_activity_percentile_bin_rows()
+    rows[0]["author_count"] = 6
+    rows[0]["observed_value_denominator"] = 5
+    rows[0]["author_percentage"] = 100.0
+    frame = current_author_experience_rows()
+    frame["author_activity_percentile_bins_json"] = json.dumps(rows)
+
+    with pytest.raises(
+        ExplorationValidationError,
+        match="counts exceed their observed-value denominator",
+    ):
+        build_author_activity_percentile_bin_chart(
+            frame,
+            metric_name="total_studies_created_as_of_report_query_count",
+        )
+
+
+def test_author_activity_payload_rejects_missing_repeated_value() -> None:
+    """Require a payload on every nonempty current-author row."""
+    frame = current_author_experience_rows_with_bin_payload()
+    frame.loc[0, "author_activity_percentile_bins_json"] = None
+
+    with pytest.raises(
+        ExplorationValidationError,
+        match="must contain a nonmissing",
+    ):
+        build_author_experience_chart(frame, metric_unit="studies")
+
+
+def test_author_activity_percentile_bin_chart_accepts_zero_denominator() -> None:
+    """Render zero-width bars for a group with no observed values."""
+    rows = author_activity_percentile_bin_rows()
+    metric_name = "total_studies_created_as_of_report_query_count"
+    group = "BOTH_AI_AND_MANUAL"
+
+    for row in rows:
+        if row["metric_name"] == metric_name and row["author_adoption_group"] == group:
+            row["author_count"] = 0
+            row["observed_value_denominator"] = 0
+            row["author_percentage"] = None
+            row["missing_author_count"] = 4
+
+    frame = current_author_experience_rows()
+    frame["author_activity_percentile_bins_json"] = json.dumps(rows)
+    figure = build_author_activity_percentile_bin_chart(
+        frame,
+        metric_name=metric_name,
+    )
+
+    assert [float(trace.x[3]) for trace in figure.data] == [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+    ]
+    assert [trace.customdata[3][1] for trace in figure.data] == [0, 0, 0, 0]
+    assert [trace.customdata[3][2] for trace in figure.data] == [4, 4, 4, 4]
+
+
+def test_author_activity_payload_rejects_nonnull_zero_denominator() -> None:
+    """Require null percentages when an observed denominator is zero."""
+    rows = author_activity_percentile_bin_rows()
+    for row in rows:
+        if (
+            row["metric_name"] == "total_studies_created_as_of_report_query_count"
+            and row["author_adoption_group"] == "BOTH_AI_AND_MANUAL"
+        ):
+            row["author_count"] = 0
+            row["observed_value_denominator"] = 0
+            row["author_percentage"] = 0.0
+
+    frame = current_author_experience_rows()
+    frame["author_activity_percentile_bins_json"] = json.dumps(rows)
+
+    with pytest.raises(
+        ExplorationValidationError,
+        match="author_percentage must be null",
+    ):
+        build_author_activity_percentile_bin_chart(
+            frame,
+            metric_name="total_studies_created_as_of_report_query_count",
+        )
+
+
+def test_author_activity_percentile_bin_chart_rejects_unknown_metric() -> None:
+    """Reject chart requests outside the two published activity metrics."""
+    with pytest.raises(
+        ExplorationValidationError,
+        match="received an unsupported metric",
+    ):
+        build_author_activity_percentile_bin_chart(
+            current_author_experience_rows_with_bin_payload(),
+            metric_name="unsupported",
+        )
 
 
 def test_field_suggestion_adoption_chart_uses_explicit_denominator() -> None:
@@ -2067,7 +2623,9 @@ def test_chart_bundle_contains_all_figures() -> None:
             author_handoff_summary=author_handoff_rows(),
             study_retry_pathway_summary=study_retry_pathway_rows(),
             attempt_start_experience_summary=(attempt_start_experience_rows()),
-            current_author_experience_summary=(current_author_experience_rows()),
+            current_author_experience_summary=(
+                current_author_experience_rows_with_bin_payload()
+            ),
             grouped_study_summary=grouped_study_rows(),
             completed_study_author_context_summary=(
                 completed_study_author_context_rows()
@@ -2096,6 +2654,8 @@ def test_chart_bundle_contains_all_figures() -> None:
     assert charts.author_attempt_start_experience.data
     assert charts.author_experience_studies.data
     assert charts.author_experience_days.data
+    assert charts.author_total_studies_distribution.data
+    assert charts.author_other_memberships_distribution.data
     assert charts.content_source_concordance.data
     assert charts.returned_result_input_method_preference.data
     assert charts.returned_result_source_size_latency.data

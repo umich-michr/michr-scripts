@@ -318,58 +318,151 @@ def attempt_start_experience_rows() -> pd.DataFrame:
     )
 
 
+def author_activity_percentile_bin_payload() -> str:
+    """Return canonical aggregate-only percentile-bin JSON for HTML tests."""
+    metrics = {
+        "total_studies_created_as_of_report_query_count": (8.0, 12.0, 20.0),
+        "other_study_memberships_as_of_report_query_count": (3.0, 5.0, 9.0),
+    }
+    groups = (
+        "ALL_AUTHORS",
+        "AI_ONLY",
+        "MANUAL_ONLY",
+        "BOTH_AI_AND_MANUAL",
+    )
+    group_counts = {
+        "ALL_AUTHORS": (1, 1, 1, 1),
+        "AI_ONLY": (1, 1, 1, 1),
+        "MANUAL_ONLY": (1, 1, 1, 1),
+        "BOTH_AI_AND_MANUAL": (1, 1, 1, 1),
+    }
+    rows: list[dict[str, object]] = []
+
+    for metric_name, boundaries in metrics.items():
+        median, percentile_75, percentile_90 = boundaries
+        specs = (
+            (
+                1,
+                None,
+                median,
+                False,
+                True,
+                f"At or below overall median ({median:g})",
+            ),
+            (
+                2,
+                median,
+                percentile_75,
+                False,
+                True,
+                f"Above median through overall 75th percentile ({percentile_75:g})",
+            ),
+            (
+                3,
+                percentile_75,
+                percentile_90,
+                False,
+                True,
+                f"Above 75th through overall 90th percentile ({percentile_90:g})",
+            ),
+            (
+                4,
+                percentile_90,
+                None,
+                False,
+                False,
+                f"Above overall 90th percentile ({percentile_90:g})",
+            ),
+        )
+
+        for group in groups:
+            counts = group_counts[group]
+            denominator = sum(counts)
+            for spec, count in zip(specs, counts, strict=True):
+                (
+                    sequence,
+                    lower_bound,
+                    upper_bound,
+                    lower_inclusive,
+                    upper_inclusive,
+                    label,
+                ) = spec
+                rows.append(
+                    {
+                        "metric_name": metric_name,
+                        "author_adoption_group": group,
+                        "bin_sequence": sequence,
+                        "lower_bound": lower_bound,
+                        "upper_bound": upper_bound,
+                        "lower_bound_inclusive": lower_inclusive,
+                        "upper_bound_inclusive": upper_inclusive,
+                        "display_label": label,
+                        "author_count": count,
+                        "observed_value_denominator": denominator,
+                        "author_percentage": 25.0,
+                        "missing_author_count": 1,
+                        "binning_scheme": ("OVERALL_AUTHOR_PERCENTILES_50_75_90"),
+                    }
+                )
+
+    return json.dumps(
+        rows,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    )
+
+
 def current_author_experience_rows() -> pd.DataFrame:
     """Return aggregate-only query-time author experience rows."""
-    rows: list[dict[str, object]] = [
-        {
-            "author_adoption_group": "ALL_AUTHORS",
-            "experience_metric_name": (
-                "total_studies_created_as_of_report_query_count"
-            ),
-            "experience_metric_unit": "studies",
-            "author_count_with_nonmissing_metric": 4,
-            "author_count_missing_metric": 1,
-            "percentile_25_author_value": 7.0,
-            "median_author_value": 10.0,
-            "average_author_value": 11.0,
-            "percentile_75_author_value": 13.0,
-        },
-        {
-            "author_adoption_group": "AI_ONLY",
-            "experience_metric_name": (
-                "total_studies_created_as_of_report_query_count"
-            ),
-            "experience_metric_unit": "studies",
-            "author_count_with_nonmissing_metric": 2,
-            "author_count_missing_metric": 0,
-            "percentile_25_author_value": 6.0,
-            "median_author_value": 8.0,
-            "average_author_value": 9.0,
-            "percentile_75_author_value": 10.0,
-        },
-        {
-            "author_adoption_group": "ALL_AUTHORS",
-            "experience_metric_name": ("distinct_login_days_as_of_report_query_count"),
-            "experience_metric_unit": "days",
-            "author_count_with_nonmissing_metric": 4,
-            "author_count_missing_metric": 1,
-            "percentile_25_author_value": 20.0,
-            "median_author_value": 30.0,
-            "average_author_value": 35.0,
-            "percentile_75_author_value": 40.0,
-        },
-        {
-            "author_adoption_group": "AI_ONLY",
-            "experience_metric_name": ("distinct_login_days_as_of_report_query_count"),
-            "experience_metric_unit": "days",
-            "author_count_with_nonmissing_metric": 2,
-            "author_count_missing_metric": 0,
-            "percentile_25_author_value": 15.0,
-            "median_author_value": 20.0,
-            "average_author_value": 22.0,
-            "percentile_75_author_value": 25.0,
-        },
-    ]
+    metric_specs = (
+        (
+            "total_studies_created_as_of_report_query_count",
+            "studies",
+            (10.0, 8.0, 9.0, 14.0),
+        ),
+        (
+            "other_study_memberships_as_of_report_query_count",
+            "studies",
+            (4.0, 3.0, 3.5, 6.0),
+        ),
+        (
+            "distinct_login_days_as_of_report_query_count",
+            "days",
+            (30.0, 20.0, 24.0, 40.0),
+        ),
+        (
+            "login_history_span_days_as_of_report_query",
+            "days",
+            (300.0, 180.0, 240.0, 420.0),
+        ),
+    )
+    groups = (
+        "ALL_AUTHORS",
+        "AI_ONLY",
+        "MANUAL_ONLY",
+        "BOTH_AI_AND_MANUAL",
+    )
+    rows: list[dict[str, object]] = []
+    payload = author_activity_percentile_bin_payload()
+
+    for metric_name, metric_unit, medians in metric_specs:
+        for group, median in zip(groups, medians, strict=True):
+            rows.append(
+                {
+                    "author_adoption_group": group,
+                    "experience_metric_name": metric_name,
+                    "experience_metric_unit": metric_unit,
+                    "author_count_with_nonmissing_metric": 4,
+                    "author_count_missing_metric": 1,
+                    "percentile_25_author_value": max(median - 2.0, 0.0),
+                    "median_author_value": median,
+                    "average_author_value": median + 1.0,
+                    "percentile_75_author_value": median + 3.0,
+                    "percentile_90_author_value": median + 6.0,
+                    "author_activity_percentile_bins_json": payload,
+                }
+            )
 
     return pd.DataFrame.from_records(rows)
 
@@ -1368,7 +1461,8 @@ def test_html_report_is_self_contained_and_accessible() -> None:
     assert "Author experience at report query time: days" in html
     assert "These charts describe attempt authors" in normalized_html
     assert "The first chart uses an author-attempt grain" in normalized_html
-    assert "The next two charts use a unique-author grain" in normalized_html
+    assert "This visible chart uses a unique-author grain" in normalized_html
+    assert "Additional study-creation and membership context" in normalized_html
     assert (
         "Counts may differ because the attempt-start chart counts "
         "author-attempt observations"
@@ -1519,6 +1613,73 @@ def test_html_report_explains_author_handoff_categories() -> None:
     )
     assert "details.explanation-panel:not([open])" in html
     assert "display: block" in html
+
+
+def test_html_report_places_study_activity_in_supplementary_panel() -> None:
+    """Keep login context visible and collapse study-activity context."""
+    html = render_html_report(
+        records=feedback_records(),
+        overview_summary=overview_rows(),
+        author_handoff_summary=author_handoff_rows(),
+        retry_card_summary=retry_card_rows(),
+        retry_characteristics_summary=retry_characteristic_rows(),
+        data_quality_summary=quality_rows(),
+        repeated_attempt_source_consistency_summary=repeated_source_rows(),
+        charts=charts(),
+    )
+    normalized = " ".join(html.split())
+    title = "Additional study-creation and membership context"
+    summary = html.index(f"<summary>{title}</summary>")
+    panel_start = html.rfind(
+        '<details class="explanation-panel">',
+        0,
+        summary,
+    )
+    panel_end = html.index("</details>", summary)
+    panel = html[panel_start:panel_end]
+
+    login_chart = html.index("Author experience at report query time: days")
+    study_chart = html.index("Author experience at report query time: studies")
+    total_bins = html.index(
+        "Total studies created distribution by author adoption group"
+    )
+    membership_bins = html.index(
+        "Other study memberships distribution by author adoption group"
+    )
+
+    assert login_chart < panel_start
+    assert panel_start < study_chart < panel_end
+    assert panel_start < total_bins < panel_end
+    assert panel_start < membership_bins < panel_end
+    assert '<details class="explanation-panel" open' not in panel
+    assert "strongly right-skewed" in normalized
+    assert "Mean and 90th percentile remain available in hover" in normalized
+    assert "represents 100% of authors with an observed value" in normalized
+    assert "Missing values are excluded from the bar denominator" in normalized
+    assert "Tied boundaries can make a bin empty" in normalized
+    assert "do not establish that an authoring mode caused" in normalized
+    assert "measure engagement quality, or establish tenure" in normalized
+    assert "details.explanation-panel:not([open])" in html
+    assert "> .explanation-panel-content" in html
+    assert "display: block" in html
+
+
+def test_html_report_excludes_raw_author_activity_payload() -> None:
+    """Do not expose the embedded JSON transport in faculty HTML."""
+    html = render_html_report(
+        records=feedback_records(),
+        overview_summary=overview_rows(),
+        author_handoff_summary=author_handoff_rows(),
+        retry_card_summary=retry_card_rows(),
+        retry_characteristics_summary=retry_characteristic_rows(),
+        data_quality_summary=quality_rows(),
+        repeated_attempt_source_consistency_summary=repeated_source_rows(),
+        charts=charts(),
+    )
+
+    assert "author_activity_percentile_bins_json" not in html
+    assert "OVERALL_AUTHOR_PERCENTILES_50_75_90" not in html
+    assert '"author_adoption_group"' not in html
 
 
 def test_html_report_explains_author_experience_and_study_mix() -> None:
