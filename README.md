@@ -1,12 +1,12 @@
 # michr-scripts
 
-A polyglot monorepo for reusable MICHR libraries, independently runnable
-programs, and operational scripts.
+`michr-scripts` is a polyglot monorepo for reusable libraries, runnable
+applications, and operational scripts maintained by the Michigan Institute for
+Clinical & Health Research (MICHR).
 
-Python projects are managed as a
-[uv workspace](https://docs.astral.sh/uv/). The repository shares one Git
-history, lockfile, virtual environment, development workflow, and CI
-configuration.
+Python projects share one
+[uv workspace](https://docs.astral.sh/uv/), lockfile, virtual environment,
+development workflow, and continuous-integration configuration.
 
 ## Repository layout
 
@@ -14,237 +14,27 @@ configuration.
 michr-scripts/
 ├── python/
 │   ├── packages/    Reusable Python libraries
-│   └── programs/    Independently runnable applications
-├── shell/           Shell scripts and projects organized by purpose
-├── lua/             Lua scripts and projects organized by purpose
+│   └── programs/    Runnable Python applications
+├── shell/           Shell scripts and projects
+├── lua/             Lua scripts and projects
 ├── tools/           Repository-maintenance utilities
-├── Makefile         Repository-wide development interface
-├── pyproject.toml   Workspace and shared tool configuration
+├── Makefile         Shared development and workflow commands
+├── pyproject.toml   Workspace and tool configuration
 └── uv.lock          Locked Python dependencies
 ```
 
-`uv` manages members under `python/`. The root `Makefile` is the normal
-development interface.
-
-## Python workspace members
-
-### Packages
-
-| Package | Import | Responsibility |
-|---|---|---|
-| [`program-configuration`](python/packages/program-configuration/) | `program_configuration` | Layered, typed, secret-aware configuration resolution |
-| [`tabular-row-sources`](python/packages/tabular-row-sources/) | `tabular_row_sources` | Schema-aware lazy CSV and DB-API row sources |
-| [`text-post-edit-metrics`](python/packages/text-post-edit-metrics/) | `text_post_edit_metrics` | Generic directional text post-edit metrics |
-| [`text-readability-metrics`](python/packages/text-readability-metrics/) | `text_readability_metrics` | Generic English readability metrics and counts |
-| [`study-posting-ai-analysis`](python/packages/study-posting-ai-analysis/) | `study_posting_ai_analysis` | Study-posting field policy, parsing, analysis, and flattening |
-
-### Programs
-
-| Program | Command | Responsibility |
-|---|---|---|
-| [`study-posting-audit-report`](python/programs/study-posting-audit-report/) | `study-posting-audit-report` | Generate normalized audit records and completed-AI field metrics from CSV or Oracle |
-| [`study-posting-audit-exploration`](python/programs/study-posting-audit-exploration/) | `study-posting-audit-exploration` | Validate normalized reports and publish traceable aggregates and faculty exploration |
-
-## Architecture
-
-The audit-report program composes reusable packages:
-
-```text
-study-posting-audit-report
-├── program-configuration
-├── tabular-row-sources
-├── text-readability-metrics
-└── study-posting-ai-analysis
-    └── text-post-edit-metrics
-```
-
-The end-to-end flow is:
-
-```text
-CSV file or Oracle query
-            ↓
-    tabular-row-sources
-            ↓ canonical rows
-study-posting-audit-report
-            ↓
-study-posting-ai-analysis
-            ↓
- text-post-edit-metrics
-            ↓
- records.csv + ai_assistance_metrics.csv + readability_metrics.csv
-            ↓
-study-posting-audit-exploration
-            ↓
-31-file exploration + report.html
-```
-
-Dependency rules:
-
-1. Programs may depend on packages.
-2. Packages must not depend on programs.
-3. More reusable packages must not import more specific packages.
-4. Programs must not import another program's internal modules.
-5. Shared behavior belongs in a package rather than being copied.
-6. Cross-language integration uses documented executable and data contracts.
-7. Add a dependency only to the member that directly imports it.
-
-Inspect the dependency graph with:
-
-```bash
-uv tree --package study-posting-audit-report
-```
-
-## Package contracts
-
-### `program-configuration`
-
-Resolves program settings using:
-
-```text
-explicit value
-→ process environment
-→ dotenv
-→ default
-→ interactive prompt
-→ missing-setting error
-```
-
-It owns generic precedence, parsing, provenance, dotenv loading, prompting, and
-secret redaction. Programs retain ownership of their setting names, CLI syntax,
-defaults, and application policy.
-
-See its
-[package README](python/packages/program-configuration/README.md).
-
-### `tabular-row-sources`
-
-Streams canonical rows from CSV files and DB-API queries through a common
-interface:
-
-```python
-with source.open_rows() as rows:
-    for row in rows:
-        process(row)
-```
-
-CSV and database sources use the same `RowSchema` and conversion layer. Source
-columns may arrive in any order, but names must match the schema exactly.
-Yielded rows follow canonical schema order.
-
-See:
-
-- the [package README](python/packages/tabular-row-sources/README.md);
-- the [schema format](python/packages/tabular-row-sources/docs/schema-format.md).
-
-### `text-post-edit-metrics`
-
-Compares an initial suggestion with text represented by the caller as its edited
-form:
-
-```python
-from text_post_edit_metrics import analyze_post_edit
-
-result = analyze_post_edit(
-    suggestion="Generated text",
-    final="Human-edited text",
-)
-```
-
-It owns generic TER-derived, character, and soft-word metrics. It does not own
-study fields, product policy, source records, or reporting.
-
-See:
-
-- the [package README](python/packages/text-post-edit-metrics/README.md);
-- the [methodology](python/packages/text-post-edit-metrics/docs/methodology.md);
-- the [verification strategy](python/packages/text-post-edit-metrics/docs/verification.md).
-
-### `text-readability-metrics`
-
-Analyzes nonblank English text:
-
-```python
-from text_readability_metrics import analyze_readability
-
-result = analyze_readability("Synthetic text used for readability analysis.")
-```
-
-See the
-[package README](python/packages/text-readability-metrics/README.md).
-
-### `study-posting-ai-analysis`
-
-Analyzes one record's suggested, selected, and final study-posting objects:
-
-```python
-from study_posting_ai_analysis import (
-    analyze_objects,
-    flatten_analysis_results,
-    parse_analysis_inputs,
-)
-
-suggested, selected, final = parse_analysis_inputs(
-    suggested_payload,
-    selected_payload,
-    final_payload,
-)
-results = analyze_objects(suggested, selected, final)
-rows = flatten_analysis_results(
-    results,
-    record_id="synthetic-record",
-)
-```
-
-It owns study-specific field policy and delegates generic text calculations to
-`text-post-edit-metrics`.
-
-See:
-
-- the [package README](python/packages/study-posting-ai-analysis/README.md);
-- the [analysis specification](python/packages/study-posting-ai-analysis/docs/analysis-specification.md);
-- the [program flow](python/packages/study-posting-ai-analysis/docs/program-flow.md).
-
-## Faculty and LLM inquiry
-
-The repository is organized so faculty and language-model assistants can trace
-a report statement to its source, formula, implementation, and tests.
-
-Start with:
-
-- the [Study Posting Audit inquiry guide](python/programs/study-posting-audit-exploration/docs/inquiry-guide.md);
-- the [data-lineage guide](python/programs/study-posting-audit-exploration/docs/data-lineage.md);
-- the [exploration program README](python/programs/study-posting-audit-exploration/README.md);
-- the [study analysis specification](python/packages/study-posting-ai-analysis/docs/analysis-specification.md);
-- the [post-edit metric methodology](python/packages/text-post-edit-metrics/docs/methodology.md);
-- the [post-edit verification strategy](python/packages/text-post-edit-metrics/docs/verification.md);
-- the [readability metric README](python/packages/text-readability-metrics/README.md);
-- the [normalized report README](python/programs/study-posting-audit-report/README.md).
-
-Generated explorations also contain:
-
-- `definitions/metric_definitions.csv`, the aggregate data dictionary;
-- `analysis_manifest.json`, source and output counts plus reproducibility
-  settings;
-- `research/candidate_research_questions.csv`, currently supported descriptive
-  questions.
-
-A reliable answer should state its analytical unit, numerator, denominator,
-source columns, missing-value policy, implementation path, and interpretation
-limits.
+Behavior-specific documentation belongs with the package, program, or script
+that owns it. This README covers only repository-wide setup, navigation, and
+common commands.
 
 ## Setup
 
-### Prerequisites
+Prerequisites:
 
-| Tool | Check |
-|---|---|
-| `uv` | `uv --version` |
-| `make` | `make --version` |
+- [`uv`](https://docs.astral.sh/uv/)
+- `make`
 
-Python does not need to be installed separately. `uv` reads `.python-version`
-and installs the required interpreter.
-
-### Bootstrap a clone
+Bootstrap a clone:
 
 ```bash
 git clone https://github.com/umich-michr/michr-scripts
@@ -252,10 +42,11 @@ cd michr-scripts
 make setup
 ```
 
-`make setup` synchronizes all workspace members, installs Git hooks, and prints
-an environment summary.
+`make setup` installs all Python workspace members and Git hooks. Python does
+not need to be installed separately; `uv` uses the version in
+`.python-version`.
 
-Verify the workspace:
+Useful checks:
 
 ```bash
 make members
@@ -263,48 +54,126 @@ make doctor
 make check
 ```
 
-Do not manually activate `.venv`, invoke `pip`, or edit `uv.lock`.
+Do not manually activate `.venv`, use `pip`, or edit `uv.lock`.
+
+## Quick start: Study Posting Audit
+
+The root Makefile can generate a normalized audit report and its descriptive
+exploration in one workflow.
+
+### Database source
+
+```bash
+make audit-explore-database
+```
+
+Disable automatic browser opening:
+
+```bash
+make audit-explore-database OPEN_REPORT=0
+```
+
+Database settings resolve through the audit-report program's command-line,
+process-environment, dotenv, default, and prompt precedence. Passwords are not
+accepted as Make variables or command-line arguments.
+
+### CSV source
+
+```bash
+make audit-explore-csv \
+  AUDIT_CSV_INPUT=/absolute/path/to/source-audit.csv
+```
+
+`AUDIT_CSV_INPUT` is the source audit export, not an already normalized
+`records.csv`. If omitted, the audit-report program continues resolution
+through environment, dotenv, then an interactive prompt.
+
+Choose explicit destinations when needed:
+
+```bash
+make audit-explore-csv \
+  AUDIT_CSV_INPUT=/absolute/path/to/source-audit.csv \
+  AUDIT_REPORT_OUTPUT=/absolute/path/to/normalized-report \
+  AUDIT_EXPLORATION_OUTPUT=/absolute/path/to/exploration \
+  OPEN_REPORT=0
+```
+
+Defaults:
+
+| Variable | Default |
+|---|---|
+| `AUDIT_REPORT_OUTPUT` | `output/study-posting-ai-audit-analysis/report` |
+| `AUDIT_EXPLORATION_OUTPUT` | `output/study-posting-ai-audit-analysis/exploration` |
+| `AUDIT_CSV_INPUT` | Unset; resolved by the program |
+| `OPEN_REPORT` | `1` |
+| `FAIL_ON_QUALITY_WARNING` | `0` |
+
+Set `FAIL_ON_QUALITY_WARNING=1` when warnings should produce a nonzero workflow
+result.
+
+If a normalized report already exists, run exploration directly:
+
+```bash
+uv run study-posting-audit-exploration analyze \
+  --input-report /absolute/path/to/normalized-report \
+  --output /absolute/path/to/exploration
+```
+
+See the program documentation for data contracts, business rules, privacy
+boundaries, and all options.
+
+## Python workspace
+
+### Programs
+
+| Program | Purpose |
+|---|---|
+| [`study-posting-audit-report`](python/programs/study-posting-audit-report/) | Normalize Study Posting Authoring audit rows from CSV or Oracle |
+| [`study-posting-audit-exploration`](python/programs/study-posting-audit-exploration/) | Validate a normalized report and publish aggregate analysis and HTML |
+
+See the [program catalog](python/programs/README.md) for direct commands and
+input/output summaries.
+
+### Packages
+
+| Package | Purpose |
+|---|---|
+| [`program-configuration`](python/packages/program-configuration/) | Layered, typed, secret-aware configuration |
+| [`tabular-row-sources`](python/packages/tabular-row-sources/) | Schema-aware lazy CSV and database row sources |
+| [`text-post-edit-metrics`](python/packages/text-post-edit-metrics/) | Directional technical text post-edit metrics |
+| [`text-readability-metrics`](python/packages/text-readability-metrics/) | English readability metrics and counts |
+| [`study-posting-ai-analysis`](python/packages/study-posting-ai-analysis/) | Study-posting suggestion, selection, and final-value analysis |
+
+Each package README documents its public API and links to detailed methodology
+or schema documentation.
 
 ## Development commands
 
-### Whole workspace
+Run `make` or `make help` for the complete target list.
 
 | Command | Purpose |
 |---|---|
-| `make setup` | Bootstrap a fresh clone |
-| `make install` | Synchronize all Python members |
-| `make members` | List workspace members |
-| `make doctor` | Show interpreter and tool information |
-| `make format` | Format code and organize imports |
-| `make format-check` | Check formatting without modification |
+| `make setup` | Bootstrap the workspace |
+| `make members` | List Python workspace members |
+| `make format` | Format Python code |
+| `make format-check` | Verify formatting |
 | `make lint` | Run Ruff |
 | `make typecheck` | Run strict mypy |
-| `make test` | Run every member's tests |
-| `make coverage` | Run every member's coverage gate |
-| `make docs-check` | Check staged documentation synchronization |
+| `make test` | Run all member tests |
+| `make coverage` | Run all coverage gates |
+| `make docs-check` | Verify documentation synchronization |
 | `make audit` | Audit dependencies and source |
-| `make check` | Run the complete quality gate |
-| `make hooks-run` | Run pre-commit hooks against all files |
-| `make clean` | Remove generated reports and caches |
-| `make clean-output` | Explicitly remove application output under the repository-root `output/` directory |
+| `make check` | Run the complete local and CI gate |
+| `make hooks-run` | Run all pre-commit hooks |
 
-`make clean-output` is intentionally separate from `make clean`, `make check`,
-and CI. It deletes operational program output, which may contain sensitive data
-or be expensive to regenerate. Move or archive any needed report before running
-it.
-
-Run `make` without arguments for the complete target list.
-
-### One member
+Target one member:
 
 ```bash
-make test PACKAGE=program-configuration
-make coverage PACKAGE=tabular-row-sources
 make test PACKAGE=study-posting-ai-analysis
-make coverage PACKAGE=study-posting-audit-report
+make coverage PACKAGE=study-posting-audit-exploration
 ```
 
-Pass pytest arguments with:
+Pass pytest options with:
 
 ```bash
 make test \
@@ -312,9 +181,7 @@ make test \
   PYTEST_ARGS="-k database -vv"
 ```
 
-An unknown `PACKAGE=` value fails rather than silently running no tests.
-
-### Before committing
+Before committing:
 
 ```bash
 make check
@@ -323,246 +190,38 @@ git diff --check
 git status --short
 ```
 
-Pre-commit hooks may modify files and stop the commit. Review and stage those
-changes, then rerun the hooks. Do not bypass a failing hook merely to complete a
-commit.
+## Documentation map
 
-## Running the audit-report program
+Documentation lives with the behavior it governs.
 
-Show available source modes:
-
-```bash
-uv run study-posting-audit-report --help
-```
-
-CSV input:
-
-```bash
-uv run study-posting-audit-report csv \
-  --input path/to/audit.csv
-```
-
-Oracle input:
-
-```bash
-uv run study-posting-audit-report database \
-  --dsn "database.example:1521/service" \
-  --username reporting_user
-```
-
-The program writes normalized:
-
-```text
-records.csv
-ai_assistance_metrics.csv
-readability_metrics.csv
-```
-
-See the
-[program README](python/programs/study-posting-audit-report/README.md)
-for configuration, input templates, SQL parameters, output behavior, and
-security guidance.
-
-## End-to-end audit exploration workflows
-
-The root Makefile can regenerate a normalized audit report, publish its
-31-file exploration, print the deterministic data-quality summary, and open the
-faculty-facing HTML report.
-
-### Database source
-
-Run:
-
-    make audit-explore-database
-
-Database connection, SQL, schema, and prompt settings continue to use the
-audit-report program's existing command-line, environment, dotenv, default, and
-prompt precedence. Passwords are never accepted as Make variables or command
-arguments.
-
-### CSV source
-
-Use an explicit source:
-
-    make audit-explore-csv AUDIT_CSV_INPUT=path/to/audit.csv
-
-If `AUDIT_CSV_INPUT` is omitted, the audit-report program resolves its input
-through the existing environment, dotenv, or prompt behavior.
-
-### Defaults and options
-
-Generated destinations default to:
-
-    output/study-posting-ai-audit-analysis/report
-    output/study-posting-ai-audit-analysis/exploration
-
-Override them when needed:
-
-    make audit-explore-database \
-      AUDIT_REPORT_OUTPUT="output/custom/report" \
-      AUDIT_EXPLORATION_OUTPUT="output/custom/exploration"
-
-Disable browser opening for remote or automated execution:
-
-    make audit-explore-database OPEN_REPORT=0
-
-Treat quality warnings as a nonzero workflow result:
-
-    make audit-explore-database FAIL_ON_QUALITY_WARNING=1
-
-By default, warnings are printed but do not fail the workflow.
-
-### Regeneration safety
-
-Each target is intentionally idempotent for its two generated destinations. It
-removes the previous normalized-report and exploration directories, then
-regenerates them in order.
-
-The underlying helper validates paths before cleanup. It permits deletion only
-inside the repository-root `output/` directory and rejects broad, overlapping,
-or source-containing paths. The targets never run `rm -rf output` or
-`make clean-output`.
-
-A failure in normalized report generation stops all later stages. An
-exploration failure stops quality summarization and browser opening. Browser
-opening failure does not invalidate successfully generated output; the report
-path is always printed.
-
-## Adding a Python member
-
-Python packages use:
-
-```text
-python/packages/<distribution-name>/
-├── pyproject.toml
-├── README.md
-├── src/
-│   └── <import_name>/
-│       ├── __init__.py
-│       └── py.typed
-└── tests/
-```
-
-Runnable programs use:
-
-```text
-python/programs/<distribution-name>/
-├── pyproject.toml
-├── README.md
-├── src/
-│   └── <import_name>/
-│       ├── __init__.py
-│       ├── cli.py
-│       └── __main__.py
-└── tests/
-```
-
-For either kind of member:
-
-1. use a `src` layout;
-2. document its contract and exclusions;
-3. configure pytest and coverage in its `pyproject.toml`;
-4. add full type annotations and focused tests;
-5. add the import name to Ruff's `known-first-party` list;
-6. add its source path to `.vscode/settings.json`;
-7. add scoped instructions when important rules apply;
-8. run `uv lock`, `uv sync --all-packages`, and `make check`.
-
-The workspace discovers:
-
-```toml
-[tool.uv.workspace]
-members = ["python/packages/*", "python/programs/*"]
-```
-
-Add an internal dependency with:
-
-```bash
-uv add \
-  --package consuming-distribution \
-  dependency-distribution
-```
-
-Declare internal workspace resolution:
-
-```toml
-[tool.uv.sources]
-dependency-distribution = { workspace = true }
-```
-
-## Shell, Lua, and repository tools
-
-Use:
-
-```text
-shell/<purpose>/
-lua/<purpose>/
-```
-
-A small script may remain one file. Promote it to a directory when it gains
-tests, fixtures, configuration, or supporting files.
-
-`tools/` is reserved for utilities that maintain this repository. User-facing
-or operational programs belong under the language-specific program area.
-
-## Documentation ownership
-
-| Documentation | Owner |
+| Subject | Location |
 |---|---|
-| Repository layout and shared workflow | Root `README.md` |
-| Public package API | Package `README.md` |
-| Program CLI and configuration | Program `README.md` |
-| Generic metric formulas | `text-post-edit-metrics/docs/methodology.md` |
-| Generic metric verification | `text-post-edit-metrics/docs/verification.md` |
-| Study policy | `study-posting-ai-analysis/docs/analysis-specification.md` |
-| Study control flow | `study-posting-ai-analysis/docs/program-flow.md` |
-| Tabular schema and conversion | `tabular-row-sources/docs/schema-format.md` |
-| Shared agent rules | `.github/copilot-instructions.md` |
-| Member-specific rules | `.github/instructions/` |
-| Generic readability metrics | `text-readability-metrics/README.md` |
-| Study Posting Audit inquiry navigation | `study-posting-audit-exploration/docs/inquiry-guide.md` |
-| Source-to-report lineage | `study-posting-audit-exploration/docs/data-lineage.md` |
+| Repository setup and shared workflow | This README |
+| Program catalog | [`python/programs/README.md`](python/programs/README.md) |
+| Program CLI and configuration | Each program README and `docs/` directory |
+| Package API | Each package README |
+| AI-assisted Study Posting feature and audit capture | [`feature-and-audit-model.md`](python/programs/study-posting-audit-report/docs/feature-and-audit-model.md) |
+| Normalized audit-report contract | [`normalized-report.md`](python/programs/study-posting-audit-report/docs/normalized-report.md) |
+| Exploration data lineage | [`data-lineage.md`](python/programs/study-posting-audit-exploration/docs/data-lineage.md) |
+| Faculty and LLM inquiry navigation | [`inquiry-guide.md`](python/programs/study-posting-audit-exploration/docs/inquiry-guide.md) |
+| Study-field analysis policy | [`analysis-specification.md`](python/packages/study-posting-ai-analysis/docs/analysis-specification.md) |
+| Generic post-edit formulas | [`methodology.md`](python/packages/text-post-edit-metrics/docs/methodology.md) |
+| Tabular schema format | [`schema-format.md`](python/packages/tabular-row-sources/docs/schema-format.md) |
 
-A behavior or public-contract change is incomplete until its owning
-documentation is updated.
+Do not duplicate detailed program or analytical rules in the repository README.
+Link to the owning document instead.
 
 ## Security and data handling
 
-- Never commit credentials, API keys, wallets, production connection strings,
-  or local operational SQL.
-- Never commit real audit exports or institutional data.
+- Never commit credentials, production connection details, source exports, or
+  institutional data.
 - Use synthetic values in tests, examples, and documentation.
 - Keep generated reports out of version control.
-- Avoid logging payloads, free text, credentials, or secret-bearing DSNs.
-- Pass SQL bind values separately from SQL text.
-- Database and filesystem access belongs only to members whose contract
-  requires it.
-- Repository checks are guardrails; they do not replace institutional policy or
-  review.
-
-## CI
-
-GitHub Actions runs formatting, linting, strict typing, documentation checks,
-security audits, tests, and coverage gates.
-
-The stable aggregate branch-protection check is:
-
-```text
-CI success
-```
-
-## Current status
-
-All current Python members require at least 95% measured coverage.
-
-Run:
-
-```bash
-make members
-make coverage
-```
-
-for authoritative member, test, and coverage information.
+- Avoid logging payloads, free text, credentials, or secret-bearing connection
+  strings.
+- Run operational programs only in approved environments under applicable U-M
+  controls.
+- Repository checks are guardrails and do not replace institutional policy.
 
 ## License
 

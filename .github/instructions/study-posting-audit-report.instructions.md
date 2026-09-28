@@ -4,6 +4,13 @@ applyTo: "python/programs/study-posting-audit-report/**"
 
 # study-posting-audit-report instructions
 
+Canonical documentation:
+
+- `README.md`;
+- `docs/running.md`;
+- `docs/feature-and-audit-model.md`;
+- `docs/normalized-report.md`.
+
 This runnable program composes:
 
 - `tabular-row-sources`;

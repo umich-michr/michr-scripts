@@ -35,9 +35,10 @@ Required normalized inputs:
 
 - `records.csv`;
 - `ai_assistance_metrics.csv`;
-- `readability_metrics.csv`.
+- `readability_metrics.csv`;
+- `report_metadata.json`.
 
-A successful run publishes exactly 31 files.
+A successful run publishes exactly 36 files.
 
 Publication uses staging followed by atomic rename. Do not change the inventory,
 manifest, schemas, or paths without updating exact-inventory tests and
@@ -72,6 +73,8 @@ When answering questions about the exploration:
 Use:
 
 - `docs/inquiry-guide.md`;
+- `docs/analysis-rules.md`;
+- `docs/output-reference.md`;
 - `docs/data-lineage.md`;
 - generated `definitions/metric_definitions.csv`;
 - generated `analysis_manifest.json`;

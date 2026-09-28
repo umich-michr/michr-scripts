@@ -13,7 +13,9 @@ denominator, data source, or causal interpretation from a chart title alone.
 | Question | Start here |
 |---|---|
 | What does the project do? | [Root README](../../../../README.md) |
-| What files are produced? | [Exploration README](../README.md) |
+| What files are produced? | [Output reference](output-reference.md) |
+| What analytical and business rules apply? | [Analysis rules](analysis-rules.md) |
+| How do I run the program? | [Running guide](running.md) |
 | Where did a report value come from? | [Data lineage](data-lineage.md) |
 | How are study fields classified? | [Study analysis specification](../../../packages/study-posting-ai-analysis/docs/analysis-specification.md) |
 | How are edit metrics calculated? | [Post-edit methodology](../../../packages/text-post-edit-metrics/docs/methodology.md) |
@@ -196,7 +198,7 @@ The normalized report contains:
 - `ai_assistance_metrics.csv`;
 - `readability_metrics.csv`.
 
-The exploration validates those files and publishes 31 files, including:
+The exploration validates those files and publishes 36 files, including:
 
 - aggregate CSV files;
 - restricted analysis-audit records;

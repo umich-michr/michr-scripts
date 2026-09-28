@@ -6,102 +6,69 @@
 applications, and operational scripts.
 
 ```text
-michr-scripts/
-├── python/
-│   ├── packages/    Reusable Python libraries
-│   └── programs/    Runnable Python applications
-├── shell/           Shell scripts and projects
-├── lua/             Lua scripts and projects
-└── tools/           Repository-maintenance utilities
+python/packages/    Reusable Python libraries
+python/programs/    Runnable Python applications
+shell/              Shell scripts and projects
+lua/                Lua scripts and projects
+tools/              Repository-maintenance utilities
 ```
 
-`uv` manages only Python workspace members. The root `Makefile` is the common
-developer interface across the repository.
+`uv` manages Python workspace members. Use the root `Makefile` as the shared
+developer interface.
 
-`tools/` is not a location for user-facing or operational programs.
-
-## Current Python members
-
-Packages:
-
-- `program-configuration`;
-- `tabular-row-sources`;
-- `text-post-edit-metrics`;
-- `text-readability-metrics`;
-- `study-posting-ai-analysis`.
-
-Programs:
-
-- `study-posting-audit-report`;
-- `study-posting-audit-exploration`.
-
-### `text-post-edit-metrics`
-
-Generic directional text post-editing metrics:
-
-```python
-result = analyze_post_edit(
-    suggestion=initial_text,
-    final=represented_edited_text,
-)
-```
-
-Owns TER, character Levenshtein metrics, weighted soft-word metrics, metric
-normalization, and `PostEditingResult`.
-
-### `study-posting-ai-analysis`
-
-Study-posting policy analysis:
-
-```python
-results = analyze_objects(suggested, selected, final)
-```
-
-Owns field configuration, requiredness, suggestion selection, outcome
-classification, contact, compensation, lookup analysis, parsing, and flattening.
-
-Depends on `text-post-edit-metrics` for technical text comparisons.
-
-## Dependency direction
-
-```text
-text-post-edit-metrics
-          ↑
-study-posting-ai-analysis
-          ↑
-runnable reporting programs
-```
-
-Rules:
-
-1. Programs may depend on packages.
-2. Packages must not depend on programs.
-3. Reusable packages must not depend on more specific packages.
-4. Do not duplicate behavior owned by another member.
-5. Shared program logic belongs in a reusable package.
-6. Cross-language integration uses documented executable and data contracts.
-
-## Ownership
+## Ownership and dependency direction
 
 Before editing:
 
 1. identify the owning package, program, language project, or repository tool;
-2. read its README and `pyproject.toml` when present;
-3. read the matching scoped instruction file;
-4. inspect existing tests;
-5. preserve dependency direction.
+2. read its README, detailed docs, `pyproject.toml`, and scoped instructions;
+3. inspect focused tests;
+4. preserve dependency direction.
 
-Python members own their package metadata, source, tests, README, and coverage
-configuration.
+```text
+reusable package
+       ↑
+specific package
+       ↑
+runnable program
+```
 
-Programs own their CLI, configuration, logging, orchestration, and external I/O.
+Rules:
 
-Package-specific analytical rules belong in scoped instructions and package
-documentation, not in this file.
+- programs may depend on packages;
+- packages must not depend on programs;
+- more reusable packages must not import more specific packages;
+- shared behavior belongs in an owning package rather than being duplicated;
+- cross-language integration uses documented executable and data contracts;
+- `tools/` is not a home for user-facing or operational programs.
+
+## Documentation navigation
+
+Use one authoritative home per subject.
+
+| Subject | Document |
+|---|---|
+| Repository setup and commands | Root `README.md` |
+| Program catalog | `python/programs/README.md` |
+| Feature and audit model | `study-posting-audit-report/docs/feature-and-audit-model.md` |
+| Audit-report CLI/defaults | `study-posting-audit-report/docs/running.md` |
+| Normalized report contract | `study-posting-audit-report/docs/normalized-report.md` |
+| Exploration CLI | `study-posting-audit-exploration/docs/running.md` |
+| Exploration analytical rules | `study-posting-audit-exploration/docs/analysis-rules.md` |
+| Exploration output inventory | `study-posting-audit-exploration/docs/output-reference.md` |
+| Data lineage | `study-posting-audit-exploration/docs/data-lineage.md` |
+| Faculty/LLM navigation | `study-posting-audit-exploration/docs/inquiry-guide.md` |
+| Study-field policy | `study-posting-ai-analysis/docs/analysis-specification.md` |
+| Generic edit formulas | `text-post-edit-metrics/docs/methodology.md` |
+| Tabular schema | `tabular-row-sources/docs/schema-format.md` |
+
+Update the owning document when behavior, formulas, classifications, schemas,
+public APIs, CLI contracts, or output inventories change. Link rather than
+duplicating details.
 
 ## Shared workflow
 
-Use `make`; do not use `pip`, manually activate `.venv`, or edit `uv.lock`.
+Use `make`. Do not use `pip`, manually activate `.venv`, or edit `uv.lock`.
 
 ```bash
 make setup
@@ -117,86 +84,43 @@ make check
 Target one Python member:
 
 ```bash
-make test PACKAGE=text-post-edit-metrics
-make coverage PACKAGE=study-posting-ai-analysis
+make test PACKAGE=<member-name>
+make coverage PACKAGE=<member-name>
 ```
 
 `make check` is the required local and CI gate.
 
-## Adding dependencies
-
-Add a dependency only to the member that imports it:
-
-```bash
-uv add --package <distribution-name> <dependency>
-```
-
-Before adding one, explain:
-
-- which contract requires it;
-- why existing dependencies or the standard library are insufficient;
-- which member owns it;
-- whether it can change analytical results.
-
-Commit the member `pyproject.toml` and root `uv.lock`.
-
-## Documentation ownership
-
-Documentation lives with the behavior it governs:
-
-- repository organization and shared workflow → root README;
-- package API and behavior → package README or package docs;
-- program CLI and configuration → program README;
-- shell or Lua usage → documentation beside the script or project;
-- shared agent guidance → this file;
-- package-specific rules → scoped instruction files.
-
-Changes to formulas, normalization, classifications, requiredness, public APIs,
-flattened columns, package boundaries, or CLI contracts require documentation in
-the same change.
-
 ## Security and data handling
 
-- Never commit credentials, wallets, production connection strings, exports, or
-  institutional data.
+- Never commit credentials, production connection strings, operational SQL,
+  source exports, generated reports, or institutional data.
 - Use synthetic data in tests, examples, and documentation.
 - Avoid logging sensitive payloads or free text.
-- Keep generated reports out of version control.
-- Database and filesystem access belong only to members whose documented
-  contracts require them.
+- Keep database and filesystem access in members whose contracts require it.
+- Pass SQL bind values separately from SQL text.
 
-## Faculty-question answering
+## Faculty and LLM answers
 
-When faculty asks how a feature, data point, metric, or report value works:
+When answering a report question:
 
-1. identify the owning member;
-2. cite the owning README or methodology;
-3. state the analytical unit and denominator;
-4. trace source column → normalized file → derivation → aggregate → HTML;
-5. cite implementation and focused tests when calculations are questioned;
-6. provide a synthetic step-by-step example when requested;
-7. distinguish software verification from scientific validation;
-8. identify uncertainty rather than guessing.
+1. identify the analytical unit and eligible population;
+2. state numerator, denominator, and missing-value treatment;
+3. trace source column through normalized, derived, aggregate, and HTML layers;
+4. cite the owning documentation, implementation, and focused tests;
+5. distinguish descriptive output from causal or scientific claims;
+6. use synthetic examples;
+7. state uncertainty rather than guessing.
 
-Primary navigation:
+Start with the exploration inquiry guide and data-lineage document. Generated
+`definitions/metric_definitions.csv` and `analysis_manifest.json` are the
+run-specific references.
 
-- `python/programs/study-posting-audit-exploration/docs/inquiry-guide.md`;
-- `python/programs/study-posting-audit-exploration/docs/data-lineage.md`;
-- generated `definitions/metric_definitions.csv`;
-- generated `analysis_manifest.json`.
-
-Do not infer semantics from a field name when documentation or source can be
-checked. Do not present descriptive associations as causal findings.
-
-## Agent completion checklist
+## Completion checklist
 
 After editing:
 
-1. run focused tests for the owning member;
+1. run focused tests;
 2. run `make lint` and `make typecheck`;
 3. run `make check`;
 4. inspect the complete Git diff;
-5. report documentation changes or explain why none were needed.
-
-Do not recommend reloading VS Code as generic troubleshooting. Prefer concrete
-file inspection, command output, and tool diagnostics.
+5. update owning documentation when required.

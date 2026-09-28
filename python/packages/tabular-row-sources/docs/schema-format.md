@@ -134,8 +134,8 @@ Database `NULL` values normally arrive as Python `None`.
 An empty CSV field is not automatically null. Empty string and null are distinct
 values.
 
-A future CSV source will preserve `""` unless the caller explicitly configures
-one or more null markers.
+`CsvRowSource` preserves `""` unless the caller explicitly configures one or
+more null markers.
 
 For example:
 

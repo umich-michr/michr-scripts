@@ -13,6 +13,12 @@ Use it to answer:
 - Which code calculated the value?
 - Where can the value be independently checked?
 
+Related references:
+
+- [analysis rules](analysis-rules.md);
+- [output reference](output-reference.md);
+- [inquiry guide](inquiry-guide.md).
+
 ## End-to-end flow
 
 ```text
