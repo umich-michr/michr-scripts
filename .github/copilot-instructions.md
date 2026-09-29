@@ -48,8 +48,9 @@ Use one authoritative home per subject.
 
 | Subject | Document |
 |---|---|
-| Repository setup and commands | Root `README.md` |
-| Program catalog | `python/programs/README.md` |
+| Repository setup and shared gates | Root `README.md` |
+| Python workspace, commands, packages, and programs | `python/README.md` |
+| Program-only catalog | `python/programs/README.md` |
 | Feature and audit model | `study-posting-audit-report/docs/feature-and-audit-model.md` |
 | Audit-report CLI/defaults | `study-posting-audit-report/docs/running.md` |
 | Normalized report contract | `study-posting-audit-report/docs/normalized-report.md` |
