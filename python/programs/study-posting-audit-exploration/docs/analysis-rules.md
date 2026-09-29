@@ -25,6 +25,17 @@ Do not combine counts across units without an explicit join and denominator.
 
 ## Completion and AI exposure
 
+Source attempt results use four precedence-ordered values:
+
+1. `AI_ERROR`: linked generation stack trace;
+2. `AI_ERROR_WITHOUT_STACK_TRACE`: zero latency without a stack trace, retained
+   as a defensive anomaly;
+3. `USER_DROPPED`: no completed workflow submission;
+4. `COMPLETE`: completed Add Study workflow and posting creation.
+
+A valid provider response with empty field suggestions is not a generation
+error. Error evidence has precedence in the source result category.
+
 - A study can have at most one `COMPLETE` attempt.
 - The completed attempt creates the posting.
 - A completed AI attempt therefore represents a completed study whose final
@@ -58,13 +69,20 @@ Keep these measures distinct:
 
 | Population | Measure |
 |---|---|
-| Completed study | First attempt start to completed-attempt end |
+| Completed attempt | Estimated time on its Study Information form, from when the form appeared until the user continued |
+| Completed attempt | Total elapsed Add Study workflow time through Study Information, Inclusion/Exclusion Criteria, and posting creation |
+| Completed study | First recorded attempt start to completed-attempt end |
 | No completion observed | First attempt start to latest observed attempt start |
 | No completion observed | Latest attempt start to report-run cutoff |
 | No completion observed | First attempt start to report-run cutoff |
 
-These durations are descriptive. They do not measure active effort and do not
-define follow-up eligibility, drop-off, abandonment, or final outcomes.
+Each attempt keeps its own timing values. The analysis does not sum Study
+Information form time or total workflow time across separate attempts for one
+study. Completed-attempt timing distributions exclude incomplete attempts.
+
+These are elapsed durations and may include pauses or inactive browser time.
+They do not measure active attention or effort and do not define follow-up
+eligibility, drop-off, abandonment, or final outcomes.
 
 ## Author experience
 
@@ -156,14 +174,24 @@ These are project-specific descriptive bands, not writing-quality standards.
 ## Suggestion index
 
 For title, purpose, and about, the prompt intends earlier indices to be ranked
-more highly. Index `0` is first.
+more highly. Index `0` is first. Returned order is preserved.
 
-This is prompt intent, not proof of objective quality. Selection is confounded
-with display position and opportunity.
+The audit stores complete generated text and the latest selected text. The
+selected index is derived by exact text matching against the ordered suggestion
+list. Selecting another suggestion before submission replaces the previous
+selection; selection-click history is not captured.
 
-Use selected-at-index divided by offered-at-index. Analyze compensation within
-suggestion kind because specific and generic suggestions have different
-position semantics.
+A field may return fewer than the requested maximum or no suggestions. An empty
+field suggestion list in a valid response is not a generation error.
+
+This is prompt intent, not proof of objective quality. Order was not randomized,
+so selection is confounded with model ranking, display position, and
+opportunity. Index associations do not identify a visual-position effect.
+
+Use selected-at-index divided by offered-at-index. Controlled vocabularies are
+set comparisons rather than ordinary free-text rank analyses. Analyze
+compensation within suggestion kind because generic and specific suggestions
+have separate position semantics.
 
 ## Readability
 
@@ -196,6 +224,13 @@ Equal source size and reported source form an unchanged-source proxy, not proof
 of identical text.
 
 Latency and source associations are descriptive and do not establish causality.
+
+## Audit-write boundary
+
+Latest selection and optional feedback, final saved values, and form timing are
+submitted through separate updates. They are not one atomic capture. Missing or
+stale values in one component therefore do not by themselves prove that another
+component was unavailable.
 
 ## Missing values
 

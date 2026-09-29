@@ -60,6 +60,11 @@ not another.
 
 ## User flow
 
+Every valid Add Study workflow initializes one parent audit attempt before the
+manual or AI-assisted path continues. A manual attempt has no linked generation
+audit. An AI attempt has a linked generation audit, even when generation later
+records an error.
+
 ### Manual authoring
 
 1. The user begins a study-posting attempt.
@@ -72,22 +77,35 @@ AI-suggestion analysis.
 
 ### AI-assisted authoring
 
-1. The user begins an AI authoring attempt.
-2. The user provides source material, such as pasted text or an uploaded file.
-3. The application requests AI assistance.
-4. The AI may return:
-   - text suggestions;
-   - contact values;
-   - lookup IDs;
-   - content-source classification;
-   - compensation text;
-   - a compensation yes/no recommendation.
-5. The user may select, ignore, edit, replace, or clear offered values.
-6. The user may complete the posting or leave the attempt incomplete.
-7. The final submission stores the values saved on completion.
+1. The user enables the optional AI path and supplies nonblank source text.
+2. For an uploaded supported file, the browser extracts text before submission;
+   the backend receives the extracted text, not the file. Direct entry sends
+   the entered text through the same backend boundary.
+3. Client validation prevents submission when source extraction or entry leaves
+   the required text blank.
+4. The application creates a linked generation audit and requests AI
+   assistance.
+5. A valid structured response may contain suggestions for some fields and
+   empty arrays for others. Empty field suggestions are not a generation error.
+6. A provider-call or calling-code exception is recorded as a linked AI error.
+7. The user may select, ignore, edit, replace, or clear offered values.
+8. The user may complete the posting or leave the attempt incomplete.
+9. The final submission stores the values saved on completion.
 
-An AI request can fail or return a result without the attempt completing.
-These states are distinct from completed AI use.
+AI assistance is available once within the posting-creation wizard. An AI
+attempt remains an AI attempt whether suggestions were returned, selected,
+edited, or retained.
+
+The source audit keeps three concepts separate:
+
+| Concept | Meaning |
+|---|---|
+| Source input method | Whether text was entered directly or extracted in the browser from a supported file type |
+| User-reported content source | The user's controlled source category, with optional detail for Other |
+| Model-inferred content source | The model's suggestion from the same allowed category vocabulary |
+
+A provider response with no suggestion for a field is a returned result. It
+must not be classified as an AI-generation failure.
 
 ## Captured audit information
 
@@ -127,12 +145,22 @@ not be combined as though measured at the same time.
 
 ### Workflow timing
 
-- time on the study-information page;
-- total attempt duration;
+- estimated time on the Study Information form during one attempt;
+- total elapsed Add Study workflow time;
 - AI-generation latency.
 
-Recorded durations can include pauses or work outside the application. They do
-not directly measure cognitive effort or efficiency.
+Study Information form time is measured from when the form appears until the
+user continues to the next step. If the same attempt revisits and resubmits that
+form, its submitted intervals are added within that attempt. The analysis does
+not sum form time across separate attempts for a study.
+
+Total workflow time runs from the start of the attempt through submission of
+the Study Information and Inclusion/Exclusion Criteria steps and creation of
+the posting. It is available only for completed attempts.
+
+Both measures are elapsed time and may include pauses or time when the form was
+open but the user was not actively working. They do not directly measure active
+attention, cognitive effort, engagement quality, or efficiency.
 
 ### AI source context
 
@@ -144,14 +172,65 @@ not directly measure cognitive effort or efficiency.
 
 ### AI interaction
 
-- suggestions offered;
-- suggestions or lookup values selected;
-- final saved submission;
+- complete ordered suggestion text;
+- latest suggestions or lookup values selected before submission;
+- complete final saved submission;
 - model metadata;
 - optional user feedback.
 
+For an ordinary text field, clicking another suggestion replaces the previously
+recorded selection. The audit stores the latest selected suggestion, not a
+history of every selection click. The selected text remains separate from the
+editable final value, so selection does not imply unchanged retention.
+
+Generated, selected, and final text are stored as complete strings. The
+zero-based index of a selected text suggestion is derived by exact text matching
+against the ordered generated list.
+
+Show/hide suggestion controls and Read More/Read Less affect only the current
+display. They are not persisted, do not change suggestion order or AI-exposure
+classification, and cannot establish whether a suggestion was read.
+
+Selection and optional feedback, final values, and Study Information form time
+are saved through separate updates rather than one atomic capture. A failed
+update can therefore leave one of these audit components unavailable even when
+another was saved.
+
 The analysis distinguishes offer, selection, final retention, editing,
 replacement, clearing, and unassisted final values.
+
+### Attempt classification
+
+The sanitized source SQL derives the following values.
+
+`ATTEMPT_TYPE` is `AI` when a linked generation audit has a source input method;
+otherwise it is `MANUAL`. This identifies the authoring path, not generation
+success or suggestion adoption.
+
+`ATTEMPT_RESULT` uses this precedence:
+
+1. a linked nonblank stack trace → `AI_ERROR`;
+2. zero generation latency without a stack trace →
+   `AI_ERROR_WITHOUT_STACK_TRACE`;
+3. no completed workflow submission → `USER_DROPPED`;
+4. otherwise → `COMPLETE`.
+
+`AI_ERROR_WITHOUT_STACK_TRACE` is retained as a defensive anomaly category.
+A valid response with empty field suggestions is not an error. Because error
+evidence has precedence, use the exact result category together with completion
+fields when answering whether a posting was created.
+
+`USER_TYPE` is `EXISTED` when the attempt author matched an application
+study-team relationship for that study and `NON_EXISTENT` otherwise. It is a
+study-relative membership classification, not account existence, PI status, AI
+use, or completion.
+
+### Agreement reminder
+
+The source-entry step includes a required client-side reminder linking to the
+study-team agreement. Its per-attempt checkbox is not stored in this Study
+Posting audit. First-login agreement capture is a separate access-control audit
+outside this analytical dataset.
 
 ## Normalized analytical layers
 

@@ -31,6 +31,37 @@ The default is `ID`, which must be nonmissing and unique.
 The file may contain sensitive identifiers, payloads, metadata, and free text.
 It is not a faculty-facing aggregate.
 
+Important source classifications are:
+
+- `ATTEMPT_TYPE`: `AI` when a generation-audit source input method is present;
+  otherwise `MANUAL`;
+- `ATTEMPT_RESULT`, in source-query precedence:
+  `AI_ERROR`, `AI_ERROR_WITHOUT_STACK_TRACE`, `USER_DROPPED`, or `COMPLETE`;
+- `USER_TYPE`: `EXISTED` when the author matched an application study-team
+  relationship for that study; otherwise `NON_EXISTENT`.
+
+`AI_ERROR_WITHOUT_STACK_TRACE` is a defensive anomaly category. Empty
+suggestion arrays in a valid response are not an error.
+
+`SOURCE_TYPE` is the source input method, such as directly entered text or text
+extracted in the browser from a supported file. It is distinct from the
+user-reported and model-inferred content-source categories.
+
+`TIME_SPENT_ON_STUDY_INFO_PAGE_MS` estimates time on the Study Information form
+during one attempt, from display until the user continues. It may include
+pauses. `TIME_TO_FINISH_ADDING_STUDY_MS` measures the completed Add Study
+workflow through the Study Information and Inclusion/Exclusion Criteria steps
+and posting creation. Timing values are not summed across separate attempts.
+
+Generated suggestions, the latest selected suggestions, and final saved values
+are separate complete-text payloads. Selection position is derived later by
+exact text matching against the ordered generated list. Selection-click history
+is not available.
+
+Selection/feedback, final-value, and timing updates are separate writes. One
+component can therefore be unavailable even when another was saved. See the
+[feature and audit model](feature-and-audit-model.md) for lifecycle details.
+
 ## `ai_assistance_metrics.csv`
 
 Grain: one analyzed field from a completed AI attempt.
@@ -118,8 +149,9 @@ failed_rows = 0
 source_rows = analyzed_rows + skipped_rows
 ```
 
-`skipped_rows` are manual or incomplete attempts preserved without study-field
-analysis.
+`skipped_rows` are all source attempts outside the exact
+`ATTEMPT_TYPE = AI` and `ATTEMPT_RESULT = COMPLETE` analysis population. They
+are preserved without study-field analysis.
 
 ## Serialization
 

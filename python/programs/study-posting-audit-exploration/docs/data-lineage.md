@@ -21,6 +21,30 @@ Related references:
 
 ## End-to-end flow
 
+At the product and audit layer:
+
+```text
+Add Study attempt
+        ↓
+parent attempt audit
+        ↓
+optional linked AI generation audit
+        ↓
+provider response or linked generation error
+        ↓
+latest selections and optional feedback
+final saved values
+per-attempt timing
+        ↓
+source SQL projection
+```
+
+Selection/feedback, final values, and timing are separate writes rather than one
+atomic capture. The detailed user and capture flow is owned by the
+[feature and audit model](../../study-posting-audit-report/docs/feature-and-audit-model.md).
+
+The reporting pipeline continues:
+
 ```text
 CSV export or Oracle query
         ↓
@@ -66,10 +90,10 @@ sanitized SQL template and current analysis policy.
 |---|---|---:|---|
 | `ID` | integer | No | `study_posting_audit.id`; unique audit attempt ID |
 | `START_TIME` | datetime | No | Attempt start time from the audit row |
-| `END_TIME` | datetime | Yes | Attempt end time; null for incomplete attempts |
+| `END_TIME` | datetime | Yes | Completed Add Study workflow end; null when completion was not recorded |
 | `ATTEMPT_TYPE` | string | No | `AI` when generation-audit `source_type` is present; otherwise `MANUAL` |
-| `ATTEMPT_RESULT` | string | No | Derived from stack trace, zero latency without stack trace, missing end time, or completion |
-| `USER_TYPE` | string | No | `EXISTED` when the author matched the study-role join; otherwise `NON_EXISTENT` |
+| `ATTEMPT_RESULT` | string | No | Precedence: stack trace → `AI_ERROR`; zero latency without stack trace → `AI_ERROR_WITHOUT_STACK_TRACE`; missing completion → `USER_DROPPED`; otherwise `COMPLETE` |
+| `USER_TYPE` | string | No | `EXISTED` when the author matched an application study-team relationship for this study; otherwise `NON_EXISTENT` |
 | `STUDY_NUM` | string | No | Study identifier used to group attempts |
 | `CREATED_DATE` | datetime | Yes | Created study timestamp joined by study number |
 | `CREATED_BY_ID` | integer | Yes | Application user ID that created the study |
@@ -89,11 +113,11 @@ sanitized SQL template and current analysis policy.
 | `LOGIN_DAYS` | integer | Yes | Distinct calendar days with a successful login in available history |
 | `MIN_LOGIN_TIME` | datetime | Yes | Earliest successful login in available history |
 | `MAX_LOGIN_TIME` | datetime | Yes | Latest successful login in available history |
-| `TIME_SPENT_ON_STUDY_INFO_PAGE_MS` | integer | Yes | Recorded study-information-page duration in milliseconds |
-| `TIME_TO_FINISH_ADDING_STUDY_MS` | integer | Yes | `END_TIME - START_TIME` converted to milliseconds |
+| `TIME_SPENT_ON_STUDY_INFO_PAGE_MS` | integer | Yes | Estimated time on the Study Information form for this attempt; may include pauses |
+| `TIME_TO_FINISH_ADDING_STUDY_MS` | integer | Yes | Completed Add Study workflow time through Study Information, Inclusion/Exclusion Criteria, and posting creation; derived from `END_TIME - START_TIME` |
 | `LATENCY_MS` | integer | Yes | Generation latency from the generation-audit row |
 | `SOURCE_SIZE_CHARS` | integer | Yes | Character size of the generation source |
-| `SOURCE_TYPE` | string | Yes | Generation source type; null for manual attempts under current SQL |
+| `SOURCE_TYPE` | string | Yes | Source input method: direct text or browser-extracted supported file text; null for manual attempts under current SQL |
 | `STUDY_CONTENT_SOURCE` | string | Yes | User-reported content-source lookup display text |
 | `LLM_INFERRED_STUDY_CONTENT_SOURCE` | string | Yes | Model-suggested content-source lookup display text |
 | `STUDY_CONTENT_SOURCE_OTHER_VALUE` | string | Yes | User free text when reported content source is Other |
@@ -112,7 +136,13 @@ sanitized SQL template and current analysis policy.
 - Appointment records use the printable separator `~|APPOINTMENT|~`.
 - Source joins must produce no more than one final row per audit `ID`.
 - Total-created, membership, and login values are query-time context.
-- Recorded durations are not direct measures of active cognitive work.
+- `AI_ERROR_WITHOUT_STACK_TRACE` is a defensive anomaly category.
+- Empty field suggestion arrays in a valid response are not generation errors.
+- Generated, latest-selected, and final text are stored separately as complete
+  strings. Free-text selection index is derived by exact matching; selection
+  history before the latest choice is unavailable.
+- Recorded durations belong to individual attempts, are not summed across
+  attempts for a study, and are not direct measures of active cognitive work.
 
 ## Normalized report files
 
@@ -144,7 +174,7 @@ Important workflow fields:
 | `START_TIME` | Attempt start timestamp |
 | `END_TIME` | Attempt completion timestamp when complete |
 | `ATTEMPT_TYPE` | AI or manual authoring mode |
-| `ATTEMPT_RESULT` | Complete or exact incomplete-result category |
+| `ATTEMPT_RESULT` | Exact source category: `AI_ERROR`, `AI_ERROR_WITHOUT_STACK_TRACE`, `USER_DROPPED`, or `COMPLETE` |
 | `TIME_SPENT_ON_STUDY_INFO_PAGE_MS` | Recorded study-information-page time |
 | `TIME_TO_FINISH_ADDING_STUDY_MS` | Recorded total completed-attempt time |
 
@@ -152,7 +182,7 @@ Important source and content fields:
 
 | Column | Meaning |
 |---|---|
-| `SOURCE_TYPE` | Uploaded or entered source format |
+| `SOURCE_TYPE` | Input method: direct text or browser-extracted supported file text |
 | `STUDY_CONTENT_SOURCE` | User-reported content source |
 | `LLM_INFERRED_STUDY_CONTENT_SOURCE` | Model-inferred content source |
 | `USER_FEEDBACK_COMMENTS` | Self-reported AI-usefulness feedback when supplied |
@@ -300,7 +330,14 @@ The following are query-time values, not historical attempt snapshots:
 Source timing values are milliseconds. Exploration timing summaries convert
 them to minutes.
 
-Incomplete attempts have no total completed-attempt time distribution.
+Study Information form time estimates time from the form appearing until the
+user continues. Total completed-attempt time covers the Add Study workflow
+through Study Information, Inclusion/Exclusion Criteria, and posting creation.
+Both may include pauses or inactive browser time.
+
+Each attempt contributes its own timing. Values are not summed across attempts
+for a study. Incomplete attempts do not contribute to completed-attempt timing
+distributions.
 
 ### Edit intensity
 

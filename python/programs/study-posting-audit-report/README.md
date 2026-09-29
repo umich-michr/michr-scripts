@@ -16,7 +16,17 @@ uv run study-posting-audit-report csv \
   --input /absolute/path/to/source-audit.csv
 ```
 
-From Oracle:
+From Oracle, first copy the sanitized example query to the program's
+ignored default SQL path:
+
+```bash
+cp \
+  python/programs/study-posting-audit-report/input/audit-rows.example.sql \
+  python/programs/study-posting-audit-report/input/audit-rows.sql
+```
+
+Adapt that local copy for the approved reporting environment. With
+`input/audit-rows.sql` in place, `--sql-file` is not required:
 
 ```bash
 export STUDY_POSTING_AUDIT_DB_PASSWORD='...'
@@ -25,6 +35,9 @@ uv run study-posting-audit-report database \
   --dsn "database.example:1521/service" \
   --username reporting_user
 ```
+
+See the [database-source guide](docs/running.md#database-source) for SQL
+template requirements, configuration precedence, and path overrides.
 
 The destination must not already exist. By default it is:
 
