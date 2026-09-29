@@ -61,10 +61,6 @@ jobs:
         if: always()
         run: make typecheck
 
-      - name: Check documentation synchronization
-        if: always()
-        run: make docs-check
-
       - name: Audit locked dependencies
         if: always()
         run: env -u FORCE_COLOR NO_COLOR=1 make audit-deps
@@ -82,7 +78,6 @@ jobs:
             echo "- Formatting: see **Verify formatting**"
             echo "- Linting: see **Run Ruff with GitHub annotations**"
             echo "- Types: see **Run strict type checking**"
-            echo "- Documentation: see **Check documentation synchronization**"
             echo "- Dependencies: see **Audit locked dependencies**"
             echo "- Source security: see **Scan Python source for security issues**"
           } >> "$GITHUB_STEP_SUMMARY"

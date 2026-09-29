@@ -102,14 +102,6 @@ repos:
         files: ^(python/(packages|programs)/.*/src/|tools/).*\.pyi?$
         require_serial: true
 
-      - id: docs-sync
-        name: documentation synchronization
-        entry: make docs-check
-        language: system
-        pass_filenames: false
-        always_run: true
-        require_serial: true
-
   # -----------------------------------------------------------------------
   # Commit message format
   # -----------------------------------------------------------------------

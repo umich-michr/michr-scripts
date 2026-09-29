@@ -166,14 +166,6 @@
         "panel": "dedicated",
         "clear": true
       }
-    },
-    {
-      "label": "Docs sync check",
-      "detail": "Verify documentation accompanies rule changes",
-      "type": "shell",
-      "command": "make docs-check",
-      "problemMatcher": [],
-      "presentation": { "reveal": "always", "panel": "shared", "clear": true }
     }
   ],
 

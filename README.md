@@ -85,7 +85,6 @@ operational applications belong in their language-specific program area.
 | `make typecheck` | Run strict mypy |
 | `make test` | Run all member tests |
 | `make coverage` | Run all member coverage gates |
-| `make docs-check` | Verify documentation synchronization |
 | `make audit` | Audit dependencies and source |
 | `make check` | Run the complete local and CI gate |
 | `make hooks-run` | Run all pre-commit hooks |

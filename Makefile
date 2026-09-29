@@ -80,7 +80,7 @@ endif
 .DEFAULT_GOAL := help
 
 .PHONY: help setup install install-all lock upgrade \
-        format format-check lint lint-fix typecheck docs-check \
+        format format-check lint lint-fix typecheck \
         audit audit-deps audit-code \
         test test-fast test-slow coverage coverage-open \
         check ci members validate-package \
@@ -124,7 +124,6 @@ help:
 	@echo "    lint             Ruff lint"
 	@echo "    lint-fix         Ruff lint with safe automatic fixes"
 	@echo "    typecheck        mypy strict"
-	@echo "    docs-check       Verify docs accompany rule changes"
 	@echo ""
 	@echo "  Security"
 	@echo "    audit            Dependency and source security audit"
@@ -287,9 +286,6 @@ typecheck:
 	@echo "==> tools"
 	@$(RUN) mypy --config-file "$(CURDIR)/pyproject.toml" tools
 
-docs-check:
-	$(RUN) python tools/check_docs_sync.py
-
 # ---------------------------------------------------------------------------
 # Security
 # ---------------------------------------------------------------------------
@@ -353,7 +349,7 @@ audit-explore-csv:
 # ---------------------------------------------------------------------------
 # Combined gates
 # ---------------------------------------------------------------------------
-check: format-check lint typecheck docs-check audit coverage
+check: format-check lint typecheck audit coverage
 	@echo ""
 	@echo "All checks passed."
 

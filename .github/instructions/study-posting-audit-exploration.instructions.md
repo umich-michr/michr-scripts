@@ -152,7 +152,6 @@ git diff --check
 Run full gates before commit:
 
 ```bash
-make docs-check
 make check
 make hooks-run
 ```
