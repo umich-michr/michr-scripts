@@ -584,10 +584,13 @@ _TEMPLATE = """<!doctype html>
 
     <h3>Recorded time for completed attempts</h3>
     <p>
-      Attempt-level timing separates time on the study-information page from
-      total elapsed attempt time. Bars show medians and error bars show the
-      25th through 75th percentiles. Sample sizes, missing counts, and 90th
-      percentiles are available in hover text.
+      <strong>Study Information form time</strong> estimates the time from when
+      that form appeared until the user continued to the next step.
+      <strong>Total Add Study time</strong> covers the full workflow through
+      the Study Information and Inclusion/Exclusion Criteria steps and creation
+      of the posting. Bars show medians, and error bars show the 25th through
+      75th percentiles. Sample sizes, missing counts, and 90th percentiles are
+      available in hover text.
     </p>
     <p class="caution">
       Recorded and elapsed times may include pauses or work outside the
@@ -1559,9 +1562,16 @@ _TEMPLATE = """<!doctype html>
       </p>
       <p class="caution">
         Later positions may have fewer opportunities because not every attempt
-        offers the same number of suggestions. Compare positions with their
-        offered counts; a higher point does not by itself show that position or
-        suggestion quality caused selection.
+        offers the same number of suggestions. Suggestion order was not
+        randomized, so differences by index cannot separate the model's ranking
+        from the effect of appearing earlier or later on the screen. Compare
+        positions with their offered counts; a higher point does not by itself
+        show that position or suggestion quality caused selection.
+      </p>
+      <p>
+        If an author clicked more than one suggestion for the same field, the
+        audit retained only the last selection made before submission. It did
+        not record the earlier sequence of choices.
       </p>
     </div>
   </details>
@@ -2046,7 +2056,9 @@ _TEMPLATE = """<!doctype html>
       creation. An <strong>AI generation that returned a result</strong> is an
       AI generation that did not end in either recorded AI-error category. It
       includes completed and user-dropped attempts. It does not mean that the
-      study posting was created.
+      study posting was created. A returned result may still contain no
+      suggestion for an individual field. That is treated as no offer for that
+      field, not as an AI error.
     </p>
 
     <h3>All AI generations that returned a result</h3>

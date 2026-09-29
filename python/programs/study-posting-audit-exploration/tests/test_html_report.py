@@ -1509,6 +1509,8 @@ def test_html_report_explains_source_context_and_latency() -> None:
     assert "Latency by source-size band for completed AI-assisted attempts" in rendered
     assert "AI generation that returned a result" in rendered
     assert "It does not mean that the study posting was created." in normalized
+    assert "may still contain no suggestion for an individual field" in normalized
+    assert "treated as no offer for that field, not as an AI error" in normalized
     assert (
         "Each completed study contributes its unique completed "
         "AI-assisted attempt once." in normalized
@@ -2193,6 +2195,11 @@ def test_html_report_explains_workflow_timing() -> None:
     assert html.count("How the captured attempts ended") == 1
     assert "Recorded time for completed attempts" in html
     assert "Time from first attempt to study completion" not in html
+    assert "Study Information form time" in normalized_html
+    assert "from when that form appeared" in normalized_html
+    assert "Total Add Study time" in normalized_html
+    assert "Inclusion/Exclusion Criteria steps" in normalized_html
+    assert "creation of the posting" in normalized_html
     assert "25th through 75th percentiles" in normalized_html
     assert "observed minimum through maximum" not in normalized_html
     assert "do not establish author effort, efficiency" in normalized_html
@@ -2225,6 +2232,10 @@ def test_html_report_explains_suggestion_choice_denominators() -> None:
     assert "if a group offered 10 suggestions at index 0" in normalized_html
     assert "its index-0 point is 40%" in normalized_html
     assert "Later positions may have fewer opportunities" in normalized_html
+    assert "Suggestion order was not randomized" in normalized_html
+    assert "appearing earlier or later on the screen" in normalized_html
+    assert "retained only the last selection made before submission" in normalized_html
+    assert "did not record the earlier sequence of choices" in normalized_html
 
     summary = html.index("<summary>How to read the suggestion-choice charts</summary>")
     panel_start = html.rfind('<details class="explanation-panel">', 0, summary)
