@@ -64,8 +64,27 @@ Use one authoritative home per subject.
 | Tabular schema | `tabular-row-sources/docs/schema-format.md` |
 
 Update the owning document when behavior, formulas, classifications, schemas,
-public APIs, CLI contracts, or output inventories change. Link rather than
-duplicating details.
+public APIs, CLI contracts, configuration defaults, business rules,
+eligibility or denominator rules, missing-value policy, user-visible behavior,
+or output inventories change. Link rather than duplicating details.
+
+Review documentation by the contract being changed, not merely by the source
+file path:
+
+1. identify the public, business, analytical, data, or command contract affected;
+2. use the table above, the owning member README, its linked detailed docs,
+   scoped instructions, and focused tests to locate the authoritative document;
+3. update only the authoritative documents whose facts or guidance changed;
+4. leave unrelated documentation untouched;
+5. document stable domain knowledge, goals, rules, formulas, data contracts,
+   interpretation limits, and supported entry points rather than narrating
+   implementation details that readers can obtain from source code;
+6. keep implementation detail only when it is necessary to explain a durable
+   business rule, calculation, data boundary, or user-visible contract.
+
+Do not make documentation changes solely because a nearby implementation file
+changed, and do not reintroduce a hard-coded source-to-document pairing
+registry without explicit authorization.
 
 ## Shared workflow
 
